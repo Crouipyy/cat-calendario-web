@@ -1959,9 +1959,19 @@ function cerrarCalendario() {
         // En modo FiveM, simplemente llamar al callback y dejar que el cliente maneje el cierre
         // NO ocultar el body aquí, el cliente lo hará con SendNUIMessage
         console.log('[Calendario] DEBUG: Modo FiveM detectado, obteniendo resourceName...');
-        const resourceName = GetParentResourceName();
-        console.log('[Calendario] DEBUG: Modo FiveM, resourceName =', resourceName, 'tipo:', typeof resourceName);
+        let resourceName;
+        try {
+            resourceName = GetParentResourceName();
+            console.log('[Calendario] DEBUG: GetParentResourceName() completado, resourceName =', resourceName, 'tipo:', typeof resourceName);
+        } catch (e) {
+            console.error('[Calendario] DEBUG: Error al llamar GetParentResourceName():', e);
+            console.error('[Calendario] DEBUG: Stack trace:', e.stack);
+            resourceName = 'cat_calendario'; // Usar nombre por defecto
+            console.log('[Calendario] DEBUG: Usando resourceName por defecto:', resourceName);
+        }
+        
         console.log('[Calendario] DEBUG: Verificando condiciones... resourceName existe?', !!resourceName, 'es web-mode?', resourceName === 'web-mode', 'es unknown?', resourceName === 'unknown');
+        
         if (resourceName && resourceName !== 'web-mode' && resourceName !== 'unknown') {
             try {
                 const url = `https://${resourceName}/cerrarCalendario`;
