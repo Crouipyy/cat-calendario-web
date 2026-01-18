@@ -1952,10 +1952,28 @@ function cerrarCalendario() {
         document.body.style.display = 'none';
     } else {
         // En modo FiveM, notificar al cliente
-        // IMPORTANTE: Ocultar INMEDIATAMENTE para evitar que el cursor se quede atascado
-        document.body.style.display = 'none';
-        document.body.style.visibility = 'hidden';
-        document.body.style.opacity = '0';
+        // IMPORTANTE: Ocultar INMEDIATAMENTE y de forma agresiva para evitar que el cursor se quede atascado
+        const body = document.body;
+        const html = document.documentElement;
+        
+        // Ocultar todo de forma agresiva
+        body.style.display = 'none';
+        body.style.visibility = 'hidden';
+        body.style.opacity = '0';
+        body.style.pointerEvents = 'none';
+        html.style.display = 'none';
+        html.style.visibility = 'hidden';
+        html.style.opacity = '0';
+        html.style.pointerEvents = 'none';
+        
+        // Ocultar también el contenedor principal si existe
+        const contenedor = document.getElementById('calendario-container');
+        if (contenedor) {
+            contenedor.style.display = 'none';
+            contenedor.style.visibility = 'hidden';
+            contenedor.style.opacity = '0';
+            contenedor.style.pointerEvents = 'none';
+        }
         
         // Llamar al callback de forma inmediata (sin esperar respuesta)
         // Usar fetch con keepalive para asegurar que se envíe

@@ -224,20 +224,30 @@ local function CerrarCalendario()
     if not calendarioAbierto then return end
     
     calendarioAbierto = false
-    -- Desactivar NUI focus INMEDIATAMENTE
-    SetNuiFocus(false, false)
     
-    -- Enviar mensaje al NUI para ocultar
+    -- Activar thread de forzar desactivación por 1 segundo
+    forzarDesactivacionCursor = true
+    tiempoForzarDesactivacion = GetGameTimer() + 1000
+    
+    -- PRIMERO: Enviar mensaje al NUI para ocultar (dar tiempo al NUI a ocultarse)
     SendNUIMessage({action = 'cerrarCalendario'})
     
-    -- Asegurarse de que el focus se desactive con delays cortos
+    -- SEGUNDO: Esperar un frame antes de desactivar el focus (dar tiempo al NUI)
     Citizen.SetTimeout(0, function()
+        SetNuiFocus(false, false)
+    end)
+    
+    -- TERCERO: Forzar desactivación múltiples veces con delays
+    Citizen.SetTimeout(10, function()
         SetNuiFocus(false, false)
     end)
     Citizen.SetTimeout(50, function()
         SetNuiFocus(false, false)
     end)
     Citizen.SetTimeout(100, function()
+        SetNuiFocus(false, false)
+    end)
+    Citizen.SetTimeout(200, function()
         SetNuiFocus(false, false)
     end)
 end
@@ -282,23 +292,32 @@ RegisterNUICallback('cerrarCalendario', function(data, cb)
     -- Marcar como cerrado INMEDIATAMENTE
     calendarioAbierto = false
     
-    -- Desactivar focus INMEDIATAMENTE antes de responder
-    SetNuiFocus(false, false)
+    -- Activar thread de forzar desactivación por 1 segundo
+    forzarDesactivacionCursor = true
+    tiempoForzarDesactivacion = GetGameTimer() + 1000
     
     -- Responder primero para que el NUI sepa que se recibió
     cb('ok')
     
-    -- Enviar mensaje al NUI para ocultar
+    -- PRIMERO: Enviar mensaje al NUI para ocultar (dar tiempo al NUI a ocultarse)
     SendNUIMessage({action = 'cerrarCalendario'})
     
-    -- Forzar desactivación adicional con delays cortos
+    -- SEGUNDO: Esperar un frame antes de desactivar el focus (dar tiempo al NUI)
     Citizen.SetTimeout(0, function()
+        SetNuiFocus(false, false)
+    end)
+    
+    -- TERCERO: Forzar desactivación múltiples veces con delays
+    Citizen.SetTimeout(10, function()
         SetNuiFocus(false, false)
     end)
     Citizen.SetTimeout(50, function()
         SetNuiFocus(false, false)
     end)
     Citizen.SetTimeout(100, function()
+        SetNuiFocus(false, false)
+    end)
+    Citizen.SetTimeout(200, function()
         SetNuiFocus(false, false)
     end)
 end)
@@ -327,8 +346,6 @@ Citizen.CreateThread(function()
         Citizen.Wait(0)
         if calendarioAbierto then
             if IsControlJustReleased(0, 322) or IsControlJustReleased(0, 177) then -- ESC o BACKSPACE
-                -- Desactivar focus INMEDIATAMENTE
-                SetNuiFocus(false, false)
                 CerrarCalendario()
             end
         end
@@ -336,7 +353,24 @@ Citizen.CreateThread(function()
 end)
 
 -- Thread para verificar y forzar desactivación del cursor SOLO cuando se cierra el calendario
--- No ejecutar constantemente para evitar interferencias con otros recursos
+-- Este thread solo se activa temporalmente después de cerrar el calendario
+local forzarDesactivacionCursor = false
+local tiempoForzarDesactivacion = 0
+
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(50)
+        
+        -- Solo forzar desactivación si está activo y dentro del tiempo límite (1 segundo)
+        if forzarDesactivacionCursor and GetGameTimer() < tiempoForzarDesactivacion then
+            if not calendarioAbierto then
+                SetNuiFocus(false, false)
+            end
+        else
+            forzarDesactivacionCursor = false
+        end
+    end
+end)
 
 -- Obtener QBCore
 CreateThread(function()
