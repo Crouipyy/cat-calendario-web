@@ -1,27 +1,27 @@
 {
-  "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/web",
+      "destination": "/nui/index.html"
+    },
+    {
+      "source": "/",
+      "destination": "/nui/index.html"
     }
   ],
-  "routes": [
+  "headers": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/nui/(.*)",
-      "dest": "/nui/$1"
-    },
-    {
-      "src": "/web",
-      "dest": "/nui/index.html"
-    },
-    {
-      "src": "/",
-      "dest": "/nui/index.html"
+      "source": "/nui/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
     }
   ]
 }
