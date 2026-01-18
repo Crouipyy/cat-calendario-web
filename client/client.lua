@@ -203,7 +203,7 @@ local function AbrirCalendario()
     end
     
     VerificarPermisos()
-    SetNuiFocus(true, true)
+    SetNuiFocus(true, false) -- Cambiar el segundo parámetro a false para evitar problemas al cerrar
     calendarioAbierto = true
     
     print('[Calendario] Abriendo calendario, es profesor:', esProfesor)

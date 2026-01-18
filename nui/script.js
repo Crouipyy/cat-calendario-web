@@ -1975,12 +1975,12 @@ function cerrarCalendario() {
             contenedor.style.pointerEvents = 'none';
         }
         
-        // Llamar al callback de forma inmediata (sin esperar respuesta)
-        // Usar fetch con keepalive para asegurar que se envíe
+        // Llamar al callback de forma inmediata usando el sistema nativo de FiveM
+        // Esto es más directo que fetch y debería funcionar mejor
         const resourceName = GetParentResourceName();
         if (resourceName && resourceName !== 'web-mode' && resourceName !== 'unknown') {
-            // Intentar enviar el callback, pero no bloquear si falla
             try {
+                // Usar fetch con keepalive para asegurar que se envíe
                 fetch(`https://${resourceName}/cerrarCalendario`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json; charset=UTF-8'},
@@ -1997,6 +1997,7 @@ function cerrarCalendario() {
                     console.error('[Calendario] Error en fetch al cerrar:', error);
                     // Aunque falle el fetch, el body ya está oculto
                 });
+                
             } catch (e) {
                 console.error('[Calendario] Error al intentar cerrar:', e);
             }
