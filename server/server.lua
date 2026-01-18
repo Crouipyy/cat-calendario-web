@@ -122,12 +122,29 @@ local function SincronizarConWebServer(datos)
     local datosJSON = json.encode(datos)
     local apiUrl = url .. '/api/calendario'
     
-    -- Nota: PerformHttpRequest requiere un callback, pero en Lua no podemos usar async fácilmente
-    -- Por ahora, solo logueamos. En producción, podrías usar un recurso HTTP externo
     print('[Calendario] 🌐 Sincronizando con servidor web: ' .. apiUrl)
+    print('[Calendario] 🌐 Enviando datos del juego a la web...')
     
-    -- Intentar sincronización (requiere un recurso HTTP como httprequest o similar)
-    -- Por ahora, solo guardamos en archivo y el servidor web lo leerá
+    -- Enviar POST a la API web para actualizar el cache
+    -- NOTA: Esto actualiza el cache en memoria de Vercel, no el archivo del repo
+    -- El archivo del repo se actualiza cuando FiveM guarda localmente
+    PerformHttpRequest(apiUrl, function(statusCode, response, headers)
+        if statusCode == 200 then
+            print('[Calendario] ✅ Calendario sincronizado con servidor web correctamente')
+            local datos, error = json.decode(response)
+            if datos and datos.success then
+                print('[Calendario] ✅ Confirmación del servidor web recibida')
+            end
+        else
+            print('[Calendario] ⚠️ Error sincronizando con servidor web. Status:', statusCode)
+            if response then
+                print('[Calendario] ⚠️ Respuesta:', response)
+            end
+        end
+    end, 'POST', datosJSON, {
+        ['Content-Type'] = 'application/json'
+    })
+    
     return true
 end
 
