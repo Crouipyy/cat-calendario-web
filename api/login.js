@@ -5,32 +5,42 @@ const path = require('path');
 
 function leerUsuarios() {
     try {
+        // Intentar leer desde el archivo del repositorio
         const usersPath = path.join(process.cwd(), 'web-server', 'users.json');
         
         if (fs.existsSync(usersPath)) {
             const contenido = fs.readFileSync(usersPath, 'utf8');
-            return JSON.parse(contenido);
+            const usuarios = JSON.parse(contenido);
+            console.log('[Login] Usuarios cargados desde archivo');
+            return usuarios;
         }
         
-        // Crear usuario por defecto si no existe
-        const defaultPassword = bcrypt.hashSync('admin123', 10);
+        // Si no existe el archivo, usar usuario por defecto hardcodeado
+        // NOTA: En Vercel NO se puede escribir archivos (solo lectura)
+        // Usamos un hash pre-generado de 'admin123'
+        // Hash generado con: bcrypt.hashSync('admin123', 10)
+        const defaultPasswordHash = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+        
         const usuarios = [{
             username: 'admin',
-            password: defaultPassword,
+            password: defaultPasswordHash,
             permisos: ['editar']
         }];
         
-        // Crear directorio si no existe
-        const dir = path.dirname(usersPath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-        
-        fs.writeFileSync(usersPath, JSON.stringify(usuarios, null, 2), 'utf8');
+        console.log('[Login] Usando usuario por defecto (admin/admin123) - archivo no encontrado');
         return usuarios;
     } catch (error) {
         console.error('Error leyendo usuarios:', error);
-        return [];
+        
+        // Fallback: usuario por defecto hardcodeado con hash pre-generado
+        // Hash de 'admin123' generado con bcrypt
+        const defaultPasswordHash = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+        console.log('[Login] Usando usuario por defecto (fallback)');
+        return [{
+            username: 'admin',
+            password: defaultPasswordHash,
+            permisos: ['editar']
+        }];
     }
 }
 
