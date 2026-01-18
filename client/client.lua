@@ -203,7 +203,7 @@ local function AbrirCalendario()
     end
     
     VerificarPermisos()
-    SetNuiFocus(true, false) -- Cambiar el segundo parámetro a false para evitar problemas al cerrar
+    SetNuiFocus(true, true) -- Mantener input del juego activo
     calendarioAbierto = true
     
     print('[Calendario] Abriendo calendario, es profesor:', esProfesor)
@@ -233,9 +233,9 @@ local function CerrarCalendario()
     -- SEGUNDO: Marcar como cerrado
     calendarioAbierto = false
     
-    -- TERCERO: Activar thread de forzar desactivación por 1 segundo
+    -- TERCERO: Activar thread de forzar desactivación por 500ms (reducido para no interferir)
     forzarDesactivacionCursor = true
-    tiempoForzarDesactivacion = GetGameTimer() + 1000
+    tiempoForzarDesactivacion = GetGameTimer() + 500
     
     -- CUARTO: Enviar mensaje al NUI para ocultar
     SendNUIMessage({action = 'cerrarCalendario'})
@@ -301,9 +301,9 @@ RegisterNUICallback('cerrarCalendario', function(data, cb)
     -- SEGUNDO: Marcar como cerrado
     calendarioAbierto = false
     
-    -- TERCERO: Activar thread de forzar desactivación por 2 segundos (aumentado)
+    -- TERCERO: Activar thread de forzar desactivación por 500ms (reducido para no interferir)
     forzarDesactivacionCursor = true
-    tiempoForzarDesactivacion = GetGameTimer() + 2000
+    tiempoForzarDesactivacion = GetGameTimer() + 500
     
     -- CUARTO: Responder para que el NUI sepa que se recibió
     cb('ok')
@@ -367,15 +367,19 @@ end)
 -- Este thread solo se activa temporalmente después de cerrar el calendario
 Citizen.CreateThread(function()
     while true do
-        Citizen.Wait(0) -- Verificar cada frame cuando está activo
+        Citizen.Wait(50) -- Verificar cada 50ms (no cada frame para no sobrecargar)
         
-        -- Solo forzar desactivación si está activo y dentro del tiempo límite (2 segundos)
+        -- Solo forzar desactivación si está activo y dentro del tiempo límite (500ms, reducido)
         if forzarDesactivacionCursor and GetGameTimer() < tiempoForzarDesactivacion then
             if not calendarioAbierto then
                 SetNuiFocus(false, false)
             end
         else
-            forzarDesactivacionCursor = false
+            -- Cuando se acaba el tiempo, asegurarse de que el focus esté desactivado una última vez
+            if forzarDesactivacionCursor then
+                SetNuiFocus(false, false)
+                forzarDesactivacionCursor = false
+            end
         end
     end
 end)
