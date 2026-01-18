@@ -1976,24 +1976,9 @@ function cerrarCalendario() {
                 }
             }
             
-            // Intentar también con la función nativa si está disponible
-            console.log('[Calendario] DEBUG: Verificando NATIVE_GET_PARENT_RESOURCE_NAME, existe?', typeof NATIVE_GET_PARENT_RESOURCE_NAME !== 'undefined');
-            if (typeof NATIVE_GET_PARENT_RESOURCE_NAME !== 'undefined' && NATIVE_GET_PARENT_RESOURCE_NAME) {
-                try {
-                    console.log('[Calendario] DEBUG: Llamando función nativa...');
-                    const nativeResult = NATIVE_GET_PARENT_RESOURCE_NAME();
-                    console.log('[Calendario] DEBUG: Resultado función nativa:', nativeResult);
-                    if (nativeResult && nativeResult !== 'web-mode' && nativeResult !== 'unknown') {
-                        resourceName = nativeResult;
-                        console.log('[Calendario] DEBUG: ResourceName de función nativa:', resourceName);
-                    }
-                } catch (e) {
-                    console.log('[Calendario] DEBUG: Error al llamar función nativa:', e);
-                    console.log('[Calendario] DEBUG: Función nativa no disponible, usando valor de URL');
-                }
-            } else {
-                console.log('[Calendario] DEBUG: NATIVE_GET_PARENT_RESOURCE_NAME no está disponible');
-            }
+            // No usar la función nativa ya que está causando bloqueos
+            // El resourceName extraído de la URL es suficiente
+            console.log('[Calendario] DEBUG: Usando resourceName extraído de URL (sin función nativa para evitar bloqueos)');
             
             console.log('[Calendario] DEBUG: ResourceName final:', resourceName);
         } catch (e) {
