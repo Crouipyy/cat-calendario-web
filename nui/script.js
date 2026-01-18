@@ -27,10 +27,11 @@ function detectarModoWeb() {
         return false; // Estamos en FiveM, NO en modo web
     }
     
-    // Si GetParentResourceName está disponible y funciona, estamos en FiveM
+    // Verificar GetParentResourceName de FiveM (sin recursión)
     try {
-        if (typeof GetParentResourceName === 'function') {
-            const resourceName = GetParentResourceName();
+        // Usar window.GetParentResourceName directamente (función nativa de FiveM)
+        if (typeof window.GetParentResourceName === 'function') {
+            const resourceName = window.GetParentResourceName();
             if (resourceName && resourceName !== 'web-mode' && resourceName !== 'unknown') {
                 return false; // Estamos en FiveM
             }
@@ -331,13 +332,27 @@ async function hacerLogin() {
 
 // Función helper para GetParentResourceName (compatibilidad FiveM)
 function GetParentResourceName() {
+    // Verificar primero si estamos en modo web (sin recursión)
+    const url = window.location.href;
+    if (url.includes('cfx-nui')) {
+        // Estamos en FiveM, usar la función nativa
+        if (typeof window.GetParentResourceName === 'function') {
+            return window.GetParentResourceName();
+        }
+        // Si no está disponible, usar el nombre del recurso desde la URL
+        const match = url.match(/cfx-nui-([^/]+)/);
+        if (match) {
+            return match[1];
+        }
+        return 'cat_calendario'; // Nombre por defecto
+    }
+    
+    // Si estamos en modo web
     if (MODO_WEB) {
         return 'web-mode';
     }
-    // En FiveM, esta función está disponible globalmente
-    if (typeof window.GetParentResourceName === 'function') {
-        return window.GetParentResourceName();
-    }
+    
+    // Fallback
     return 'unknown';
 }
 
@@ -1948,22 +1963,8 @@ function cerrarCalendario() {
     }
 }
 
-// Guardar cambios
-document.getElementById('btnGuardar').addEventListener('click', function() {
-    fetch(`https://${GetParentResourceName()}/guardarCambios`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json; charset=UTF-8'},
-        body: JSON.stringify({calendario: calendarioData})
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data === 'ok') {
-            mostrarNotificacion('Cambios guardados correctamente', 'success');
-        } else {
-            mostrarNotificacion('Error al guardar cambios', 'error');
-        }
-    });
-});
+// Guardar cambios - ELIMINADO (duplicado, ya está en guardarCalendario())
+// El botón ya está configurado en inicializarEventos() para llamar a guardarCalendario()
 
 function mostrarNotificacion(mensaje, tipo) {
     const notificacion = document.createElement('div');
