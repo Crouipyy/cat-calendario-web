@@ -471,8 +471,12 @@ function inicializarEventos() {
     // Botón guardar
     const btnGuardar = document.getElementById('btnGuardar');
     if (btnGuardar) {
-        btnGuardar.addEventListener('click', function() {
+        btnGuardar.addEventListener('click', function(e) {
+            e.preventDefault(); // Prevenir comportamiento por defecto
+            e.stopPropagation(); // Evitar propagación del evento
+            console.log('[Calendario] DEBUG: Botón guardar clickeado');
             guardarCalendario();
+            return false; // Asegurar que no se ejecute ningún comportamiento por defecto
         });
     }
     
@@ -2771,12 +2775,16 @@ function cerrarModalClimaHorario() {
 
 // Función separada para guardar
 function guardarCalendario() {
+    console.log('[Calendario] DEBUG: guardarCalendario() llamado');
+    console.log('[Calendario] DEBUG: esProfesor =', esProfesor);
+    console.log('[Calendario] DEBUG: MODO_WEB =', MODO_WEB);
+    
     if (!esProfesor) {
         mostrarNotificacion('No tienes permisos para guardar cambios', 'error');
         return;
     }
     
-    console.log('Enviando datos al servidor:', calendarioData);
+    console.log('[Calendario] DEBUG: Enviando datos al servidor:', calendarioData);
     
     if (MODO_WEB) {
         // Modo web: usar API REST

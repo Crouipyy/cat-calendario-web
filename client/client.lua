@@ -288,6 +288,9 @@ end)
 
 -- Guardar cambios (solo profesores)
 RegisterNUICallback('guardarCambios', function(data, cb)
+    print('[Calendario] DEBUG: RegisterNUICallback("guardarCambios") recibido')
+    print('[Calendario] DEBUG: calendarioAbierto =', calendarioAbierto)
+    
     if not esProfesor or not QBCore then
         QBCore.Functions.Notify("No tienes permisos para editar el calendario", "error")
         cb('error')
@@ -295,12 +298,21 @@ RegisterNUICallback('guardarCambios', function(data, cb)
     end
     
     QBCore.Functions.TriggerCallback('cat_calendario:guardarCalendario', function(resultado)
+        print('[Calendario] DEBUG: Callback guardarCalendario completado, resultado =', resultado)
+        print('[Calendario] DEBUG: calendarioAbierto después de guardar =', calendarioAbierto)
+        
         if resultado then
             QBCore.Functions.Notify("Calendario actualizado correctamente", "success")
+            print('[Calendario] DEBUG: Guardado exitoso, calendario permanece abierto')
+            -- IMPORTANTE: NO cerrar el calendario después de guardar
+            -- El calendario debe permanecer abierto para que el usuario pueda seguir editando
         else
             QBCore.Functions.Notify("Error al guardar el calendario", "error")
         end
+        
+        print('[Calendario] DEBUG: Respondiendo cb con', resultado and 'ok' or 'error')
         cb(resultado and 'ok' or 'error')
+        print('[Calendario] DEBUG: Callback respondido, calendarioAbierto =', calendarioAbierto)
     end, data.calendario)
 end)
 
