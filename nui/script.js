@@ -1951,41 +1951,15 @@ function cerrarCalendario() {
         // En modo web, solo ocultar (no hay que cerrar NUI)
         document.body.style.display = 'none';
     } else {
-        // En modo FiveM, notificar al cliente
-        // IMPORTANTE: Ocultar INMEDIATAMENTE y de forma agresiva para evitar que el cursor se quede atascado
-        const body = document.body;
-        const html = document.documentElement;
-        
-        // Ocultar todo de forma agresiva
-        body.style.display = 'none';
-        body.style.visibility = 'hidden';
-        body.style.opacity = '0';
-        body.style.pointerEvents = 'none';
-        html.style.display = 'none';
-        html.style.visibility = 'hidden';
-        html.style.opacity = '0';
-        html.style.pointerEvents = 'none';
-        
-        // Ocultar también el contenedor principal si existe
-        const contenedor = document.getElementById('calendario-container');
-        if (contenedor) {
-            contenedor.style.display = 'none';
-            contenedor.style.visibility = 'hidden';
-            contenedor.style.opacity = '0';
-            contenedor.style.pointerEvents = 'none';
-        }
-        
-        // Llamar al callback de forma inmediata usando el sistema nativo de FiveM
-        // Esto es más directo que fetch y debería funcionar mejor
+        // En modo FiveM, simplemente llamar al callback y dejar que el cliente maneje el cierre
+        // NO ocultar el body aquí, el cliente lo hará con SendNUIMessage
         const resourceName = GetParentResourceName();
         if (resourceName && resourceName !== 'web-mode' && resourceName !== 'unknown') {
             try {
-                // Usar fetch con keepalive para asegurar que se envíe
                 fetch(`https://${resourceName}/cerrarCalendario`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json; charset=UTF-8'},
-                    body: JSON.stringify({}),
-                    keepalive: true
+                    body: JSON.stringify({})
                 })
                 .then(response => {
                     if (!response.ok) {
@@ -1995,9 +1969,7 @@ function cerrarCalendario() {
                 })
                 .catch(error => {
                     console.error('[Calendario] Error en fetch al cerrar:', error);
-                    // Aunque falle el fetch, el body ya está oculto
                 });
-                
             } catch (e) {
                 console.error('[Calendario] Error al intentar cerrar:', e);
             }

@@ -8,9 +8,6 @@ local enZonaInteraccion = false
 local puntoInteraccionActual = nil
 local blips = {}
 
--- Variables para forzar desactivación del cursor
-local forzarDesactivacionCursor = false
-local tiempoForzarDesactivacion = 0
 
 -- FUNCIÓN: Verificar si el jugador está cerca de algún punto de interacción
 local function EstaCercaDePuntoInteraccion()
@@ -227,32 +224,9 @@ end
 local function CerrarCalendario()
     if not calendarioAbierto then return end
     
-    -- PRIMERO: Desactivar focus INMEDIATAMENTE y de forma sincrónica (ANTES de marcar como cerrado)
-    SetNuiFocus(false, false)
-    
-    -- SEGUNDO: Marcar como cerrado
     calendarioAbierto = false
-    
-    -- TERCERO: Activar thread de forzar desactivación por 2 segundos
-    forzarDesactivacionCursor = true
-    tiempoForzarDesactivacion = GetGameTimer() + 2000
-    
-    -- CUARTO: Enviar mensaje al NUI para ocultar
+    SetNuiFocus(false, false)
     SendNUIMessage({action = 'cerrarCalendario'})
-    
-    -- QUINTO: Forzar desactivación múltiples veces con delays (por si acaso)
-    Citizen.SetTimeout(0, function()
-        SetNuiFocus(false, false)
-    end)
-    Citizen.SetTimeout(10, function()
-        SetNuiFocus(false, false)
-    end)
-    Citizen.SetTimeout(50, function()
-        SetNuiFocus(false, false)
-    end)
-    Citizen.SetTimeout(100, function()
-        SetNuiFocus(false, false)
-    end)
 end
 
 -- Función para traducir clima (agregar si no existe)
@@ -292,45 +266,10 @@ end)
 
 -- Cerrar calendario desde NUI
 RegisterNUICallback('cerrarCalendario', function(data, cb)
-    -- PRIMERO: Desactivar focus INMEDIATAMENTE y de forma sincrónica (ANTES de responder)
-    -- Hacer esto múltiples veces para asegurar que se desactive
-    SetNuiFocus(false, false)
-    SetNuiFocus(false, false)
-    SetNuiFocus(false, false)
-    
-    -- SEGUNDO: Marcar como cerrado
     calendarioAbierto = false
-    
-    -- TERCERO: Activar thread de forzar desactivación por 2 segundos
-    forzarDesactivacionCursor = true
-    tiempoForzarDesactivacion = GetGameTimer() + 2000
-    
-    -- CUARTO: Responder para que el NUI sepa que se recibió
+    SetNuiFocus(false, false)
     cb('ok')
-    
-    -- QUINTO: Enviar mensaje al NUI para ocultar (aunque ya debería estar oculto)
     SendNUIMessage({action = 'cerrarCalendario'})
-    
-    -- SEXTO: Forzar desactivación múltiples veces con delays (por si acaso)
-    Citizen.SetTimeout(0, function()
-        SetNuiFocus(false, false)
-        SetNuiFocus(false, false)
-    end)
-    Citizen.SetTimeout(10, function()
-        SetNuiFocus(false, false)
-    end)
-    Citizen.SetTimeout(50, function()
-        SetNuiFocus(false, false)
-    end)
-    Citizen.SetTimeout(100, function()
-        SetNuiFocus(false, false)
-    end)
-    Citizen.SetTimeout(200, function()
-        SetNuiFocus(false, false)
-    end)
-    Citizen.SetTimeout(500, function()
-        SetNuiFocus(false, false)
-    end)
 end)
 
 -- Guardar cambios (solo profesores)
@@ -363,29 +302,6 @@ Citizen.CreateThread(function()
     end
 end)
 
--- Thread para verificar y forzar desactivación del cursor SOLO cuando se cierra el calendario
--- Este thread solo se activa temporalmente después de cerrar el calendario
-Citizen.CreateThread(function()
-    while true do
-        Citizen.Wait(0) -- Verificar cada frame cuando está activo
-        
-        -- Solo forzar desactivación si está activo y dentro del tiempo límite (2 segundos)
-        if forzarDesactivacionCursor and GetGameTimer() < tiempoForzarDesactivacion then
-            if not calendarioAbierto then
-                -- Forzar desactivación múltiples veces por frame para asegurar que funcione
-                SetNuiFocus(false, false)
-                SetNuiFocus(false, false)
-            end
-        else
-            -- Cuando se acaba el tiempo, asegurarse de que el focus esté desactivado una última vez
-            if forzarDesactivacionCursor then
-                SetNuiFocus(false, false)
-                SetNuiFocus(false, false)
-                forzarDesactivacionCursor = false
-            end
-        end
-    end
-end)
 
 -- Obtener QBCore
 CreateThread(function()
