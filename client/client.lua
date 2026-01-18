@@ -224,12 +224,23 @@ local function CerrarCalendario()
     if not calendarioAbierto then return end
     
     calendarioAbierto = false
-    -- Desactivar NUI focus ANTES de enviar el mensaje
+    -- Desactivar NUI focus INMEDIATAMENTE
     SetNuiFocus(false, false)
+    
+    -- Enviar mensaje al NUI para ocultar
     SendNUIMessage({action = 'cerrarCalendario'})
     
-    -- Asegurarse de que el focus se desactive (por si acaso)
+    -- Asegurarse de que el focus se desactive múltiples veces (por si hay algún delay)
+    Citizen.SetTimeout(0, function()
+        SetNuiFocus(false, false)
+    end)
+    Citizen.SetTimeout(50, function()
+        SetNuiFocus(false, false)
+    end)
     Citizen.SetTimeout(100, function()
+        SetNuiFocus(false, false)
+    end)
+    Citizen.SetTimeout(200, function()
         SetNuiFocus(false, false)
     end)
 end
@@ -271,10 +282,19 @@ end)
 
 -- Cerrar calendario desde NUI
 RegisterNUICallback('cerrarCalendario', function(data, cb)
+    -- Responder primero para que el NUI sepa que se recibió
+    cb('ok')
+    
+    -- Luego cerrar (esto asegura que el callback se complete)
     CerrarCalendario()
+    
     -- Asegurarse de que SetNuiFocus se desactive correctamente
     SetNuiFocus(false, false)
-    cb('ok')
+    
+    -- Forzar desactivación adicional
+    Citizen.SetTimeout(0, function()
+        SetNuiFocus(false, false)
+    end)
 end)
 
 -- Guardar cambios (solo profesores)

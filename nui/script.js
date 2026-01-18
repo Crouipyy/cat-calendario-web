@@ -1955,22 +1955,27 @@ function cerrarCalendario() {
         // IMPORTANTE: Ocultar primero para evitar que el cursor se quede atascado
         document.body.style.display = 'none';
         
-        // Llamar al callback para que el cliente desactive SetNuiFocus
-        fetch(`https://${GetParentResourceName()}/cerrarCalendario`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json; charset=UTF-8'},
-            body: JSON.stringify({})
-        })
-        .then(response => {
-            if (!response.ok) {
-                console.error('[Calendario] Error al cerrar calendario:', response.status);
-            }
-            return response.json();
-        })
-        .catch(error => {
-            console.error('[Calendario] Error en fetch al cerrar:', error);
-            // Aunque falle el fetch, el body ya está oculto
-        });
+        // Llamar al callback de forma inmediata (sin esperar respuesta)
+        // Usar fetch con keepalive para asegurar que se envíe
+        const resourceName = GetParentResourceName();
+        if (resourceName && resourceName !== 'web-mode' && resourceName !== 'unknown') {
+            fetch(`https://${resourceName}/cerrarCalendario`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json; charset=UTF-8'},
+                body: JSON.stringify({}),
+                keepalive: true
+            })
+            .then(response => {
+                if (!response.ok) {
+                    console.error('[Calendario] Error al cerrar calendario:', response.status);
+                }
+                return response.json();
+            })
+            .catch(error => {
+                console.error('[Calendario] Error en fetch al cerrar:', error);
+                // Aunque falle el fetch, el body ya está oculto
+            });
+        }
     }
 }
 
