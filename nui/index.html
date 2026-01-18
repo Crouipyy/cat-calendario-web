@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendario Escolar - Hogwarts</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <div class="header">
+            <h1>📅 Calendario Escolar Hogwarts</h1>
+            <button id="btnCerrar" class="btn-cerrar">✕</button>
+        </div>
+
+        <!-- Selector de Semanas -->
+        <div class="semanas-selector">
+            <button class="btn-semana" data-semana="1">1º Semana</button>
+            <button class="btn-semana" data-semana="2">2º Semana</button>
+        </div>
+
+        <!-- Calendario con scroll -->
+        <div id="calendario" class="calendario">
+            <!-- Se llena dinámicamente con JavaScript -->
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="acciones">
+            <button id="btnGuardar" class="btn-guardar" style="display: none;">💾 Guardar Cambios</button>
+            <button id="btnCerrar2" class="btn-cerrar">Cerrar</button>
+            <button id="btnProbarClimas" class="btn-guardar" style="background: #6f42c1;">🧪 Probar Climas</button> 
+        </div>
+    </div>
+
+    <!-- Modal para editar clase MEJORADO -->
+    <div id="modalClase" class="modal">
+        <div class="modal-content">
+            <h3>📚 Crear/Editar Clase</h3>
+            <form id="formClase">
+                <input type="hidden" id="modalSemana">
+                <input type="hidden" id="modalDia">
+                <input type="hidden" id="modalHorario">
+                <input type="hidden" id="modalClaseIndex">
+                
+                <div class="form-group">
+                    <label>Título de la Clase:</label>
+                    <input type="text" id="tituloClase" maxlength="50" placeholder="Ej: Pociones Avanzadas" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Descripción:</label>
+                    <textarea id="descripcionClase" maxlength="200" placeholder="Descripción de la clase..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Profesor:</label>
+                    <input type="text" id="profesorClase" maxlength="30" placeholder="Nombre del profesor" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Hora dentro de la franja:</label>
+                    <div id="horaExactaClase">
+                        <!-- Se llena dinámicamente con opciones disponibles -->
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Cursos:</label>
+                    <div class="cursos-selector" id="cursosSelector">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+                
+                <div class="modal-botones">
+                    <button type="submit" class="btn-guardar">💾 Guardar Clase</button>
+                    <button type="button" id="btnCancelar" class="btn-cerrar">❌ Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para editar meses -->
+    <div id="modalMeses" class="modal">
+        <div class="modal-content">
+            <h3>📅 Editar Meses</h3>
+            <form id="formMeses">
+                <input type="hidden" id="modalMesesSemana">
+                
+                <div class="form-group">
+                    <label>Selecciona los meses para cada día:</label>
+                    <div id="mesesSelector">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+                
+                <div class="modal-botones">
+                    <button type="submit" class="btn-guardar">💾 Guardar Meses</button>
+                    <button type="button" id="btnCancelarMeses" class="btn-cerrar">❌ Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- NUEVO: Modal para editar clima y eventos -->
+    <div id="modalClima" class="modal">
+        <div class="modal-content">
+            <h3>🌤️ Editar Información del Día</h3>
+            <form id="formClima">
+                <input type="hidden" id="modalClimaSemana">
+                <input type="hidden" id="modalClimaDia">
+                
+                <div class="form-group">
+                    <label>Temperatura para Roleo (°C):</label>
+                    <input type="number" id="temperaturaClima" min="-50" max="50" step="1" required>
+                    <small>Solo para información visual en el calendario</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Fase Lunar:</label>
+                    <select id="lunaClima" required>
+                        <!-- Se llena dinámicamente -->
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Evento Especial:</label>
+                    <select id="eventoClima">
+                        <!-- Se llena dinámicamente -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Información del Sistema de Clima Automático:</label>
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 12px;">
+                        <strong>El clima se controla automáticamente por horarios</strong><br>
+                        • Los profesores pueden usar: <code>/cambiarclima [tipo]</code><br>
+                        • Ver horarios: <code>/horariosclima</code>
+                    </div>
+                </div>
+
+                <div class="modal-botones">
+                    <button type="submit" class="btn-guardar">💾 Guardar Información</button>
+                    <button type="button" id="btnCancelarClima" class="btn-cerrar">❌ Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- NUEVO: Modal para confirmar eliminación -->
+    <div id="modalEliminar" class="modal">
+        <div class="modal-content">
+            <h3>🗑️ Eliminar Clase</h3>
+            <p id="textoEliminar">¿Estás seguro de que quieres eliminar esta clase?</p>
+            
+            <div class="modal-botones">
+                <button id="btnConfirmarEliminar" class="btn-eliminar">✅ Sí, Eliminar</button>
+                <button id="btnCancelarEliminar" class="btn-cerrar">❌ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalEvento" class="modal">
+        <div class="modal-content">
+            <h3>🎪 Crear Evento</h3>
+            <form id="formEvento">
+                <input type="hidden" id="modalEventoSemana">
+                <input type="hidden" id="modalEventoDia">
+                <input type="hidden" id="modalEventoHorario">
+                <input type="hidden" id="modalEventoIndex" value="0">
+                
+                <div class="form-group">
+                    <label>Texto del Evento:</label>
+                    <input type="text" id="textoEvento" maxlength="50" placeholder="Ej: Torneo de Quidditch" required>
+                </div>
+                
+                <!-- NUEVO: Selector de color personalizado para eventos -->
+                <div class="form-group">
+                    <label>Color de Fondo:</label>
+                    <div class="color-selector">
+                        <input type="color" id="colorFondoEventoPicker" value="#fff3cd">
+                        <input type="text" id="colorFondoEventoHex" placeholder="#fff3cd" maxlength="7">
+                        <div class="color-preview" id="colorFondoEventoPreview"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Color de Texto:</label>
+                    <div class="color-selector">
+                        <input type="color" id="colorTextoEventoPicker" value="#000000">
+                        <input type="text" id="colorTextoEventoHex" placeholder="#000000" maxlength="7">
+                        <div class="color-preview" id="colorTextoEventoPreview"></div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="cursivaEvento">
+                        Texto en Cursiva
+                    </label>
+                </div>
+                
+                <div class="modal-botones">
+                    <button type="submit" class="btn-guardar">💾 Guardar Evento</button>
+                    <button type="button" id="btnCancelarEvento" class="btn-cerrar">❌ Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para crear/editar separador -->
+    <div id="modalSeparador" class="modal">
+        <div class="modal-content">
+            <h3>📏 Crear Separador</h3>
+            <form id="formSeparador">
+                <input type="hidden" id="modalSeparadorHorario">
+                
+                <div class="form-group">
+                    <label>Texto del Separador:</label>
+                    <select id="textoSeparador">
+                        <option value="">Sin separador</option>
+                        <!-- Se llena dinámicamente -->
+                    </select>
+                    <small>O escribe uno personalizado:</small>
+                    <input type="text" id="textoSeparadorPersonalizado" maxlength="50" placeholder="Texto personalizado">
+                </div>
+                
+                <!-- MEJORADO: Opción para mostrar hora en el separador -->
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="mostrarHoraSeparador">
+                        Mostrar horario en el separador
+                    </label>
+                    <small>Si se activa, el separador mostrará la franja horaria a la izquierda</small>
+                </div>
+
+                <!-- MEJORADO: Campos para horario personalizado con minutos -->
+                <div class="form-group" id="grupoHorarioPersonalizado" style="display: none;">
+                    <label>Horario Personalizado:</label>
+                    <div class="horario-personalizado">
+                        <div class="hora-input-group">
+                            <label>Hora Inicio:</label>
+                            <input type="time" id="horaInicioSeparador" step="60">
+                        </div>
+                        <div class="hora-input-group">
+                            <label>Hora Fin:</label>
+                            <input type="time" id="horaFinSeparador" step="60">
+                        </div>
+                    </div>
+                    <small>Permite configurar horas y minutos. Deja en blanco para usar la hora de la fila actual.</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Color de Fondo:</label>
+                    <div class="color-selector">
+                        <input type="color" id="colorFondoSeparadorPicker" value="#740001">
+                        <input type="text" id="colorFondoSeparadorHex" placeholder="#740001" maxlength="7">
+                        <div class="color-preview" id="colorFondoPreview"></div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Color de Texto:</label>
+                    <div class="color-selector">
+                        <input type="color" id="colorTextoSeparadorPicker" value="#ffffff">
+                        <input type="text" id="colorTextoSeparadorHex" placeholder="#ffffff" maxlength="7">
+                        <div class="color-preview" id="colorTextoPreview"></div>
+                    </div>
+                </div>
+                
+                <div class="modal-botones">
+                    <button type="submit" class="btn-guardar">💾 Guardar Separador</button>
+                    <button type="button" id="btnCancelarSeparador" class="btn-cerrar">❌ Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para confirmar eliminación de separador -->
+    <div id="modalEliminarSeparador" class="modal">
+        <div class="modal-content">
+            <h3>🗑️ Eliminar Separador</h3>
+            <p id="textoEliminarSeparador">¿Estás seguro de que quieres eliminar este separador?</p>
+            
+            <div class="modal-botones">
+                <button id="btnConfirmarEliminarSeparador" class="btn-eliminar">✅ Sí, Eliminar</button>
+                <button id="btnCancelarEliminarSeparador" class="btn-cerrar">❌ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para editar clima por franja horaria - SIMPLIFICADO -->
+    <div id="modalClimaHorario" class="modal">
+        <div class="modal-content">
+            <h3>🌤️ Editar Clima</h3>
+            <form id="formClimaHorario">
+                <input type="hidden" id="modalClimaHorarioFranja">
+                
+                <div class="form-group">
+                    <label>Franja Horaria:</label>
+                    <div id="infoFranjaHoraria" style="background: #f8f9fa; padding: 10px; border-radius: 5px; font-weight: bold; text-align: center;"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Selecciona el clima:</label>
+                    <select id="climaHorarioSelect" required style="width: 100%; padding: 10px; font-size: 14px;">
+                        <!-- Se llena dinámicamente -->
+                    </select>
+                </div>
+
+                <div class="modal-botones">
+                    <button type="submit" class="btn-guardar">💾 Guardar Clima</button>
+                    <button type="button" id="btnCancelarClimaHorario" class="btn-cerrar">❌ Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalProbarClimas" class="modal">
+        <div class="modal-content">
+            <h3>🧪 Probar Sistema de Climas</h3>
+            
+            <div class="form-group">
+                <label>Selecciona una hora para probar:</label>
+                <input type="time" id="horaPruebaClima" value="" step="60" style="width: 100%; padding: 10px; font-size: 16px;">
+            </div>
+
+            <div class="form-group">
+                <label>Clima que se activaría:</label>
+                <div id="resultadoClimaPrueba" style="background: #f8f9fa; padding: 15px; border-radius: 5px; font-weight: bold; text-align: center; font-size: 18px;">
+                    Selecciona una hora...
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Configuración actual de climas:</label>
+                <div style="background: #e9ecef; padding: 10px; border-radius: 5px; font-size: 12px; max-height: 200px; overflow-y: auto;">
+                    <div id="listaClimasConfigurados">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-botones">
+                <button type="button" id="btnAplicarClimaPrueba" class="btn-guardar">🌤️ Aplicar Este Clima</button>
+                <button type="button" id="btnCerrarProbarClimas" class="btn-cerrar">❌ Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para gestionar barras de estación -->
+    <div id="modalBarrasEstacion" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <h3>🌸 Gestionar Barras de Estación</h3>
+            <input type="hidden" id="modalBarrasSemana">
+            
+            <div class="form-group">
+                <label>Barras actuales para esta semana:</label>
+                <div id="listaBarrasEstacion" style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px; min-height: 60px;">
+                    <!-- Se llena dinámicamente -->
+                </div>
+            </div>
+
+            <div class="form-group">
+                <button type="button" id="btnAgregarBarra" class="btn-guardar" style="width: 100%;">+ Agregar Nueva Barra de Estación</button>
+            </div>
+
+            <div class="modal-botones">
+                <button type="button" id="btnCerrarBarrasEstacion" class="btn-cerrar">❌ Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para editar/crear una barra de estación -->
+    <div id="modalEditarBarra" class="modal">
+        <div class="modal-content">
+            <h3 id="tituloModalBarra">📝 Editar Barra de Estación</h3>
+            <form id="formEditarBarra">
+                <input type="hidden" id="modalBarraIndex">
+                
+                <div class="form-group">
+                    <label>Estación:</label>
+                    <select id="estacionBarra" required style="width: 100%; padding: 10px; font-size: 14px;">
+                        <option value="Primavera">🌸 Primavera (Spring)</option>
+                        <option value="Verano">☀️ Verano (Summer)</option>
+                        <option value="Otoño">🍂 Otoño (Autumn)</option>
+                        <option value="Invierno">❄️ Invierno (Winter)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Día de Inicio (0 = Primer día, 6 = Último día):</label>
+                    <input type="number" id="diaInicioBarra" min="0" max="6" required style="width: 100%; padding: 10px;">
+                </div>
+                
+                <div class="form-group">
+                    <label>Duración (días):</label>
+                    <input type="number" id="diasDuracionBarra" min="1" max="7" required style="width: 100%; padding: 10px;">
+                    <small>Cuántos días consecutivos abarca esta barra</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Vista previa:</label>
+                    <div id="vistaPreviewBarra" style="position: relative; height: 50px; background: #e9ecef; border-radius: 8px; margin-top: 10px; overflow: hidden;">
+                        <div style="position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex;">
+                            <div style="flex: 1; border-right: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px;">D0</div>
+                            <div style="flex: 1; border-right: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px;">D1</div>
+                            <div style="flex: 1; border-right: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px;">D2</div>
+                            <div style="flex: 1; border-right: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px;">D3</div>
+                            <div style="flex: 1; border-right: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px;">D4</div>
+                            <div style="flex: 1; border-right: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px;">D5</div>
+                            <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-size: 10px;">D6</div>
+                        </div>
+                        <div id="barraPreview" style="position: absolute; height: 100%; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; text-shadow: 1px 1px 3px rgba(0,0,0,0.3); transition: all 0.3s;">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-botones">
+                    <button type="submit" class="btn-guardar">💾 Guardar Barra</button>
+                    <button type="button" id="btnCancelarEditarBarra" class="btn-cerrar">❌ Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación para eliminar barra -->
+    <div id="modalConfirmarEliminarBarra" class="modal">
+        <div class="modal-content">
+            <h3>🗑️ Eliminar Barra de Estación</h3>
+            <p id="textoConfirmarEliminarBarra" style="text-align: center; font-size: 16px; margin: 20px 0;">
+                ¿Estás seguro de que quieres eliminar esta barra de estación?
+            </p>
+            
+            <div class="modal-botones">
+                <button id="btnConfirmarEliminarBarra" class="btn-eliminar">✅ Sí, Eliminar</button>
+                <button id="btnCancelarEliminarBarra" class="btn-cerrar">❌ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <!-- Script para modo web (inyectado por Vercel) -->
+    <script>
+        // Detectar si estamos en modo web (si no está definido, lo definimos)
+        if (typeof window.MODO_WEB === 'undefined') {
+            // Si estamos en Vercel o fuera de FiveM
+            if (typeof GetParentResourceName === 'undefined' || window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+                window.MODO_WEB = true;
+                // Obtener URL base automáticamente
+                window.API_URL = window.location.origin;
+            }
+        }
+    </script>
+</body>
+</html>

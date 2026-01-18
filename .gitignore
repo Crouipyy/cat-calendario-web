@@ -1,0 +1,35 @@
+# Dependencias
+node_modules/
+package-lock.json
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Variables de entorno (no subir secretos)
+.env
+.env.local
+
+# Archivos temporales
+*.tmp
+*.temp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Vercel
+.vercel
+
+# Usuarios (opcional - puedes subirlo si quieres)
+# web-server/users.json
+
+# Datos del calendario (opcional - puedes subirlo si quieres)
+# calendario_data.json
+

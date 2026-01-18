@@ -1,0 +1,16 @@
+{
+  "name": "cat-calendario-web",
+  "version": "1.0.0",
+  "description": "Calendario escolar accesible desde internet",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
+  }
+}
+

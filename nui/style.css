@@ -1,0 +1,1086 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    color: #333;
+    overflow-x: hidden;
+}
+
+#app {
+    width: 95vw;
+    height: 90vh;
+    margin: 2vh auto;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Header */
+.header {
+    background: linear-gradient(135deg, #740001, #ae0001);
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 15px 15px 0 0;
+}
+
+.header h1 {
+    font-size: 24px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.btn-cerrar {
+    background: #d3a625;
+    color: #2c2c2c;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-cerrar:hover {
+    background: #b38f20;
+    transform: scale(1.05);
+}
+
+/* Selector de semanas */
+.semanas-selector {
+    display: flex;
+    background: #f0f0f0;
+    padding: 10px;
+    border-bottom: 2px solid #ddd;
+}
+
+.btn-semana {
+    flex: 1;
+    padding: 12px;
+    margin: 0 5px;
+    border: none;
+    border-radius: 8px;
+    background: #372e29;
+    color: #d3a625;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-semana:hover, .btn-semana.activa {
+    background: #d3a625;
+    color: #372e29;
+    transform: translateY(-2px);
+}
+
+/* Calendario */
+.calendario {
+    flex: 1;
+    padding: 15px;
+    overflow: auto;
+    position: relative;
+}
+
+/* Barras de Estación */
+.barras-estacion-container {
+    position: relative;
+    width: 100%;
+    height: 40px;
+    margin-bottom: 10px;
+}
+
+.barra-estacion {
+    position: absolute;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+    z-index: 10;
+}
+
+.barra-estacion:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+}
+
+.barra-estacion small {
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.barra-estacion:hover small {
+    opacity: 1;
+}
+
+.tabla-calendario {
+    width: 100%;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border-left: none !important;
+    border-right: none !important;
+}
+
+.tabla-calendario th {
+    background: #372e29;
+    color: #d3a625;
+    padding: 12px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.tabla-calendario td {
+    border: 1px solid #ddd !important;
+    padding: 8px;
+    vertical-align: top;
+    height: 120px;
+}
+
+.dia-header {
+    background: #740001;
+    color: white;
+    padding: 8px;
+    border-radius: 5px;
+    margin-bottom: 5px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.info-dia {
+    font-size: 11px;
+    margin-bottom: 5px;
+    padding: 3px;
+    background: #f8f9fa;
+    border-radius: 3px;
+    border-left: 3px solid #d3a625;
+}
+
+/* Clases */
+.clase {
+    background: #e8f4fd;
+    border: 1px solid #b3d9ff;
+    border-radius: 4px;
+    padding: 4px 6px;
+    margin: 2px 0;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.clase:hover {
+    background: #d1ecf1;
+    transform: scale(1.02);
+    z-index: 10;
+}
+
+.clase.activa {
+    background: #d4edda;
+    border-color: #c3e6cb;
+}
+
+.clase-vacia {
+    background: #f8f9fa;
+    border: 1px dashed #dee2e6;
+    border-radius: 4px;
+    padding: 4px 6px;
+    margin: 2px 0;
+    font-size: 11px;
+    color: #6c757d;
+    text-align: center;
+    cursor: pointer;
+}
+
+.clase-vacia:hover {
+    background: #e9ecef;
+}
+
+/* Tooltip */
+.tooltip {
+    position: absolute;
+    background: #333;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    z-index: 1000;
+    max-width: 250px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.tooltip h4 {
+    margin: 0 0 5px 0;
+    color: #d3a625;
+}
+
+.tooltip p {
+    margin: 2px 0;
+}
+
+/* Acciones */
+.acciones {
+    padding: 15px;
+    background: #f8f9fa;
+    border-top: 2px solid #ddd;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.btn-guardar {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-guardar:hover {
+    background: #218838;
+    transform: scale(1.05);
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.modal-content {
+    background: white;
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modal h3 {
+    color: #740001;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #372e29;
+}
+
+.form-group input[type="text"],
+.form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input[type="text"]:focus,
+.form-group textarea:focus {
+    border-color: #d3a625;
+    outline: none;
+}
+
+.form-group textarea {
+    height: 80px;
+    resize: vertical;
+}
+
+.form-group input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.modal-botones {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .tabla-calendario {
+        font-size: 12px;
+    }
+    
+    .clase, .clase-vacia {
+        font-size: 10px;
+        padding: 3px 4px;
+    }
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #d3a625;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #b38f20;
+}
+
+.tabla-calendario {
+    width: 100% !important;
+    table-layout: fixed !important;
+}
+
+.tabla-calendario th,
+.tabla-calendario td {
+    min-width: 150px !important;
+    max-width: 200px !important;
+}
+
+.tabla-calendario th:first-child,
+.tabla-calendario td:first-child {
+    width: 120px !important;
+    min-width: 120px !important;
+    max-width: 120px !important;
+}
+
+/* Asegurar que el calendario sea visible */
+.calendario {
+    flex: 1;
+    padding: 15px;
+    overflow: auto;
+    background: white;
+    border-radius: 10px;
+    margin: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+/* Estilos anteriores se mantienen... */
+
+/* NUEVOS ESTILOS MEJORADOS */
+
+/* Scroll para calendario */
+.calendario {
+    flex: 1;
+    padding: 15px;
+    overflow: auto;
+    max-height: 65vh;
+}
+
+.tabla-calendario {
+    min-width: 1200px; /* Para forzar scroll horizontal si es necesario */
+}
+
+/* Encabezado de días con meses */
+.dia-header {
+    background: #740001;
+    color: white;
+    padding: 8px;
+    border-radius: 5px;
+    margin-bottom: 5px;
+    text-align: center;
+    font-weight: bold;
+    position: relative;
+}
+
+.mes-header {
+    background: #372e29;
+    color: #d3a625;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    margin-bottom: 5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.mes-header:hover {
+    background: #d3a625;
+    color: #372e29;
+}
+
+/* Clases con cursos */
+.clase {
+    background: #e8f4fd;
+    border: 1px solid #b3d9ff;
+    border-radius: 4px;
+    padding: 6px 8px;
+    margin: 3px 0;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.clase.activa {
+    background: #d4edda;
+    border-color: #c3e6cb;
+}
+
+.clase-contenido {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.clase-titulo {
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.clase-detalles {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+}
+
+.clase-cursos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-top: 3px;
+}
+
+.curso-badge {
+    background: #d3a625;
+    color: #372e29;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: bold;
+}
+
+.clase-hora {
+    color: #740001;
+    font-weight: bold;
+    font-size: 10px;
+}
+
+/* Selector de cursos en modal */
+.cursos-selector {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.curso-option {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.curso-option:hover {
+    background: #f0f0f0;
+}
+
+.curso-option.selected {
+    background: #d3a625;
+    color: #372e29;
+    border-color: #b38f20;
+}
+
+/* Selector de meses */
+.meses-selector {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.mes-option {
+    padding: 8px 12px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.mes-option:hover {
+    border-color: #d3a625;
+}
+
+.mes-option.selected {
+    background: #d3a625;
+    color: #372e29;
+    border-color: #b38f20;
+    font-weight: bold;
+}
+
+/* Mejoras responsive */
+@media (max-width: 1400px) {
+    .calendario {
+        overflow-x: auto;
+    }
+    
+    .cursos-selector {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Scrollbar personalizado mejorado */
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #d3a625;
+    border-radius: 6px;
+    border: 2px solid #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #b38f20;
+}
+
+/* Tooltip mejorado */
+.tooltip {
+    max-width: 300px;
+}
+
+.tooltip-cursos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-top: 5px;
+}
+/* Estilos anteriores se mantienen... */
+
+/* NUEVOS ESTILOS PARA MÚLTIPLES CLASES */
+
+.clase-container {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-height: 40px;
+}
+
+.clase {
+    background: #e8f4fd;
+    border: 1px solid #b3d9ff;
+    border-radius: 4px;
+    padding: 6px 8px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.clase:hover {
+    background: #d1ecf1;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.clase-contenido {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.clase-titulo {
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.clase-detalles {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+}
+
+.clase-cursos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-top: 3px;
+}
+
+.curso-badge {
+    background: #d3a625;
+    color: #372e29;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: bold;
+}
+
+.curso-badge.todos {
+    background: #740001;
+    color: white;
+}
+
+.clase-hora {
+    color: #740001;
+    font-weight: bold;
+    font-size: 10px;
+}
+
+/* Botón eliminar */
+.btn-eliminar {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-eliminar:hover {
+    background: #c82333;
+    transform: scale(1.05);
+}
+
+/* Mejoras para el selector de cursos */
+.curso-option.todos {
+    background: #740001;
+    color: white;
+}
+
+.curso-option.todos.selected {
+    background: #ae0001;
+    color: white;
+}
+
+/* Context menu para eliminar */
+.context-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    z-index: 10001;
+    min-width: 180px;
+    font-size: 14px;
+}
+
+.context-menu-item {
+    padding: 12px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.context-menu-item:hover {
+    background: #f8f9fa;
+}
+
+.context-menu-item:last-child {
+    border-bottom: none;
+}
+
+.context-menu-item.eliminar {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.context-menu-item.eliminar:hover {
+    background: #ffe6e6;
+}
+
+/* Indicador de múltiples clases */
+.multi-clase-indicator {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #d3a625;
+    color: #372e29;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+/* Mejoras responsive */
+@media (max-width: 1400px) {
+    .clase-container {
+        min-height: 35px;
+    }
+    
+    .clase {
+        font-size: 10px;
+        padding: 4px 6px;
+    }
+}
+
+/* Scroll mejorado */
+.calendario {
+    flex: 1;
+    padding: 15px;
+    overflow: auto;
+    max-height: 65vh;
+    position: relative;
+}
+
+.tabla-calendario td {
+    vertical-align: top;
+    padding: 5px;
+}
+
+.clase-vacia.agregar-mas {
+    background: #e9ecef;
+    border: 2px dashed #6c757d;
+    color: #6c757d;
+    font-style: italic;
+    margin-top: 5px;
+}
+
+.clase-vacia.agregar-mas:hover {
+    background: #d1ecf1;
+    border-color: #17a2b8;
+    color: #17a2b8;
+}
+
+.hora-selector {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    background: white;
+    margin-bottom: 5px;
+    cursor: pointer; /* Siempre mostrar cursor de pointer */
+    transition: all 0.3s ease;
+}
+
+.hora-selector:focus {
+    border-color: #d3a625;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(211, 166, 37, 0.2);
+}
+
+.hora-selector:hover {
+    border-color: #b38f20;
+}
+
+/* Estilo especial para cuando solo hay una opción */
+.hora-selector[style*="background-color: #f8f9fa"] {
+    background: #f8f9fa !important;
+    border-color: #d3a625 !important;
+    color: #372e29;
+    font-weight: bold;
+}
+
+.hora-selector[style*="background-color: #f8f9fa"]:hover {
+    background: #e9ecef !important;
+    border-color: #b38f20 !important;
+}
+
+
+.hora-selector:disabled {
+    background: #f8f9fa;
+    color: #6c757d;
+}
+
+.evento {
+    background: #fff3cd;
+    border: 2px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 6px 8px;
+    margin: 3px 0;
+    font-size: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+}
+
+.evento:hover {
+    transform: scale(1.02);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.evento.cursiva {
+    font-style: italic;
+}
+
+
+/* Estilos para separadores */
+.separador-fila {
+    background: #740001 !important;
+    color: white !important;
+    font-weight: bold !important;
+    font-size: 16px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    height: 50px !important;
+    border-bottom: 2px solid #d3a625 !important;
+    border-top: 2px solid #d3a625 !important;
+}
+
+.separador-fila td {
+    background: inherit !important;
+    color: inherit !important;
+    font-weight: inherit !important;
+    font-size: inherit !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    height: 50px !important;
+    padding: 12px !important;
+    border-left: none !important;
+    border-right: none !important;
+}
+
+.separador-fila:hover {
+    opacity: 0.9;
+    transform: scale(1.01);
+}
+
+.separador-fila.cursiva {
+    font-style: italic;
+}
+
+.separador-fila.con-menu-contexto {
+    box-shadow: 0 0 0 2px #d3a625 !important;
+    position: relative;
+}
+
+.separador-fila.con-menu-contexto::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(211, 166, 37, 0.1);
+    pointer-events: none;
+}
+
+/* Botones para agregar eventos */
+.clase-vacia.agregar-evento {
+    background: #e8f4fd;
+    border: 2px dashed #17a2b8;
+    color: #17a2b8;
+    font-style: italic;
+    margin-top: 3px;
+}
+
+.clase-vacia.agregar-evento:hover {
+    background: #d1ecf1;
+    border-color: #138496;
+    color: #138496;
+}
+
+/* Botón para editar separador */
+.btn-editar-separador {
+    background: rgba(255, 255, 255, 0.3) !important;
+    color: white !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+    font-size: 12px !important;
+    cursor: pointer !important;
+    margin-left: 10px !important;
+    transition: all 0.2s ease !important;
+}
+
+.btn-editar-separador:hover {
+    background: rgba(255, 255, 255, 0.5) !important;
+    border-color: white !important;
+    transform: scale(1.05) !important;
+}
+
+/* Selectores de color personalizados */
+.color-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.color-selector input[type="color"] {
+    width: 50px;
+    height: 40px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.color-selector input[type="text"] {
+    flex: 1;
+    padding: 8px 12px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-family: monospace;
+    font-size: 14px;
+}
+
+.color-preview {
+    width: 40px;
+    height: 40px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    background: #740001;
+}
+
+.color-preview#colorFondoEventoPreview {
+    background: #fff3cd;
+}
+
+.color-preview#colorTextoEventoPreview {
+    background: #000000;
+}
+
+/* Quitar los selectores viejos de color */
+#colorFondoEvento, #colorTextoEvento, 
+#colorFondoSeparador, #colorTextoSeparador {
+    display: none;
+}
+
+/* Contenedor de eventos */
+.evento-container {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-height: 30px;
+}
+
+/* NUEVO: Estilos para horario personalizado en separadores */
+.horario-personalizado {
+    display: flex;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.hora-input-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.hora-input-group label {
+    font-size: 12px;
+    font-weight: bold;
+    color: #372e29;
+    margin-bottom: 0;
+}
+
+.hora-input-group input[type="time"] {
+    padding: 8px 12px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    font-family: monospace;
+    width: 100%;
+}
+
+.hora-input-group input[type="time"]:focus {
+    border-color: #d3a625;
+    outline: none;
+}
+
+/* Mejoras para separadores con hora */
+.separador-fila .btn-editar-separador {
+    background: rgba(255, 255, 255, 0.3) !important;
+    color: white !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+    padding: 4px 8px !important;
+    position: relative;
+    border-radius: 4px !important;
+    font-size: 12px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+}
+
+.separador-fila .btn-editar-separador:hover {
+    background: rgba(255, 255, 255, 0.5) !important;
+    border-color: white !important;
+    transform: scale(1.05) !important;
+}
+
+/* Estilos para el modal de confirmación de eliminación de separador */
+#modalEliminarSeparador .modal-content {
+    max-width: 400px;
+}
+
+#modalEliminarSeparador h3 {
+    color: #dc3545;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+#textoEliminarSeparador {
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+/* Asegurar que el texto de ayuda se vea bien */
+.form-group small {
+    color: #6c757d;
+    font-size: 12px;
+    display: block;
+    margin-top: 5px;
+}
+
+.form-group small[style*="color: #d3a625"] {
+    color: #d3a625 !important;
+    font-weight: bold;
+}
