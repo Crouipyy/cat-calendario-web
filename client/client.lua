@@ -290,24 +290,38 @@ end)
 
 -- Cerrar calendario desde NUI
 RegisterNUICallback('cerrarCalendario', function(data, cb)
-    -- Desactivar focus INMEDIATAMENTE antes de responder
+    -- Marcar como cerrado INMEDIATAMENTE
+    calendarioAbierto = false
+    
+    -- Desactivar focus INMEDIATAMENTE antes de responder (múltiples veces)
+    SetNuiFocus(false, false)
     SetNuiFocus(false, false)
     SetNuiFocus(false, false)
     
     -- Responder primero para que el NUI sepa que se recibió
     cb('ok')
     
-    -- Luego cerrar (esto asegura que el callback se complete)
-    CerrarCalendario()
+    -- Enviar mensaje al NUI para ocultar
+    SendNUIMessage({action = 'cerrarCalendario'})
     
-    -- Asegurarse de que SetNuiFocus se desactive correctamente
-    SetNuiFocus(false, false)
-    
-    -- Forzar desactivación adicional
+    -- Forzar desactivación adicional múltiples veces
     Citizen.SetTimeout(0, function()
+        SetNuiFocus(false, false)
+        SetNuiFocus(false, false)
+    end)
+    Citizen.SetTimeout(10, function()
         SetNuiFocus(false, false)
     end)
     Citizen.SetTimeout(50, function()
+        SetNuiFocus(false, false)
+    end)
+    Citizen.SetTimeout(100, function()
+        SetNuiFocus(false, false)
+    end)
+    Citizen.SetTimeout(200, function()
+        SetNuiFocus(false, false)
+    end)
+    Citizen.SetTimeout(500, function()
         SetNuiFocus(false, false)
     end)
 end)
@@ -350,10 +364,17 @@ end)
 -- Thread adicional para forzar desactivación del cursor cuando el calendario está cerrado
 Citizen.CreateThread(function()
     while true do
-        Citizen.Wait(100) -- Revisar cada 100ms
+        Citizen.Wait(0) -- Revisar cada frame
         if not calendarioAbierto then
             -- Si el calendario está cerrado, forzar desactivación del cursor
             SetNuiFocus(false, false)
+            -- También deshabilitar controles del mouse para forzar el desbloqueo
+            DisableControlAction(0, 1, true) -- LookLeftRight
+            DisableControlAction(0, 2, true) -- LookUpDown
+            DisableControlAction(0, 24, true) -- Attack
+            DisableControlAction(0, 25, true) -- Aim
+            DisableControlAction(0, 142, true) -- MeleeAttackAlternate
+            DisableControlAction(0, 106, true) -- VehicleMouseControlOverride
         end
     end
 end)
