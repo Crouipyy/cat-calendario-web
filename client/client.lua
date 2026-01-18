@@ -223,9 +223,15 @@ end
 local function CerrarCalendario()
     if not calendarioAbierto then return end
     
-    SetNuiFocus(false, false)
     calendarioAbierto = false
+    -- Desactivar NUI focus ANTES de enviar el mensaje
+    SetNuiFocus(false, false)
     SendNUIMessage({action = 'cerrarCalendario'})
+    
+    -- Asegurarse de que el focus se desactive (por si acaso)
+    Citizen.SetTimeout(100, function()
+        SetNuiFocus(false, false)
+    end)
 end
 
 -- Función para traducir clima (agregar si no existe)
@@ -266,6 +272,8 @@ end)
 -- Cerrar calendario desde NUI
 RegisterNUICallback('cerrarCalendario', function(data, cb)
     CerrarCalendario()
+    -- Asegurarse de que SetNuiFocus se desactive correctamente
+    SetNuiFocus(false, false)
     cb('ok')
 end)
 
@@ -294,6 +302,8 @@ Citizen.CreateThread(function()
         if calendarioAbierto then
             if IsControlJustReleased(0, 322) or IsControlJustReleased(0, 177) then -- ESC o BACKSPACE
                 CerrarCalendario()
+                -- Asegurarse de que SetNuiFocus se desactive correctamente
+                SetNuiFocus(false, false)
             end
         end
     end
