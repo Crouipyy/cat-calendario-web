@@ -8,6 +8,10 @@ local enZonaInteraccion = false
 local puntoInteraccionActual = nil
 local blips = {}
 
+-- Variables para forzar desactivación del cursor
+local forzarDesactivacionCursor = false
+local tiempoForzarDesactivacion = 0
+
 -- FUNCIÓN: Verificar si el jugador está cerca de algún punto de interacción
 local function EstaCercaDePuntoInteraccion()
     local playerPed = PlayerPedId()
@@ -223,21 +227,23 @@ end
 local function CerrarCalendario()
     if not calendarioAbierto then return end
     
+    -- PRIMERO: Desactivar focus INMEDIATAMENTE y de forma sincrónica (ANTES de marcar como cerrado)
+    SetNuiFocus(false, false)
+    
+    -- SEGUNDO: Marcar como cerrado
     calendarioAbierto = false
     
-    -- Activar thread de forzar desactivación por 1 segundo
+    -- TERCERO: Activar thread de forzar desactivación por 1 segundo
     forzarDesactivacionCursor = true
     tiempoForzarDesactivacion = GetGameTimer() + 1000
     
-    -- PRIMERO: Enviar mensaje al NUI para ocultar (dar tiempo al NUI a ocultarse)
+    -- CUARTO: Enviar mensaje al NUI para ocultar
     SendNUIMessage({action = 'cerrarCalendario'})
     
-    -- SEGUNDO: Esperar un frame antes de desactivar el focus (dar tiempo al NUI)
+    -- QUINTO: Forzar desactivación múltiples veces con delays (por si acaso)
     Citizen.SetTimeout(0, function()
         SetNuiFocus(false, false)
     end)
-    
-    -- TERCERO: Forzar desactivación múltiples veces con delays
     Citizen.SetTimeout(10, function()
         SetNuiFocus(false, false)
     end)
@@ -245,9 +251,6 @@ local function CerrarCalendario()
         SetNuiFocus(false, false)
     end)
     Citizen.SetTimeout(100, function()
-        SetNuiFocus(false, false)
-    end)
-    Citizen.SetTimeout(200, function()
         SetNuiFocus(false, false)
     end)
 end
@@ -289,25 +292,30 @@ end)
 
 -- Cerrar calendario desde NUI
 RegisterNUICallback('cerrarCalendario', function(data, cb)
-    -- Marcar como cerrado INMEDIATAMENTE
+    -- PRIMERO: Desactivar focus INMEDIATAMENTE y de forma sincrónica (ANTES de responder)
+    -- Hacer esto múltiples veces para asegurar que se desactive
+    SetNuiFocus(false, false)
+    SetNuiFocus(false, false)
+    SetNuiFocus(false, false)
+    
+    -- SEGUNDO: Marcar como cerrado
     calendarioAbierto = false
     
-    -- Activar thread de forzar desactivación por 1 segundo
+    -- TERCERO: Activar thread de forzar desactivación por 2 segundos (aumentado)
     forzarDesactivacionCursor = true
-    tiempoForzarDesactivacion = GetGameTimer() + 1000
+    tiempoForzarDesactivacion = GetGameTimer() + 2000
     
-    -- Responder primero para que el NUI sepa que se recibió
+    -- CUARTO: Responder para que el NUI sepa que se recibió
     cb('ok')
     
-    -- PRIMERO: Enviar mensaje al NUI para ocultar (dar tiempo al NUI a ocultarse)
+    -- QUINTO: Enviar mensaje al NUI para ocultar (aunque ya debería estar oculto)
     SendNUIMessage({action = 'cerrarCalendario'})
     
-    -- SEGUNDO: Esperar un frame antes de desactivar el focus (dar tiempo al NUI)
+    -- SEXTO: Forzar desactivación múltiples veces con delays (por si acaso)
     Citizen.SetTimeout(0, function()
         SetNuiFocus(false, false)
+        SetNuiFocus(false, false)
     end)
-    
-    -- TERCERO: Forzar desactivación múltiples veces con delays
     Citizen.SetTimeout(10, function()
         SetNuiFocus(false, false)
     end)
@@ -318,6 +326,9 @@ RegisterNUICallback('cerrarCalendario', function(data, cb)
         SetNuiFocus(false, false)
     end)
     Citizen.SetTimeout(200, function()
+        SetNuiFocus(false, false)
+    end)
+    Citizen.SetTimeout(500, function()
         SetNuiFocus(false, false)
     end)
 end)
@@ -354,14 +365,11 @@ end)
 
 -- Thread para verificar y forzar desactivación del cursor SOLO cuando se cierra el calendario
 -- Este thread solo se activa temporalmente después de cerrar el calendario
-local forzarDesactivacionCursor = false
-local tiempoForzarDesactivacion = 0
-
 Citizen.CreateThread(function()
     while true do
-        Citizen.Wait(50)
+        Citizen.Wait(0) -- Verificar cada frame cuando está activo
         
-        -- Solo forzar desactivación si está activo y dentro del tiempo límite (1 segundo)
+        -- Solo forzar desactivación si está activo y dentro del tiempo límite (2 segundos)
         if forzarDesactivacionCursor and GetGameTimer() < tiempoForzarDesactivacion then
             if not calendarioAbierto then
                 SetNuiFocus(false, false)
