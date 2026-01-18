@@ -1952,29 +1952,36 @@ function cerrarCalendario() {
         document.body.style.display = 'none';
     } else {
         // En modo FiveM, notificar al cliente
-        // IMPORTANTE: Ocultar primero para evitar que el cursor se quede atascado
+        // IMPORTANTE: Ocultar INMEDIATAMENTE para evitar que el cursor se quede atascado
         document.body.style.display = 'none';
+        document.body.style.visibility = 'hidden';
+        document.body.style.opacity = '0';
         
         // Llamar al callback de forma inmediata (sin esperar respuesta)
         // Usar fetch con keepalive para asegurar que se envíe
         const resourceName = GetParentResourceName();
         if (resourceName && resourceName !== 'web-mode' && resourceName !== 'unknown') {
-            fetch(`https://${resourceName}/cerrarCalendario`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json; charset=UTF-8'},
-                body: JSON.stringify({}),
-                keepalive: true
-            })
-            .then(response => {
-                if (!response.ok) {
-                    console.error('[Calendario] Error al cerrar calendario:', response.status);
-                }
-                return response.json();
-            })
-            .catch(error => {
-                console.error('[Calendario] Error en fetch al cerrar:', error);
-                // Aunque falle el fetch, el body ya está oculto
-            });
+            // Intentar enviar el callback, pero no bloquear si falla
+            try {
+                fetch(`https://${resourceName}/cerrarCalendario`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json; charset=UTF-8'},
+                    body: JSON.stringify({}),
+                    keepalive: true
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        console.error('[Calendario] Error al cerrar calendario:', response.status);
+                    }
+                    return response.json();
+                })
+                .catch(error => {
+                    console.error('[Calendario] Error en fetch al cerrar:', error);
+                    // Aunque falle el fetch, el body ya está oculto
+                });
+            } catch (e) {
+                console.error('[Calendario] Error al intentar cerrar:', e);
+            }
         }
     }
 }

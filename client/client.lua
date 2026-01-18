@@ -224,7 +224,9 @@ local function CerrarCalendario()
     if not calendarioAbierto then return end
     
     calendarioAbierto = false
-    -- Desactivar NUI focus INMEDIATAMENTE
+    -- Desactivar NUI focus INMEDIATAMENTE (múltiples veces para asegurar)
+    SetNuiFocus(false, false)
+    SetNuiFocus(false, false)
     SetNuiFocus(false, false)
     
     -- Enviar mensaje al NUI para ocultar
@@ -234,6 +236,9 @@ local function CerrarCalendario()
     Citizen.SetTimeout(0, function()
         SetNuiFocus(false, false)
     end)
+    Citizen.SetTimeout(10, function()
+        SetNuiFocus(false, false)
+    end)
     Citizen.SetTimeout(50, function()
         SetNuiFocus(false, false)
     end)
@@ -241,6 +246,9 @@ local function CerrarCalendario()
         SetNuiFocus(false, false)
     end)
     Citizen.SetTimeout(200, function()
+        SetNuiFocus(false, false)
+    end)
+    Citizen.SetTimeout(500, function()
         SetNuiFocus(false, false)
     end)
 end
@@ -282,6 +290,10 @@ end)
 
 -- Cerrar calendario desde NUI
 RegisterNUICallback('cerrarCalendario', function(data, cb)
+    -- Desactivar focus INMEDIATAMENTE antes de responder
+    SetNuiFocus(false, false)
+    SetNuiFocus(false, false)
+    
     -- Responder primero para que el NUI sepa que se recibió
     cb('ok')
     
@@ -293,6 +305,9 @@ RegisterNUICallback('cerrarCalendario', function(data, cb)
     
     -- Forzar desactivación adicional
     Citizen.SetTimeout(0, function()
+        SetNuiFocus(false, false)
+    end)
+    Citizen.SetTimeout(50, function()
         SetNuiFocus(false, false)
     end)
 end)
@@ -321,10 +336,24 @@ Citizen.CreateThread(function()
         Citizen.Wait(0)
         if calendarioAbierto then
             if IsControlJustReleased(0, 322) or IsControlJustReleased(0, 177) then -- ESC o BACKSPACE
+                -- Desactivar focus INMEDIATAMENTE
+                SetNuiFocus(false, false)
+                SetNuiFocus(false, false)
                 CerrarCalendario()
                 -- Asegurarse de que SetNuiFocus se desactive correctamente
                 SetNuiFocus(false, false)
             end
+        end
+    end
+end)
+
+-- Thread adicional para forzar desactivación del cursor cuando el calendario está cerrado
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(100) -- Revisar cada 100ms
+        if not calendarioAbierto then
+            -- Si el calendario está cerrado, forzar desactivación del cursor
+            SetNuiFocus(false, false)
         end
     end
 end)
