@@ -233,9 +233,9 @@ local function CerrarCalendario()
     -- SEGUNDO: Marcar como cerrado
     calendarioAbierto = false
     
-    -- TERCERO: Activar thread de forzar desactivación por 500ms (reducido para no interferir)
+    -- TERCERO: Activar thread de forzar desactivación por 2 segundos
     forzarDesactivacionCursor = true
-    tiempoForzarDesactivacion = GetGameTimer() + 500
+    tiempoForzarDesactivacion = GetGameTimer() + 2000
     
     -- CUARTO: Enviar mensaje al NUI para ocultar
     SendNUIMessage({action = 'cerrarCalendario'})
@@ -301,9 +301,9 @@ RegisterNUICallback('cerrarCalendario', function(data, cb)
     -- SEGUNDO: Marcar como cerrado
     calendarioAbierto = false
     
-    -- TERCERO: Activar thread de forzar desactivación por 500ms (reducido para no interferir)
+    -- TERCERO: Activar thread de forzar desactivación por 2 segundos
     forzarDesactivacionCursor = true
-    tiempoForzarDesactivacion = GetGameTimer() + 500
+    tiempoForzarDesactivacion = GetGameTimer() + 2000
     
     -- CUARTO: Responder para que el NUI sepa que se recibió
     cb('ok')
@@ -367,16 +367,19 @@ end)
 -- Este thread solo se activa temporalmente después de cerrar el calendario
 Citizen.CreateThread(function()
     while true do
-        Citizen.Wait(50) -- Verificar cada 50ms (no cada frame para no sobrecargar)
+        Citizen.Wait(0) -- Verificar cada frame cuando está activo
         
-        -- Solo forzar desactivación si está activo y dentro del tiempo límite (500ms, reducido)
+        -- Solo forzar desactivación si está activo y dentro del tiempo límite (2 segundos)
         if forzarDesactivacionCursor and GetGameTimer() < tiempoForzarDesactivacion then
             if not calendarioAbierto then
+                -- Forzar desactivación múltiples veces por frame para asegurar que funcione
+                SetNuiFocus(false, false)
                 SetNuiFocus(false, false)
             end
         else
             -- Cuando se acaba el tiempo, asegurarse de que el focus esté desactivado una última vez
             if forzarDesactivacionCursor then
+                SetNuiFocus(false, false)
                 SetNuiFocus(false, false)
                 forzarDesactivacionCursor = false
             end
