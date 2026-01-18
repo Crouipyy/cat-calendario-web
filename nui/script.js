@@ -1958,18 +1958,23 @@ function cerrarCalendario() {
     } else {
         // En modo FiveM, simplemente llamar al callback y dejar que el cliente maneje el cierre
         // NO ocultar el body aquí, el cliente lo hará con SendNUIMessage
+        console.log('[Calendario] DEBUG: Modo FiveM detectado, obteniendo resourceName...');
         const resourceName = GetParentResourceName();
-        console.log('[Calendario] DEBUG: Modo FiveM, resourceName =', resourceName);
+        console.log('[Calendario] DEBUG: Modo FiveM, resourceName =', resourceName, 'tipo:', typeof resourceName);
+        console.log('[Calendario] DEBUG: Verificando condiciones... resourceName existe?', !!resourceName, 'es web-mode?', resourceName === 'web-mode', 'es unknown?', resourceName === 'unknown');
         if (resourceName && resourceName !== 'web-mode' && resourceName !== 'unknown') {
             try {
-                console.log('[Calendario] DEBUG: Enviando fetch a', `https://${resourceName}/cerrarCalendario`);
-                fetch(`https://${resourceName}/cerrarCalendario`, {
+                const url = `https://${resourceName}/cerrarCalendario`;
+                console.log('[Calendario] DEBUG: Enviando fetch a', url);
+                const fetchPromise = fetch(url, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json; charset=UTF-8'},
                     body: JSON.stringify({})
-                })
+                });
+                console.log('[Calendario] DEBUG: Fetch iniciado, esperando respuesta...');
+                fetchPromise
                 .then(response => {
-                    console.log('[Calendario] DEBUG: Respuesta recibida, status =', response.status);
+                    console.log('[Calendario] DEBUG: Respuesta recibida, status =', response.status, 'ok =', response.ok);
                     if (!response.ok) {
                         console.error('[Calendario] Error al cerrar calendario:', response.status);
                     }
@@ -1980,12 +1985,14 @@ function cerrarCalendario() {
                 })
                 .catch(error => {
                     console.error('[Calendario] DEBUG: Error en fetch:', error);
+                    console.error('[Calendario] DEBUG: Stack trace:', error.stack);
                 });
             } catch (e) {
-                console.error('[Calendario] DEBUG: Error al intentar cerrar:', e);
+                console.error('[Calendario] DEBUG: Error al intentar cerrar (catch):', e);
+                console.error('[Calendario] DEBUG: Stack trace:', e.stack);
             }
         } else {
-            console.log('[Calendario] DEBUG: resourceName inválido, no se puede cerrar');
+            console.log('[Calendario] DEBUG: resourceName inválido, no se puede cerrar. resourceName =', resourceName);
         }
     }
 }
