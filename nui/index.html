@@ -439,8 +439,7 @@
         </div>
     </div>
 
-    <script src="/nui/script.js"></script>
-    <!-- Script para modo web (inyectado por Vercel) -->
+    <!-- Script para modo web (debe ejecutarse ANTES de script.js) -->
     <script>
         // Detectar si estamos en modo web (si no está definido, lo definimos)
         if (typeof window.MODO_WEB === 'undefined') {
@@ -449,8 +448,13 @@
                 window.MODO_WEB = true;
                 // Obtener URL base automáticamente
                 window.API_URL = window.location.origin;
+                console.log('[HTML] Modo web detectado, API_URL:', window.API_URL);
+            } else {
+                window.MODO_WEB = false;
+                console.log('[HTML] Modo FiveM detectado');
             }
         }
     </script>
+    <script src="/nui/script.js"></script>
 </body>
 </html>

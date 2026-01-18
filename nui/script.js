@@ -8,11 +8,43 @@ let claseParaEliminar = null;
 let separadorParaEditar = null;
 let separadorParaEliminar = null;
 
-// Detectar modo web
-const MODO_WEB = window.MODO_WEB || false;
-const API_URL = window.API_URL || '';
+// Detectar modo web automáticamente
+function detectarModoWeb() {
+    // Si window.MODO_WEB está definido explícitamente, usarlo
+    if (typeof window.MODO_WEB !== 'undefined') {
+        return window.MODO_WEB;
+    }
+    
+    // Detectar automáticamente: si no estamos en FiveM, estamos en web
+    // FiveM tiene GetParentResourceName disponible
+    if (typeof GetParentResourceName === 'undefined' || 
+        window.location.protocol === 'http:' || 
+        window.location.protocol === 'https:') {
+        // Estamos en un navegador web
+        return true;
+    }
+    
+    return false;
+}
+
+function obtenerAPIURL() {
+    // Si está definido explícitamente, usarlo
+    if (window.API_URL && window.API_URL !== '') {
+        return window.API_URL;
+    }
+    
+    // Obtener automáticamente desde la URL actual
+    return window.location.origin;
+}
+
+const MODO_WEB = detectarModoWeb();
+const API_URL = obtenerAPIURL();
 let tokenAutenticacion = localStorage.getItem('calendario_token') || null;
 let usuarioActual = null;
+
+// Log para debugging
+console.log('[Calendario] Modo Web detectado:', MODO_WEB);
+console.log('[Calendario] API URL:', API_URL);
 
 // Configuración por defecto (para modo web)
 const configPorDefecto = {
@@ -92,12 +124,21 @@ const configPorDefecto = {
 // Función para cargar datos desde API (modo web)
 async function cargarDatosDesdeAPI() {
     try {
+        console.log('[Calendario] Cargando datos desde:', `${API_URL}/api/calendario`);
+        
         const response = await fetch(`${API_URL}/api/calendario`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log('[Calendario] Datos recibidos:', data);
         
         if (data.success && data.calendario) {
             calendarioData = data.calendario;
         } else {
+            console.warn('[Calendario] No hay datos del calendario, usando estructura vacía');
             calendarioData = { semanas: [], meses: [], separadores: {}, climasHorario: {} };
         }
         
@@ -125,8 +166,10 @@ async function cargarDatosDesdeAPI() {
             }
         }
         
-        // Mostrar calendario
+        // Asegurar que el body esté visible
         document.body.style.display = 'block';
+        
+        // Mostrar calendario
         mostrarCalendario();
         
         // Mostrar botón guardar solo si es profesor
@@ -138,9 +181,28 @@ async function cargarDatosDesdeAPI() {
         // Mostrar botón de login si no está autenticado
         mostrarLoginSiNecesario();
         
+        console.log('[Calendario] Calendario cargado correctamente');
+        
     } catch (error) {
         console.error('Error cargando datos desde API:', error);
-        mostrarNotificacion('Error al cargar el calendario', 'error');
+        console.error('Stack:', error.stack);
+        
+        // Mostrar mensaje de error más detallado
+        const errorMsg = error.message || 'Error desconocido';
+        mostrarNotificacion(`Error al cargar el calendario: ${errorMsg}`, 'error');
+        
+        // Mostrar el body con mensaje de error
+        document.body.style.display = 'block';
+        document.body.innerHTML = `
+            <div style="padding: 40px; text-align: center; font-family: Arial, sans-serif;">
+                <h2 style="color: #dc3545;">Error al cargar el calendario</h2>
+                <p style="color: #666; margin: 20px 0;">${errorMsg}</p>
+                <p style="color: #999; font-size: 12px;">Revisa la consola del navegador (F12) para más detalles.</p>
+                <button onclick="location.reload()" style="padding: 10px 20px; background: #740001; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px;">
+                    Recargar Página
+                </button>
+            </div>
+        `;
     }
 }
 
@@ -244,14 +306,27 @@ function GetParentResourceName() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('NUI: Interfaz cargada, inicializando eventos...');
     console.log('Modo Web:', MODO_WEB);
-    inicializarEventos();
+    console.log('API URL:', API_URL);
     
-    if (MODO_WEB) {
-        // En modo web, cargar datos desde API
-        cargarDatosDesdeAPI();
-    } else {
-        // En modo FiveM, ocultar hasta recibir mensaje
-        document.body.style.display = 'none';
+    try {
+        inicializarEventos();
+        
+        if (MODO_WEB) {
+            // En modo web, mostrar el body inmediatamente y cargar datos
+            document.body.style.display = 'block';
+            // Cargar datos desde API
+            cargarDatosDesdeAPI().catch(error => {
+                console.error('Error cargando datos:', error);
+                mostrarNotificacion('Error al cargar el calendario. Verifica la consola para más detalles.', 'error');
+            });
+        } else {
+            // En modo FiveM, ocultar hasta recibir mensaje
+            document.body.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error en inicialización:', error);
+        document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><h2>Error al cargar el calendario</h2><p>Revisa la consola para más detalles.</p></div>';
+        document.body.style.display = 'block';
     }
 });
 
