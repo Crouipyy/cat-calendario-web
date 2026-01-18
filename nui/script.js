@@ -1959,14 +1959,40 @@ function cerrarCalendario() {
         // En modo FiveM, simplemente llamar al callback y dejar que el cliente maneje el cierre
         // NO ocultar el body aquí, el cliente lo hará con SendNUIMessage
         console.log('[Calendario] DEBUG: Modo FiveM detectado, obteniendo resourceName...');
-        let resourceName;
+        let resourceName = 'cat_calendario'; // Valor por defecto
         try {
-            resourceName = GetParentResourceName();
-            console.log('[Calendario] DEBUG: GetParentResourceName() completado, resourceName =', resourceName, 'tipo:', typeof resourceName);
+            console.log('[Calendario] DEBUG: Intentando llamar GetParentResourceName()...');
+            const url = window.location.href;
+            console.log('[Calendario] DEBUG: URL actual:', url);
+            
+            // Extraer directamente de la URL sin usar GetParentResourceName()
+            if (url.includes('cfx-nui')) {
+                const match = url.match(/cfx-nui-([^/]+)/);
+                if (match && match[1]) {
+                    resourceName = match[1];
+                    console.log('[Calendario] DEBUG: ResourceName extraído de URL:', resourceName);
+                } else {
+                    console.log('[Calendario] DEBUG: No se pudo extraer de URL, usando por defecto');
+                }
+            }
+            
+            // Intentar también con la función nativa si está disponible
+            if (NATIVE_GET_PARENT_RESOURCE_NAME) {
+                try {
+                    const nativeResult = NATIVE_GET_PARENT_RESOURCE_NAME();
+                    if (nativeResult && nativeResult !== 'web-mode' && nativeResult !== 'unknown') {
+                        resourceName = nativeResult;
+                        console.log('[Calendario] DEBUG: ResourceName de función nativa:', resourceName);
+                    }
+                } catch (e) {
+                    console.log('[Calendario] DEBUG: Función nativa no disponible, usando valor de URL');
+                }
+            }
+            
+            console.log('[Calendario] DEBUG: ResourceName final:', resourceName);
         } catch (e) {
-            console.error('[Calendario] DEBUG: Error al llamar GetParentResourceName():', e);
+            console.error('[Calendario] DEBUG: Error al obtener resourceName:', e);
             console.error('[Calendario] DEBUG: Stack trace:', e.stack);
-            resourceName = 'cat_calendario'; // Usar nombre por defecto
             console.log('[Calendario] DEBUG: Usando resourceName por defecto:', resourceName);
         }
         
