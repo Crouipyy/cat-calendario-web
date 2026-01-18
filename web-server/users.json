@@ -1,7 +1,7 @@
 [
   {
     "username": "admin",
-    "password": "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+    "password": "$2b$10$BS0a7s6jMnZQ98jGBv/iBew/YBCReX6Wgx77IKpBW4KVA/qKRBGLe",
     "permisos": ["editar"]
   }
 ]

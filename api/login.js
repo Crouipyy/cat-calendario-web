@@ -65,21 +65,33 @@ export default async function handler(req, res) {
             }
 
             const users = leerUsuarios();
+            console.log('[Login] Usuarios disponibles:', users.map(u => u.username));
+            
             const usuario = users.find(u => u.username === username);
 
             if (!usuario) {
+                console.log('[Login] Usuario no encontrado:', username);
                 return res.status(401).json({
                     error: 'Usuario o contraseña incorrectos'
                 });
             }
 
+            console.log('[Login] Usuario encontrado:', usuario.username);
+            console.log('[Login] Comparando contraseña...');
+            
             const passwordValido = await bcrypt.compare(password, usuario.password);
+            
+            console.log('[Login] Resultado de comparación:', passwordValido);
+            console.log('[Login] Hash almacenado:', usuario.password.substring(0, 20) + '...');
 
             if (!passwordValido) {
+                console.log('[Login] Contraseña incorrecta para usuario:', username);
                 return res.status(401).json({
                     error: 'Usuario o contraseña incorrectos'
                 });
             }
+            
+            console.log('[Login] Autenticación exitosa para:', username);
 
             // Generar token
             const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_seguro_cambiar_en_produccion';
