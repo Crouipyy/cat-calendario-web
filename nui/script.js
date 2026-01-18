@@ -543,6 +543,16 @@ function inicializarEventos() {
             cerrarContextMenu();
             console.log('[Calendario] DEBUG: Body oculto, context menu cerrado');
         }
+        
+        if (data.action === 'actualizarCalendario') {
+            console.log('[Calendario] DEBUG: Mensaje "actualizarCalendario" recibido del cliente');
+            // Actualizar datos sin cerrar el calendario
+            if (data.calendario) {
+                calendarioData = data.calendario;
+                mostrarCalendario();
+                console.log('[Calendario] DEBUG: Calendario actualizado sin cerrar');
+            }
+        }
     });
 }
 
@@ -2829,9 +2839,12 @@ function guardarCalendario() {
             return response.json();
         })
         .then(data => {
-            console.log('Respuesta del servidor:', data);
+            console.log('[Calendario] DEBUG: Respuesta del servidor al guardar:', data);
             if (data === 'ok' || data === true) {
                 mostrarNotificacion('✅ Cambios guardados correctamente', 'success');
+                console.log('[Calendario] DEBUG: Guardado exitoso, calendario permanece abierto - NO se cierra');
+                // IMPORTANTE: NO cerrar el calendario después de guardar, solo mostrar notificación
+                // El calendario debe permanecer abierto para que el usuario pueda seguir editando
             } else {
                 mostrarNotificacion('❌ Error al guardar cambios', 'error');
             }
