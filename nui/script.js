@@ -12,25 +12,57 @@ let separadorParaEliminar = null;
 function detectarModoWeb() {
     // Si window.MODO_WEB está definido explícitamente, usarlo
     if (typeof window.MODO_WEB !== 'undefined') {
-        return window.MODO_WEB;
+        return window.MODO_WEB === true;
     }
     
-    // Detectar automáticamente: si no estamos en FiveM, estamos en web
-    // FiveM tiene GetParentResourceName disponible
-    if (typeof GetParentResourceName === 'undefined' || 
-        window.location.protocol === 'http:' || 
-        window.location.protocol === 'https:') {
-        // Estamos en un navegador web
-        return true;
+    // Detectar automáticamente:
+    // - Si estamos en FiveM NUI, la URL será como "https://cfx-nui-..."
+    // - Si estamos en un navegador real, la URL será como "https://tu-proyecto.vercel.app"
+    
+    const url = window.location.href;
+    const hostname = window.location.hostname;
+    
+    // Si la URL contiene "cfx-nui", estamos en FiveM
+    if (url.includes('cfx-nui') || hostname.includes('cfx-nui')) {
+        return false; // Estamos en FiveM, NO en modo web
     }
     
-    return false;
+    // Si GetParentResourceName está disponible y funciona, estamos en FiveM
+    try {
+        if (typeof GetParentResourceName === 'function') {
+            const resourceName = GetParentResourceName();
+            if (resourceName && resourceName !== 'web-mode' && resourceName !== 'unknown') {
+                return false; // Estamos en FiveM
+            }
+        }
+    } catch (e) {
+        // Si falla, probablemente no estamos en FiveM
+    }
+    
+    // Si llegamos aquí y la URL es http/https normal (no cfx-nui), estamos en web
+    if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+        // Verificar que no sea una URL de FiveM
+        if (!url.includes('cfx-nui') && !hostname.includes('cfx-nui')) {
+            return true; // Estamos en un navegador web real
+        }
+    }
+    
+    return false; // Por defecto, asumir que estamos en FiveM
 }
 
 function obtenerAPIURL() {
     // Si está definido explícitamente, usarlo
-    if (window.API_URL && window.API_URL !== '') {
+    if (window.API_URL && window.API_URL !== '' && window.API_URL !== 'https://cfx-nui-cat_calendario') {
         return window.API_URL;
+    }
+    
+    // Si estamos en modo web real, obtener desde la URL actual
+    const url = window.location.href;
+    const hostname = window.location.hostname;
+    
+    // Si es una URL de FiveM, no devolver nada (no usar API)
+    if (url.includes('cfx-nui') || hostname.includes('cfx-nui')) {
+        return ''; // No usar API en FiveM
     }
     
     // Obtener automáticamente desde la URL actual
@@ -123,6 +155,13 @@ const configPorDefecto = {
 
 // Función para cargar datos desde API (modo web)
 async function cargarDatosDesdeAPI() {
+    // Verificar que estamos realmente en modo web (no FiveM)
+    if (!MODO_WEB || !API_URL || API_URL === '' || API_URL.includes('cfx-nui')) {
+        console.log('[Calendario] No se puede cargar desde API - estamos en FiveM o API_URL inválida');
+        console.log('[Calendario] MODO_WEB:', MODO_WEB, 'API_URL:', API_URL);
+        return;
+    }
+    
     try {
         console.log('[Calendario] Cargando datos desde:', `${API_URL}/api/calendario`);
         
@@ -307,12 +346,14 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('NUI: Interfaz cargada, inicializando eventos...');
     console.log('Modo Web:', MODO_WEB);
     console.log('API URL:', API_URL);
+    console.log('URL actual:', window.location.href);
     
     try {
         inicializarEventos();
         
-        if (MODO_WEB) {
-            // En modo web, mostrar el body inmediatamente y cargar datos
+        // Solo cargar desde API si estamos en modo web REAL (no FiveM)
+        if (MODO_WEB && API_URL && API_URL !== '' && !API_URL.includes('cfx-nui')) {
+            // En modo web REAL, mostrar el body inmediatamente y cargar datos
             document.body.style.display = 'block';
             // Cargar datos desde API
             cargarDatosDesdeAPI().catch(error => {
@@ -322,6 +363,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             // En modo FiveM, ocultar hasta recibir mensaje
             document.body.style.display = 'none';
+            console.log('[NUI] Modo FiveM detectado - Esperando mensaje del cliente');
         }
     } catch (error) {
         console.error('Error en inicialización:', error);

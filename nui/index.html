@@ -443,15 +443,19 @@
     <script>
         // Detectar si estamos en modo web (si no está definido, lo definimos)
         if (typeof window.MODO_WEB === 'undefined') {
-            // Si estamos en Vercel o fuera de FiveM
-            if (typeof GetParentResourceName === 'undefined' || window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+            const url = window.location.href;
+            const hostname = window.location.hostname;
+            
+            // Si la URL contiene "cfx-nui", estamos en FiveM (NO modo web)
+            if (url.includes('cfx-nui') || hostname.includes('cfx-nui')) {
+                window.MODO_WEB = false;
+                window.API_URL = '';
+                console.log('[HTML] Modo FiveM detectado (cfx-nui)');
+            } else {
+                // Estamos en un navegador web real
                 window.MODO_WEB = true;
-                // Obtener URL base automáticamente
                 window.API_URL = window.location.origin;
                 console.log('[HTML] Modo web detectado, API_URL:', window.API_URL);
-            } else {
-                window.MODO_WEB = false;
-                console.log('[HTML] Modo FiveM detectado');
             }
         }
     </script>
