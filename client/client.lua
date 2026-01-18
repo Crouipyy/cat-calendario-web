@@ -190,7 +190,7 @@ local function AbrirCalendario()
     end
     
     if calendarioAbierto then 
-        print('[Calendario] Ya está abierto')
+        print('[Calendario] DEBUG: Ya está abierto')
         return 
     end
     
@@ -200,10 +200,10 @@ local function AbrirCalendario()
     end
     
     VerificarPermisos()
+    print('[Calendario] DEBUG: Llamando SetNuiFocus(true, true)')
     SetNuiFocus(true, true) -- Mantener input del juego activo
     calendarioAbierto = true
-    
-    print('[Calendario] Abriendo calendario, es profesor:', esProfesor)
+    print('[Calendario] DEBUG: calendarioAbierto = true, es profesor:', esProfesor)
     
     -- Obtener datos del calendario del servidor
     QBCore.Functions.TriggerCallback('cat_calendario:obtenerCalendario', function(datos)
@@ -222,11 +222,19 @@ end
 
 -- Función para cerrar calendario
 local function CerrarCalendario()
-    if not calendarioAbierto then return end
+    print('[Calendario] DEBUG: CerrarCalendario() llamado, calendarioAbierto =', calendarioAbierto)
+    if not calendarioAbierto then 
+        print('[Calendario] DEBUG: Calendario no está abierto, retornando')
+        return 
+    end
     
+    print('[Calendario] DEBUG: Marcando calendarioAbierto = false')
     calendarioAbierto = false
+    print('[Calendario] DEBUG: Llamando SetNuiFocus(false, false)')
     SetNuiFocus(false, false)
+    print('[Calendario] DEBUG: Enviando SendNUIMessage({action = "cerrarCalendario"})')
     SendNUIMessage({action = 'cerrarCalendario'})
+    print('[Calendario] DEBUG: CerrarCalendario() completado')
 end
 
 -- Función para traducir clima (agregar si no existe)
@@ -266,10 +274,16 @@ end)
 
 -- Cerrar calendario desde NUI
 RegisterNUICallback('cerrarCalendario', function(data, cb)
+    print('[Calendario] DEBUG: RegisterNUICallback("cerrarCalendario") recibido')
+    print('[Calendario] DEBUG: calendarioAbierto antes =', calendarioAbierto)
     calendarioAbierto = false
+    print('[Calendario] DEBUG: Llamando SetNuiFocus(false, false) en callback')
     SetNuiFocus(false, false)
+    print('[Calendario] DEBUG: Respondiendo cb("ok")')
     cb('ok')
+    print('[Calendario] DEBUG: Enviando SendNUIMessage({action = "cerrarCalendario"})')
     SendNUIMessage({action = 'cerrarCalendario'})
+    print('[Calendario] DEBUG: Callback completado')
 end)
 
 -- Guardar cambios (solo profesores)
@@ -296,6 +310,7 @@ Citizen.CreateThread(function()
         Citizen.Wait(0)
         if calendarioAbierto then
             if IsControlJustReleased(0, 322) or IsControlJustReleased(0, 177) then -- ESC o BACKSPACE
+                print('[Calendario] DEBUG: ESC/BACKSPACE presionado, llamando CerrarCalendario()')
                 CerrarCalendario()
             end
         end

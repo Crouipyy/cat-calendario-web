@@ -536,9 +536,12 @@ function inicializarEventos() {
         }
         
         if (data.action === 'cerrarCalendario') {
+            console.log('[Calendario] DEBUG: Mensaje "cerrarCalendario" recibido del cliente');
+            console.log('[Calendario] DEBUG: Ocultando body');
             document.body.style.display = 'none';
             // Limpiar cualquier context menu abierto
             cerrarContextMenu();
+            console.log('[Calendario] DEBUG: Body oculto, context menu cerrado');
         }
     });
 }
@@ -1947,32 +1950,42 @@ function cerrarModalEliminar() {
 }
 
 function cerrarCalendario() {
+    console.log('[Calendario] DEBUG: cerrarCalendario() llamado, MODO_WEB =', MODO_WEB);
     if (MODO_WEB) {
         // En modo web, solo ocultar (no hay que cerrar NUI)
+        console.log('[Calendario] DEBUG: Modo web, ocultando body');
         document.body.style.display = 'none';
     } else {
         // En modo FiveM, simplemente llamar al callback y dejar que el cliente maneje el cierre
         // NO ocultar el body aquí, el cliente lo hará con SendNUIMessage
         const resourceName = GetParentResourceName();
+        console.log('[Calendario] DEBUG: Modo FiveM, resourceName =', resourceName);
         if (resourceName && resourceName !== 'web-mode' && resourceName !== 'unknown') {
             try {
+                console.log('[Calendario] DEBUG: Enviando fetch a', `https://${resourceName}/cerrarCalendario`);
                 fetch(`https://${resourceName}/cerrarCalendario`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json; charset=UTF-8'},
                     body: JSON.stringify({})
                 })
                 .then(response => {
+                    console.log('[Calendario] DEBUG: Respuesta recibida, status =', response.status);
                     if (!response.ok) {
                         console.error('[Calendario] Error al cerrar calendario:', response.status);
                     }
                     return response.json();
                 })
+                .then(data => {
+                    console.log('[Calendario] DEBUG: Datos de respuesta:', data);
+                })
                 .catch(error => {
-                    console.error('[Calendario] Error en fetch al cerrar:', error);
+                    console.error('[Calendario] DEBUG: Error en fetch:', error);
                 });
             } catch (e) {
-                console.error('[Calendario] Error al intentar cerrar:', e);
+                console.error('[Calendario] DEBUG: Error al intentar cerrar:', e);
             }
+        } else {
+            console.log('[Calendario] DEBUG: resourceName inválido, no se puede cerrar');
         }
     }
 }
