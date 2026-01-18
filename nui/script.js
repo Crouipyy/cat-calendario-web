@@ -8,36 +8,29 @@ let claseParaEliminar = null;
 let separadorParaEditar = null;
 let separadorParaEliminar = null;
 
-// Detectar modo web automáticamente
+// Guardar referencia a la función nativa de FiveM ANTES de definir nuestra función
+// Esto evita que nuestra función sobrescriba la nativa y cause recursión
+const NATIVE_GET_PARENT_RESOURCE_NAME = (typeof window !== 'undefined' && typeof window.GetParentResourceName === 'function') 
+    ? window.GetParentResourceName.bind(window) 
+    : null;
+
+// Detectar modo web automáticamente (SIN llamar a GetParentResourceName para evitar recursión)
 function detectarModoWeb() {
     // Si window.MODO_WEB está definido explícitamente, usarlo
     if (typeof window.MODO_WEB !== 'undefined') {
         return window.MODO_WEB === true;
     }
     
-    // Detectar automáticamente:
+    // Detectar automáticamente SOLO basándose en la URL:
     // - Si estamos en FiveM NUI, la URL será como "https://cfx-nui-..."
     // - Si estamos en un navegador real, la URL será como "https://tu-proyecto.vercel.app"
     
     const url = window.location.href;
     const hostname = window.location.hostname;
     
-    // Si la URL contiene "cfx-nui", estamos en FiveM
+    // Si la URL contiene "cfx-nui", estamos definitivamente en FiveM
     if (url.includes('cfx-nui') || hostname.includes('cfx-nui')) {
         return false; // Estamos en FiveM, NO en modo web
-    }
-    
-    // Verificar GetParentResourceName de FiveM (sin recursión)
-    try {
-        // Usar window.GetParentResourceName directamente (función nativa de FiveM)
-        if (typeof window.GetParentResourceName === 'function') {
-            const resourceName = window.GetParentResourceName();
-            if (resourceName && resourceName !== 'web-mode' && resourceName !== 'unknown') {
-                return false; // Estamos en FiveM
-            }
-        }
-    } catch (e) {
-        // Si falla, probablemente no estamos en FiveM
     }
     
     // Si llegamos aquí y la URL es http/https normal (no cfx-nui), estamos en web
@@ -331,29 +324,35 @@ async function hacerLogin() {
 }
 
 // Función helper para GetParentResourceName (compatibilidad FiveM)
+// IMPORTANTE: NO usar MODO_WEB aquí para evitar recursión
 function GetParentResourceName() {
-    // Verificar primero si estamos en modo web (sin recursión)
+    // Verificar SOLO basándose en la URL (sin usar MODO_WEB)
     const url = window.location.href;
+    
     if (url.includes('cfx-nui')) {
-        // Estamos en FiveM, usar la función nativa
-        if (typeof window.GetParentResourceName === 'function') {
-            return window.GetParentResourceName();
+        // Estamos en FiveM, intentar usar la función nativa primero
+        if (NATIVE_GET_PARENT_RESOURCE_NAME) {
+            try {
+                // Llamar a la función nativa guardada (no a nuestra función)
+                const result = NATIVE_GET_PARENT_RESOURCE_NAME();
+                if (result && result !== 'web-mode' && result !== 'unknown') {
+                    return result;
+                }
+            } catch (e) {
+                // Si falla, continuar con el método alternativo
+            }
         }
-        // Si no está disponible, usar el nombre del recurso desde la URL
+        
+        // Si no está disponible, extraer el nombre del recurso desde la URL
         const match = url.match(/cfx-nui-([^/]+)/);
-        if (match) {
+        if (match && match[1]) {
             return match[1];
         }
         return 'cat_calendario'; // Nombre por defecto
     }
     
-    // Si estamos en modo web
-    if (MODO_WEB) {
-        return 'web-mode';
-    }
-    
-    // Fallback
-    return 'unknown';
+    // Si NO es cfx-nui, estamos en modo web
+    return 'web-mode';
 }
 
 // Inicializar
