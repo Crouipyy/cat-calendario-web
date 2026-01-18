@@ -267,7 +267,59 @@ end
 -- Variable para rastrear última modificación del archivo
 local ultimaModificacionArchivo = 0
 
--- Función para verificar cambios en el archivo (desde servidor web)
+-- Función para sincronizar desde la API web (HTTP)
+local function SincronizarDesdeAPIWeb()
+    if not Config.WebServer or not Config.WebServer.enabled then
+        return
+    end
+    
+    local url = Config.WebServer.url
+    if not url or url == "" then
+        return
+    end
+    
+    local apiUrl = url .. '/api/calendario'
+    
+    -- Usar PerformHttpRequest para obtener datos de la API
+    PerformHttpRequest(apiUrl, function(statusCode, response, headers)
+        if statusCode == 200 then
+            local datos, error = json.decode(response)
+            if datos and datos.success and datos.calendario then
+                local calendarioWeb = datos.calendario
+                
+                -- Comparar timestamps
+                local timestampWeb = calendarioWeb.ultimaActualizacion or 0
+                local timestampLocal = calendarioData.ultimaActualizacion or 0
+                
+                if timestampWeb > timestampLocal then
+                    print('[Calendario] 🌐 Cambios detectados desde servidor web (API)')
+                    print('[Calendario] Timestamp web:', timestampWeb, 'vs local:', timestampLocal)
+                    
+                    -- Actualizar datos locales
+                    calendarioData = calendarioWeb
+                    ultimaModificacionArchivo = timestampWeb
+                    
+                    -- Guardar en archivo local para persistencia
+                    GuardarCalendarioEnArchivo()
+                    
+                    -- Notificar a todos los clientes
+                    TriggerClientEvent('cat_calendario:actualizarCalendario', -1, calendarioData)
+                    print('[Calendario] ✅ Calendario sincronizado desde servidor web')
+                else
+                    print('[Calendario] 🔄 Calendario ya está actualizado (web:', timestampWeb, 'local:', timestampLocal, ')')
+                end
+            else
+                print('[Calendario] ⚠️ Error decodificando respuesta de API web:', error)
+            end
+        else
+            print('[Calendario] ⚠️ Error consultando API web. Status:', statusCode)
+        end
+    end, 'GET', '', {
+        ['Content-Type'] = 'application/json'
+    })
+end
+
+-- Función para verificar cambios en el archivo (desde servidor web - método antiguo)
 local function VerificarCambiosEnArchivo()
     if not Config.WebServer or not Config.WebServer.enabled then
         return
@@ -291,25 +343,35 @@ local function VerificarCambiosEnArchivo()
             local datos, error = json.decode(contenido)
             if datos and datos.ultimaActualizacion then
                 if datos.ultimaActualizacion > ultimaModificacionArchivo then
-                    print('[Calendario] 🌐 Cambios detectados desde servidor web, actualizando...')
+                    print('[Calendario] 🌐 Cambios detectados desde archivo local, actualizando...')
                     calendarioData = datos
                     ultimaModificacionArchivo = datos.ultimaActualizacion
                     
                     -- Notificar a todos los clientes
                     TriggerClientEvent('cat_calendario:actualizarCalendario', -1, calendarioData)
-                    print('[Calendario] ✅ Calendario actualizado desde servidor web')
+                    print('[Calendario] ✅ Calendario actualizado desde archivo local')
                 end
             end
         end
     end
 end
 
--- Thread para verificar cambios periódicamente
+-- Thread para verificar cambios periódicamente desde la API web
 CreateThread(function()
     if Config.WebServer and Config.WebServer.enabled and Config.WebServer.syncInterval and Config.WebServer.syncInterval > 0 then
+        -- Esperar un poco al inicio para que todo se inicialice
+        Wait(5000)
+        
         while true do
             Wait(Config.WebServer.syncInterval * 1000)
+            
+            -- Primero verificar cambios en archivo local (método antiguo)
             VerificarCambiosEnArchivo()
+            
+            -- Luego sincronizar desde API web (método nuevo - bidireccional)
+            if Config.WebServer.url and Config.WebServer.url ~= "" then
+                SincronizarDesdeAPIWeb()
+            end
         end
     end
 end)

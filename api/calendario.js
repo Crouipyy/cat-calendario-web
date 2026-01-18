@@ -6,13 +6,32 @@
 // Alternativa: Usar variables de entorno o base de datos
 // Por simplicidad, aquí usamos el archivo del repo (solo lectura)
 
+// Cache persistente en memoria (persiste entre requests en Vercel)
+// NOTA: En Vercel, cada función serverless es stateless, pero podemos usar variables globales
+// que persisten durante el tiempo de vida del proceso
 let calendarioCache = null;
 let ultimaLectura = 0;
 const CACHE_DURATION = 5000; // 5 segundos
 
+// Cache para cambios desde la web (persiste mientras la función esté activa)
+let cambiosDesdeWeb = null;
+
 function leerCalendario() {
     try {
-        // Intentar leer desde el archivo del repositorio
+        // PRIORIDAD 1: Si hay cambios desde la web (más recientes), usar esos
+        if (cambiosDesdeWeb) {
+            const ahora = Date.now();
+            // El cache de cambios web persiste por 60 segundos
+            if ((ahora - cambiosDesdeWeb.timestamp) < 60000) {
+                console.log('[API] Retornando cambios desde web (cache)');
+                return cambiosDesdeWeb.datos;
+            } else {
+                // Cache expirado, limpiar
+                cambiosDesdeWeb = null;
+            }
+        }
+        
+        // PRIORIDAD 2: Leer desde el archivo del repositorio
         const fs = require('fs');
         const path = require('path');
         const dataPath = path.join(process.cwd(), 'calendario_data.json');
@@ -54,23 +73,32 @@ function leerCalendario() {
 }
 
 // IMPORTANTE: En Vercel, no puedes escribir archivos de forma persistente
-// Esta función actualiza el cache en memoria, pero no persiste
-// Para persistencia real, necesitarías:
-// 1. Base de datos (MongoDB, PostgreSQL, etc.)
-// 2. Almacenamiento en la nube (AWS S3, etc.)
-// 3. Webhook que actualice el repositorio de GitHub
+// Usamos cache en memoria que persiste durante la ejecución de la función
+// Para sincronización con FiveM, FiveM debe consultar esta API periódicamente
 function guardarCalendario(datos) {
     try {
-        // Actualizar cache en memoria
+        // Actualizar cache en memoria con timestamp
         datos.ultimaActualizacion = Math.floor(Date.now() / 1000);
+        
+        // Guardar en cache de cambios desde web (prioridad alta)
+        cambiosDesdeWeb = {
+            datos: datos,
+            timestamp: Date.now()
+        };
+        
+        // También actualizar cache general
         calendarioCache = datos;
         ultimaLectura = Date.now();
         
-        // NOTA: En producción, aquí deberías guardar en una base de datos
-        // Por ahora, solo actualizamos el cache
-        // El archivo real se actualiza desde FiveM o mediante webhook
+        // NOTA: Este cache persiste durante la ejecución de la función serverless
+        // Para sincronización con FiveM:
+        // 1. FiveM debe consultar /api/calendario periódicamente
+        // 2. Comparar ultimaActualizacion con la local
+        // 3. Si es más reciente, actualizar el archivo local
         
-        console.log('[API] Calendario actualizado en cache (no persistente)');
+        console.log('[API] Calendario actualizado en cache (desde web)');
+        console.log('[API] Timestamp:', datos.ultimaActualizacion);
+        console.log('[API] FiveM debe consultar esta API para sincronizar');
         return true;
     } catch (error) {
         console.error('Error guardando calendario:', error);
