@@ -2831,7 +2831,32 @@ function guardarCalendario() {
         });
     } else {
         // Modo FiveM: usar NUI callback
-        fetch(`https://${GetParentResourceName()}/guardarCambios`, {
+        console.log('[Calendario] DEBUG: Modo FiveM, obteniendo resourceName para guardar...');
+        let resourceName;
+        try {
+            const url = window.location.href;
+            if (url.includes('cfx-nui')) {
+                const match = url.match(/cfx-nui-([^/]+)/);
+                if (match && match[1]) {
+                    resourceName = match[1];
+                    console.log('[Calendario] DEBUG: ResourceName extraído de URL:', resourceName);
+                } else {
+                    resourceName = 'cat_calendario';
+                    console.log('[Calendario] DEBUG: Usando resourceName por defecto:', resourceName);
+                }
+            } else {
+                resourceName = 'cat_calendario';
+                console.log('[Calendario] DEBUG: No es cfx-nui, usando resourceName por defecto:', resourceName);
+            }
+        } catch (e) {
+            console.error('[Calendario] DEBUG: Error al obtener resourceName:', e);
+            resourceName = 'cat_calendario';
+        }
+        
+        const fetchUrl = `https://${resourceName}/guardarCambios`;
+        console.log('[Calendario] DEBUG: Enviando fetch a:', fetchUrl);
+        
+        fetch(fetchUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json; charset=UTF-8',
@@ -2841,6 +2866,7 @@ function guardarCalendario() {
             })
         })
         .then(response => {
+            console.log('[Calendario] DEBUG: Respuesta recibida, status:', response.status, 'ok:', response.ok);
             if (!response.ok) {
                 throw new Error('Error en la respuesta del servidor');
             }
@@ -2858,7 +2884,8 @@ function guardarCalendario() {
             }
         })
         .catch(error => {
-            console.error('Error al guardar:', error);
+            console.error('[Calendario] DEBUG: Error al guardar:', error);
+            console.error('[Calendario] DEBUG: Stack trace:', error.stack);
             mostrarNotificacion('❌ Error de conexión al guardar', 'error');
         });
     }
