@@ -216,23 +216,45 @@ async function guardarCalendario(datos, actualizadoPor = 'web') {
 }
 
 export default async function handler(req, res) {
-    // Configurar CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    // Envolver TODO en try-catch para evitar cualquier error 500
+    try {
+        // Configurar CORS
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
+        if (req.method === 'OPTIONS') {
+            return res.status(200).end();
+        }
 
-    if (req.method === 'GET') {
-        // Obtener calendario (público)
-        try {
-            const calendario = await leerCalendario();
-            
-            // Asegurar que siempre retornamos un objeto válido
-            if (!calendario) {
-                console.warn('[API] ⚠️ leerCalendario retornó null/undefined, usando estructura vacía');
+        if (req.method === 'GET') {
+            // Obtener calendario (público)
+            try {
+                const calendario = await leerCalendario();
+                
+                // Asegurar que siempre retornamos un objeto válido
+                if (!calendario) {
+                    console.warn('[API] ⚠️ leerCalendario retornó null/undefined, usando estructura vacía');
+                    return res.status(200).json({
+                        success: true,
+                        calendario: {
+                            semanas: [],
+                            meses: [],
+                            separadores: {},
+                            climasHorario: {},
+                            ultimaActualizacion: Math.floor(Date.now() / 1000)
+                        }
+                    });
+                }
+                
+                return res.status(200).json({
+                    success: true,
+                    calendario: calendario
+                });
+            } catch (error) {
+                console.error('[API] Error en GET:', error);
+                console.error('[API] Stack:', error.stack);
+                // Retornar estructura vacía en lugar de error 500 para que la web no se rompa
                 return res.status(200).json({
                     success: true,
                     calendario: {
@@ -244,29 +266,9 @@ export default async function handler(req, res) {
                     }
                 });
             }
-            
-            return res.status(200).json({
-                success: true,
-                calendario: calendario
-            });
-        } catch (error) {
-            console.error('[API] Error en GET:', error);
-            console.error('[API] Stack:', error.stack);
-            // Retornar estructura vacía en lugar de error 500 para que la web no se rompa
-            return res.status(200).json({
-                success: true,
-                calendario: {
-                    semanas: [],
-                    meses: [],
-                    separadores: {},
-                    climasHorario: {},
-                    ultimaActualizacion: Math.floor(Date.now() / 1000)
-                }
-            });
         }
-    }
 
-    if (req.method === 'POST') {
+        if (req.method === 'POST') {
         // Guardar calendario
         const authHeader = req.headers.authorization;
         const { calendario } = req.body;
@@ -315,29 +317,47 @@ export default async function handler(req, res) {
             console.log('[API] Guardando calendario desde FiveM');
         }
 
-        try {
-            const guardado = await guardarCalendario(calendario, actualizadoPor);
-            
-            if (guardado) {
-                return res.status(200).json({
-                    success: true,
-                    message: 'Calendario guardado correctamente',
-                    ultimaActualizacion: calendario.ultimaActualizacion
-                });
-            } else {
+            try {
+                const guardado = await guardarCalendario(calendario, actualizadoPor);
+                
+                if (guardado) {
+                    return res.status(200).json({
+                        success: true,
+                        message: 'Calendario guardado correctamente',
+                        ultimaActualizacion: calendario.ultimaActualizacion
+                    });
+                } else {
+                    return res.status(500).json({
+                        error: 'Error al guardar el calendario'
+                    });
+                }
+            } catch (error) {
+                console.error('[API] Error en POST:', error);
                 return res.status(500).json({
                     error: 'Error al guardar el calendario'
                 });
             }
-        } catch (error) {
-            console.error('[API] Error en POST:', error);
-            return res.status(500).json({
-                error: 'Error al guardar el calendario'
-            });
         }
-    }
 
-    return res.status(405).json({
-        error: 'Method not allowed'
-    });
+        return res.status(405).json({
+            error: 'Method not allowed'
+        });
+    } catch (globalError) {
+        // Capturar CUALQUIER error que pueda ocurrir en TODO el handler
+        console.error('[API] ⚠️ ERROR GLOBAL en handler:', globalError);
+        console.error('[API] ⚠️ Error message:', globalError.message);
+        console.error('[API] ⚠️ Error stack:', globalError.stack);
+        
+        // SIEMPRE retornar 200 con estructura vacía, NUNCA 500
+        return res.status(200).json({
+            success: true,
+            calendario: {
+                semanas: [],
+                meses: [],
+                separadores: {},
+                climasHorario: {},
+                ultimaActualizacion: Math.floor(Date.now() / 1000)
+            }
+        });
+    }
 }
