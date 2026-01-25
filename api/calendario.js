@@ -10,12 +10,15 @@ async function obtenerConexion() {
             password: process.env.DB_PASSWORD || '',
             database: process.env.DB_NAME || 'cat_calendario',
             port: process.env.DB_PORT || 3306,
-            ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
+            ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+            connectTimeout: 10000 // Timeout de 10 segundos
         });
         return conexion;
     } catch (error) {
         console.error('[API] Error conectando a MySQL:', error);
-        throw error;
+        console.error('[API] Error details:', error.message);
+        // No lanzar el error, dejar que la función que llama lo maneje
+        return null;
     }
 }
 
@@ -24,6 +27,18 @@ async function leerCalendario() {
     let conexion = null;
     try {
         conexion = await obtenerConexion();
+        
+        // Si no se pudo conectar, retornar estructura vacía
+        if (!conexion) {
+            console.warn('[API] ⚠️ No se pudo conectar a MySQL, retornando estructura vacía');
+            return {
+                semanas: [],
+                meses: [],
+                separadores: {},
+                climasHorario: {},
+                ultimaActualizacion: Math.floor(Date.now() / 1000)
+            };
+        }
         
         // Obtener el último registro (id = 1 siempre, o el más reciente)
         const [rows] = await conexion.execute(
@@ -132,6 +147,12 @@ async function guardarCalendario(datos, actualizadoPor = 'web') {
     let conexion = null;
     try {
         conexion = await obtenerConexion();
+        
+        // Si no se pudo conectar, retornar false
+        if (!conexion) {
+            console.error('[API] ⚠️ No se pudo conectar a MySQL para guardar');
+            return false;
+        }
         
         // Actualizar timestamp
         datos.ultimaActualizacion = Math.floor(Date.now() / 1000);
