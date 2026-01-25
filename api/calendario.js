@@ -40,41 +40,43 @@ async function leerCalendario() {
                 let datosValidos = false;
                 
                 try {
-                    if (datos.semanas) {
-                        if (Array.isArray(datos.semanas) && datos.semanas.length > 0) {
-                            datosValidos = true;
-                        } else if (typeof datos.semanas === 'object' && datos.semanas !== null) {
-                            const keys = Object.keys(datos.semanas);
-                            if (keys.length > 0) {
-                                // Verificar que al menos una semana tenga datos
-                                for (const key of keys) {
-                                    const semana = datos.semanas[key];
-                                    if (semana && semana.dias && Object.keys(semana.dias).length > 0) {
-                                        datosValidos = true;
-                                        break;
+                    if (datos && typeof datos === 'object') {
+                        if (datos.semanas) {
+                            if (Array.isArray(datos.semanas) && datos.semanas.length > 0) {
+                                datosValidos = true;
+                            } else if (typeof datos.semanas === 'object' && datos.semanas !== null) {
+                                const keys = Object.keys(datos.semanas);
+                                if (keys.length > 0) {
+                                    // Verificar que al menos una semana tenga datos
+                                    for (const key of keys) {
+                                        const semana = datos.semanas[key];
+                                        if (semana && semana.dias && typeof semana.dias === 'object' && Object.keys(semana.dias).length > 0) {
+                                            datosValidos = true;
+                                            break;
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                    
-                    if (!datosValidos && datos.separadores && typeof datos.separadores === 'object' && datos.separadores !== null) {
-                        if (Object.keys(datos.separadores).length > 0) {
-                            datosValidos = true;
+                        
+                        if (!datosValidos && datos.separadores && typeof datos.separadores === 'object' && datos.separadores !== null) {
+                            if (Object.keys(datos.separadores).length > 0) {
+                                datosValidos = true;
+                            }
                         }
-                    }
-                    
-                    if (!datosValidos && datos.climasHorario && typeof datos.climasHorario === 'object' && datos.climasHorario !== null) {
-                        if (Object.keys(datos.climasHorario).length > 0) {
-                            datosValidos = true;
+                        
+                        if (!datosValidos && datos.climasHorario && typeof datos.climasHorario === 'object' && datos.climasHorario !== null) {
+                            if (Object.keys(datos.climasHorario).length > 0) {
+                                datosValidos = true;
+                            }
                         }
-                    }
-                    
-                    if (!datosValidos && datos.meses) {
-                        if (Array.isArray(datos.meses) && datos.meses.length > 0) {
-                            datosValidos = true;
-                        } else if (typeof datos.meses === 'object' && datos.meses !== null && Object.keys(datos.meses).length > 0) {
-                            datosValidos = true;
+                        
+                        if (!datosValidos && datos.meses) {
+                            if (Array.isArray(datos.meses) && datos.meses.length > 0) {
+                                datosValidos = true;
+                            } else if (typeof datos.meses === 'object' && datos.meses !== null && Object.keys(datos.meses).length > 0) {
+                                datosValidos = true;
+                            }
                         }
                     }
                 } catch (validationError) {
@@ -83,16 +85,19 @@ async function leerCalendario() {
                     datosValidos = true;
                 }
                 
-                if (datosValidos) {
-                    return datos;
-                } else {
-                    console.warn('[API] ⚠️ Datos en MySQL están vacíos, pero manteniendo timestamp para evitar reset');
-                    // Retornar datos aunque estén vacíos, pero con el timestamp original
-                    return datos;
-                }
+                // Siempre retornar los datos, validados o no
+                return datos;
             } catch (parseError) {
                 console.error('[API] Error parseando JSON desde MySQL:', parseError);
-                throw parseError;
+                console.error('[API] Datos raw:', rows[0].datos ? rows[0].datos.substring(0, 100) : 'null');
+                // En lugar de lanzar error, retornar estructura vacía
+                return {
+                    semanas: [],
+                    meses: [],
+                    separadores: {},
+                    climasHorario: {},
+                    ultimaActualizacion: rows[0].ultima_actualizacion || Math.floor(Date.now() / 1000)
+                };
             }
         }
         
