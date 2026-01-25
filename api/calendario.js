@@ -3,13 +3,30 @@ const mysql = require('mysql2/promise');
 
 // Función para obtener conexión a MySQL
 async function obtenerConexion() {
+    // Verificar que las variables de entorno necesarias estén configuradas
+    const dbHost = process.env.DB_HOST;
+    const dbUser = process.env.DB_USER;
+    const dbPassword = process.env.DB_PASSWORD;
+    const dbName = process.env.DB_NAME || 'cat_calendario'; // Valor por defecto
+    const dbPort = process.env.DB_PORT || 3306;
+    
+    // Si no hay variables críticas, retornar null
+    if (!dbHost || !dbUser || !dbPassword) {
+        console.warn('[API] ⚠️ Variables de entorno de MySQL no configuradas completamente');
+        console.warn('[API] DB_HOST:', dbHost ? '✓' : '✗');
+        console.warn('[API] DB_USER:', dbUser ? '✓' : '✗');
+        console.warn('[API] DB_PASSWORD:', dbPassword ? '✓' : '✗');
+        console.warn('[API] DB_NAME:', dbName);
+        return null;
+    }
+    
     try {
         const conexion = await mysql.createConnection({
-            host: process.env.DB_HOST || 'localhost',
-            user: process.env.DB_USER || 'root',
-            password: process.env.DB_PASSWORD || '',
-            database: process.env.DB_NAME || 'cat_calendario',
-            port: process.env.DB_PORT || 3306,
+            host: dbHost,
+            user: dbUser,
+            password: dbPassword,
+            database: dbName,
+            port: parseInt(dbPort) || 3306,
             ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
             connectTimeout: 10000 // Timeout de 10 segundos
         });
@@ -17,6 +34,7 @@ async function obtenerConexion() {
     } catch (error) {
         console.error('[API] Error conectando a MySQL:', error);
         console.error('[API] Error details:', error.message);
+        console.error('[API] Stack:', error.stack);
         // No lanzar el error, dejar que la función que llama lo maneje
         return null;
     }
@@ -41,9 +59,23 @@ async function leerCalendario() {
         }
         
         // Obtener el último registro (id = 1 siempre, o el más reciente)
-        const [rows] = await conexion.execute(
-            'SELECT datos, ultima_actualizacion FROM calendario WHERE id = 1 LIMIT 1'
-        );
+        let rows = [];
+        try {
+            [rows] = await conexion.execute(
+                'SELECT datos, ultima_actualizacion FROM calendario WHERE id = 1 LIMIT 1'
+            );
+        } catch (executeError) {
+            console.error('[API] Error ejecutando query:', executeError);
+            console.error('[API] Error details:', executeError.message);
+            // Si hay error en la query, retornar estructura vacía
+            return {
+                semanas: [],
+                meses: [],
+                separadores: {},
+                climasHorario: {},
+                ultimaActualizacion: Math.floor(Date.now() / 1000)
+            };
+        }
         
         if (rows && rows.length > 0) {
             try {
