@@ -31,25 +31,68 @@ async function leerCalendario() {
         );
         
         if (rows && rows.length > 0) {
-            const datos = JSON.parse(rows[0].datos);
-            console.log('[API] Calendario leído desde MySQL');
-            console.log('[API] Timestamp:', rows[0].ultima_actualizacion);
-            
-            // ✅ VALIDAR que los datos no estén vacíos
-            const datosValidos = (
-                (datos.semanas && (Array.isArray(datos.semanas) ? datos.semanas.length > 0 : Object.keys(datos.semanas).length > 0)) ||
-                (datos.separadores && Object.keys(datos.separadores).length > 0) ||
-                (datos.climasHorario && Object.keys(datos.climasHorario).length > 0) ||
-                (datos.meses && (Array.isArray(datos.meses) ? datos.meses.length > 0 : Object.keys(datos.meses).length > 0))
-            );
-            
-            if (datosValidos) {
-                return datos;
-            } else {
-                console.warn('[API] ⚠️ Datos en MySQL están vacíos, pero manteniendo timestamp para evitar reset');
-                // Retornar datos aunque estén vacíos, pero con el timestamp original
-                // Esto evita que se sobrescriba con datos vacíos desde el servidor
-                return datos;
+            try {
+                const datos = JSON.parse(rows[0].datos);
+                console.log('[API] Calendario leído desde MySQL');
+                console.log('[API] Timestamp:', rows[0].ultima_actualizacion);
+                
+                // ✅ VALIDAR que los datos no estén vacíos de forma segura
+                let datosValidos = false;
+                
+                try {
+                    if (datos.semanas) {
+                        if (Array.isArray(datos.semanas) && datos.semanas.length > 0) {
+                            datosValidos = true;
+                        } else if (typeof datos.semanas === 'object' && datos.semanas !== null) {
+                            const keys = Object.keys(datos.semanas);
+                            if (keys.length > 0) {
+                                // Verificar que al menos una semana tenga datos
+                                for (const key of keys) {
+                                    const semana = datos.semanas[key];
+                                    if (semana && semana.dias && Object.keys(semana.dias).length > 0) {
+                                        datosValidos = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!datosValidos && datos.separadores && typeof datos.separadores === 'object' && datos.separadores !== null) {
+                        if (Object.keys(datos.separadores).length > 0) {
+                            datosValidos = true;
+                        }
+                    }
+                    
+                    if (!datosValidos && datos.climasHorario && typeof datos.climasHorario === 'object' && datos.climasHorario !== null) {
+                        if (Object.keys(datos.climasHorario).length > 0) {
+                            datosValidos = true;
+                        }
+                    }
+                    
+                    if (!datosValidos && datos.meses) {
+                        if (Array.isArray(datos.meses) && datos.meses.length > 0) {
+                            datosValidos = true;
+                        } else if (typeof datos.meses === 'object' && datos.meses !== null && Object.keys(datos.meses).length > 0) {
+                            datosValidos = true;
+                        }
+                    }
+                } catch (validationError) {
+                    console.error('[API] Error en validación:', validationError);
+                    // Si hay error en la validación, retornar los datos de todos modos
+                    datosValidos = true;
+                }
+                
+                if (datosValidos) {
+                    return datos;
+                } else {
+                    console.warn('[API] ⚠️ Datos en MySQL están vacíos, pero manteniendo timestamp para evitar reset');
+                    // Retornar datos aunque estén vacíos, pero con el timestamp original
+                    return datos;
+                }
+            } catch (parseError) {
+                console.error('[API] Error parseando JSON desde MySQL:', parseError);
+                throw parseError;
             }
         }
         
@@ -129,14 +172,38 @@ export default async function handler(req, res) {
         try {
             const calendario = await leerCalendario();
             
+            // Asegurar que siempre retornamos un objeto válido
+            if (!calendario) {
+                console.warn('[API] ⚠️ leerCalendario retornó null/undefined, usando estructura vacía');
+                return res.status(200).json({
+                    success: true,
+                    calendario: {
+                        semanas: [],
+                        meses: [],
+                        separadores: {},
+                        climasHorario: {},
+                        ultimaActualizacion: Math.floor(Date.now() / 1000)
+                    }
+                });
+            }
+            
             return res.status(200).json({
                 success: true,
                 calendario: calendario
             });
         } catch (error) {
             console.error('[API] Error en GET:', error);
-            return res.status(500).json({
-                error: 'Error al leer el calendario'
+            console.error('[API] Stack:', error.stack);
+            // Retornar estructura vacía en lugar de error 500 para que la web no se rompa
+            return res.status(200).json({
+                success: true,
+                calendario: {
+                    semanas: [],
+                    meses: [],
+                    separadores: {},
+                    climasHorario: {},
+                    ultimaActualizacion: Math.floor(Date.now() / 1000)
+                }
             });
         }
     }
