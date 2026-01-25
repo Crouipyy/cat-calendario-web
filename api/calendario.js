@@ -21,6 +21,12 @@ async function obtenerConexion() {
     }
     
     try {
+        console.log('[API] Intentando conectar a MySQL...');
+        console.log('[API] Host:', dbHost);
+        console.log('[API] User:', dbUser);
+        console.log('[API] Database:', dbName);
+        console.log('[API] Port:', parseInt(dbPort) || 3306);
+        
         const conexion = await mysql.createConnection({
             host: dbHost,
             user: dbUser,
@@ -30,11 +36,24 @@ async function obtenerConexion() {
             ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
             connectTimeout: 10000 // Timeout de 10 segundos
         });
+        
+        console.log('[API] ✓ Conexión a MySQL establecida correctamente');
         return conexion;
     } catch (error) {
-        console.error('[API] Error conectando a MySQL:', error);
-        console.error('[API] Error details:', error.message);
-        console.error('[API] Stack:', error.stack);
+        console.error('[API] ✗ Error conectando a MySQL:', error.message);
+        console.error('[API] Error code:', error.code);
+        console.error('[API] Error errno:', error.errno);
+        
+        // Mensaje específico para errores de permisos
+        if (error.code === 'ER_DBACCESS_DENIED_ERROR' || error.errno === 1044) {
+            console.error('[API] ⚠️ ERROR DE PERMISOS: El usuario no tiene acceso a la base de datos');
+            console.error('[API] ⚠️ Verifica:');
+            console.error('[API] ⚠️ 1. Que el nombre de la base de datos (DB_NAME) sea correcto');
+            console.error('[API] ⚠️ 2. Que el usuario tenga permisos en MySQL para acceder a esa base de datos');
+            console.error('[API] ⚠️ 3. Que la base de datos exista');
+            console.error('[API] ⚠️ Base de datos intentada:', dbName);
+        }
+        
         // No lanzar el error, dejar que la función que llama lo maneje
         return null;
     }
