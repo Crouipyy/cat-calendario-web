@@ -67,6 +67,8 @@ const MODO_WEB = detectarModoWeb();
 const API_URL = obtenerAPIURL();
 let tokenAutenticacion = localStorage.getItem('calendario_token') || null;
 let usuarioActual = null;
+let ultimoTimestamp = null; // Para detectar cambios en modo web
+let pollingInterval = null; // Referencia al intervalo de polling
 
 // Log para debugging
 console.log('[Calendario] Modo Web detectado:', MODO_WEB);
@@ -169,7 +171,21 @@ async function cargarDatosDesdeAPI() {
         console.log('[Calendario] Datos recibidos:', data);
         
         if (data.success && data.calendario) {
+            // Comparar timestamps para detectar cambios
+            const nuevoTimestamp = data.calendario.ultimaActualizacion || 0;
+            
+            if (ultimoTimestamp !== null && nuevoTimestamp > ultimoTimestamp) {
+                console.log('[Calendario] 🔄 Cambios detectados! Timestamp anterior:', ultimoTimestamp, 'Nuevo:', nuevoTimestamp);
+                mostrarNotificacion('🔄 Calendario actualizado', 'info');
+            }
+            
+            ultimoTimestamp = nuevoTimestamp;
             calendarioData = data.calendario;
+            
+            // Si el calendario está visible, actualizar la vista
+            if (document.body.style.display !== 'none') {
+                renderizarCalendario();
+            }
         } else {
             console.warn('[Calendario] No hay datos del calendario, usando estructura vacía');
             calendarioData = { semanas: [], meses: [], separadores: {}, climasHorario: {} };
@@ -236,6 +252,83 @@ async function cargarDatosDesdeAPI() {
                 </button>
             </div>
         `;
+    }
+}
+
+// Función para iniciar polling periódico (solo en modo web)
+function iniciarPollingPeriodico() {
+    // Solo en modo web y si no hay un intervalo ya activo
+    if (!MODO_WEB || !API_URL || API_URL === '' || API_URL.includes('cfx-nui')) {
+        return;
+    }
+    
+    // Si ya hay un intervalo activo, no crear otro
+    if (pollingInterval !== null) {
+        console.log('[Calendario] Polling ya está activo');
+        return;
+    }
+    
+    console.log('[Calendario] 🔄 Iniciando polling periódico (cada 30 segundos)');
+    
+    // Intervalo de 30 segundos (30000 ms)
+    pollingInterval = setInterval(async () => {
+        try {
+            // Verificar si la página está visible (no hacer polling si está en segundo plano)
+            if (document.hidden) {
+                console.log('[Calendario] Página en segundo plano, omitiendo polling');
+                return;
+            }
+            
+            console.log('[Calendario] 🔍 Verificando cambios...');
+            
+            const response = await fetch(`${API_URL}/api/calendario`);
+            
+            if (!response.ok) {
+                console.warn('[Calendario] Error en polling:', response.status);
+                return;
+            }
+            
+            const data = await response.json();
+            
+            if (data.success && data.calendario) {
+                const nuevoTimestamp = data.calendario.ultimaActualizacion || 0;
+                
+                // Comparar timestamps
+                if (ultimoTimestamp !== null && nuevoTimestamp > ultimoTimestamp) {
+                    console.log('[Calendario] 🔄 Cambios detectados! Actualizando calendario...');
+                    console.log('[Calendario] Timestamp anterior:', ultimoTimestamp, 'Nuevo:', nuevoTimestamp);
+                    
+                    // Actualizar datos
+                    ultimoTimestamp = nuevoTimestamp;
+                    calendarioData = data.calendario;
+                    
+                    // Actualizar la vista si el calendario está visible
+                    if (document.body.style.display !== 'none') {
+                        renderizarCalendario();
+                        mostrarNotificacion('🔄 Calendario actualizado automáticamente', 'info');
+                    }
+                } else if (ultimoTimestamp === null) {
+                    // Primera vez, solo guardar el timestamp
+                    ultimoTimestamp = nuevoTimestamp;
+                } else {
+                    console.log('[Calendario] ✅ Sin cambios (timestamp:', nuevoTimestamp, ')');
+                }
+            }
+        } catch (error) {
+            console.error('[Calendario] Error en polling:', error);
+            // No mostrar notificación de error en polling para no molestar al usuario
+        }
+    }, 30000); // 30 segundos
+    
+    console.log('[Calendario] ✅ Polling iniciado correctamente');
+}
+
+// Función para detener polling (útil si se necesita)
+function detenerPollingPeriodico() {
+    if (pollingInterval !== null) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+        console.log('[Calendario] Polling detenido');
     }
 }
 
@@ -374,6 +467,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error cargando datos:', error);
                 mostrarNotificacion('Error al cargar el calendario. Verifica la consola para más detalles.', 'error');
             });
+            
+            // Iniciar polling periódico para detectar cambios (cada 30 segundos)
+            iniciarPollingPeriodico();
         } else {
             // En modo FiveM, ocultar hasta recibir mensaje
             document.body.style.display = 'none';
@@ -2820,6 +2916,11 @@ function guardarCalendario() {
         .then(data => {
             console.log('Respuesta del servidor:', data);
             if (data.success) {
+                // Actualizar timestamp local para evitar notificaciones innecesarias
+                if (data.ultimaActualizacion) {
+                    ultimoTimestamp = data.ultimaActualizacion;
+                    calendarioData.ultimaActualizacion = data.ultimaActualizacion;
+                }
                 mostrarNotificacion('✅ Cambios guardados correctamente', 'success');
             } else {
                 mostrarNotificacion('❌ Error al guardar cambios', 'error');
