@@ -215,7 +215,7 @@ async function guardarCalendario(datos, actualizadoPor = 'web') {
     }
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
     // Envolver TODO en try-catch para evitar cualquier error 500
     try {
         // Configurar CORS
