@@ -184,7 +184,7 @@ async function cargarDatosDesdeAPI() {
             
             // Si el calendario está visible, actualizar la vista
             if (document.body.style.display !== 'none') {
-                renderizarCalendario();
+                mostrarCalendario();
             }
         } else {
             console.warn('[Calendario] No hay datos del calendario, usando estructura vacía');
@@ -304,7 +304,7 @@ function iniciarPollingPeriodico() {
                     
                     // Actualizar la vista si el calendario está visible
                     if (document.body.style.display !== 'none') {
-                        renderizarCalendario();
+                        mostrarCalendario();
                         mostrarNotificacion('🔄 Calendario actualizado automáticamente', 'info');
                     }
                 } else if (ultimoTimestamp === null) {
