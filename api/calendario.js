@@ -1,119 +1,116 @@
-// NOTA: En Vercel, el sistema de archivos es de solo lectura
-// Para escritura persistente, necesitarías una base de datos o almacenamiento externo
-// Por ahora, usamos el archivo del repositorio para lectura
-// y para escritura, el archivo se actualiza en el repositorio (requiere webhook o similar)
+// API para manejar el calendario usando MySQL como almacenamiento persistente
+const mysql = require('mysql2/promise');
 
-// Alternativa: Usar variables de entorno o base de datos
-// Por simplicidad, aquí usamos el archivo del repo (solo lectura)
-
-// Cache persistente en memoria (persiste entre requests en Vercel)
-// NOTA: En Vercel, cada función serverless es stateless, pero podemos usar variables globales
-// que persisten durante el tiempo de vida del proceso
-let calendarioCache = null;
-let ultimaLectura = 0;
-const CACHE_DURATION = 5000; // 5 segundos
-
-// Cache para cambios desde la web (persiste mientras la función esté activa)
-let cambiosDesdeWeb = null;
-
-function leerCalendario() {
+// Función para obtener conexión a MySQL
+async function obtenerConexion() {
     try {
-        // PRIORIDAD 1: Si hay cambios desde la web O desde FiveM (cache en memoria), usar esos
-        // El cache persiste mientras la función serverless esté activa
-        if (cambiosDesdeWeb) {
-            const ahora = Date.now();
-            // El cache de cambios persiste por 5 minutos (300000ms) para dar tiempo a que FiveM sincronice
-            if ((ahora - cambiosDesdeWeb.timestamp) < 300000) {
-                console.log('[API] Retornando cambios desde cache (web o FiveM)');
-                console.log('[API] Timestamp cache:', cambiosDesdeWeb.datos.ultimaActualizacion);
-                return cambiosDesdeWeb.datos;
-            } else {
-                // Cache expirado, limpiar
-                console.log('[API] Cache expirado, limpiando');
-                cambiosDesdeWeb = null;
-            }
-        }
-        
-        // PRIORIDAD 2: Cache general (si existe y no expiró)
-        const ahora = Date.now();
-        if (calendarioCache && (ahora - ultimaLectura) < CACHE_DURATION) {
-            console.log('[API] Retornando cache general');
-            return calendarioCache;
-        }
-        
-        // PRIORIDAD 3: Leer desde el archivo del repositorio (solo lectura)
-        const fs = require('fs');
-        const path = require('path');
-        const dataPath = path.join(process.cwd(), 'calendario_data.json');
-        
-        if (fs.existsSync(dataPath)) {
-            const contenido = fs.readFileSync(dataPath, 'utf8');
-            const datosArchivo = JSON.parse(contenido);
-            
-            // Actualizar cache
-            calendarioCache = datosArchivo;
-            ultimaLectura = ahora;
-            
-            console.log('[API] Retornando datos desde archivo del repositorio');
-            console.log('[API] Timestamp archivo:', datosArchivo.ultimaActualizacion);
-            return datosArchivo;
-        }
-        
-        // Si no existe, retornar estructura vacía
-        const estructuraVacia = {
-            semanas: [],
-            meses: [],
-            separadores: {},
-            climasHorario: {},
-            ultimaActualizacion: Math.floor(Date.now() / 1000)
-        };
-        calendarioCache = estructuraVacia;
-        return estructuraVacia;
+        const conexion = await mysql.createConnection({
+            host: process.env.DB_HOST || 'localhost',
+            user: process.env.DB_USER || 'root',
+            password: process.env.DB_PASSWORD || '',
+            database: process.env.DB_NAME || 'cat_calendario',
+            port: process.env.DB_PORT || 3306,
+            ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
+        });
+        return conexion;
     } catch (error) {
-        console.error('[API] Error leyendo calendario:', error);
-        // Retornar cache si existe, sino estructura vacía
-        return calendarioCache || {
-            semanas: [],
-            meses: [],
-            separadores: {},
-            climasHorario: {},
-            ultimaActualizacion: Math.floor(Date.now() / 1000)
-        };
+        console.error('[API] Error conectando a MySQL:', error);
+        throw error;
     }
 }
 
-// IMPORTANTE: En Vercel, no puedes escribir archivos de forma persistente
-// Usamos cache en memoria que persiste durante la ejecución de la función
-// Para sincronización con FiveM, FiveM debe consultar esta API periódicamente
-function guardarCalendario(datos) {
+// Leer calendario desde MySQL
+async function leerCalendario() {
+    let conexion = null;
     try {
-        // Actualizar cache en memoria con timestamp
-        datos.ultimaActualizacion = Math.floor(Date.now() / 1000);
+        conexion = await obtenerConexion();
         
-        // Guardar en cache de cambios (prioridad alta) - funciona tanto para web como FiveM
-        cambiosDesdeWeb = {
-            datos: datos,
-            timestamp: Date.now()
+        // Obtener el último registro (id = 1 siempre, o el más reciente)
+        const [rows] = await conexion.execute(
+            'SELECT datos, ultima_actualizacion FROM calendario WHERE id = 1 LIMIT 1'
+        );
+        
+        if (rows && rows.length > 0) {
+            const datos = JSON.parse(rows[0].datos);
+            console.log('[API] Calendario leído desde MySQL');
+            console.log('[API] Timestamp:', rows[0].ultima_actualizacion);
+            
+            // ✅ VALIDAR que los datos no estén vacíos
+            const datosValidos = (
+                (datos.semanas && (Array.isArray(datos.semanas) ? datos.semanas.length > 0 : Object.keys(datos.semanas).length > 0)) ||
+                (datos.separadores && Object.keys(datos.separadores).length > 0) ||
+                (datos.climasHorario && Object.keys(datos.climasHorario).length > 0) ||
+                (datos.meses && (Array.isArray(datos.meses) ? datos.meses.length > 0 : Object.keys(datos.meses).length > 0))
+            );
+            
+            if (datosValidos) {
+                return datos;
+            } else {
+                console.warn('[API] ⚠️ Datos en MySQL están vacíos, pero manteniendo timestamp para evitar reset');
+                // Retornar datos aunque estén vacíos, pero con el timestamp original
+                // Esto evita que se sobrescriba con datos vacíos desde el servidor
+                return datos;
+            }
+        }
+        
+        // Si no existe, retornar estructura vacía
+        console.log('[API] No hay datos en MySQL, retornando estructura vacía');
+        return {
+            semanas: [],
+            meses: [],
+            separadores: {},
+            climasHorario: {},
+            ultimaActualizacion: Math.floor(Date.now() / 1000)
         };
+    } catch (error) {
+        console.error('[API] Error leyendo calendario desde MySQL:', error);
+        // Retornar estructura vacía en caso de error
+        return {
+            semanas: [],
+            meses: [],
+            separadores: {},
+            climasHorario: {},
+            ultimaActualizacion: Math.floor(Date.now() / 1000)
+        };
+    } finally {
+        if (conexion) {
+            await conexion.end();
+        }
+    }
+}
+
+// Guardar calendario en MySQL
+async function guardarCalendario(datos, actualizadoPor = 'web') {
+    let conexion = null;
+    try {
+        conexion = await obtenerConexion();
         
-        // También actualizar cache general
-        calendarioCache = datos;
-        ultimaLectura = Date.now();
+        // Actualizar timestamp
+        datos.ultimaActualizacion = Math.floor(Date.now() / 1000);
+        const datosJSON = JSON.stringify(datos);
         
-        // NOTA: Este cache persiste durante la ejecución de la función serverless
-        // Para sincronización bidireccional:
-        // 1. Cuando se guarda desde FiveM: se envía POST a esta API, actualiza el cache
-        // 2. Cuando se guarda desde web: se actualiza el cache directamente
-        // 3. FiveM consulta /api/calendario periódicamente y compara timestamps
-        // 4. Si el cache es más reciente, FiveM actualiza su archivo local
+        // Insertar o actualizar (usando INSERT ... ON DUPLICATE KEY UPDATE)
+        await conexion.execute(
+            `INSERT INTO calendario (id, datos, ultima_actualizacion, actualizado_por) 
+             VALUES (1, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE 
+             datos = VALUES(datos), 
+             ultima_actualizacion = VALUES(ultima_actualizacion),
+             actualizado_por = VALUES(actualizado_por)`,
+            [datosJSON, datos.ultimaActualizacion, actualizadoPor]
+        );
         
-        console.log('[API] Calendario actualizado en cache');
+        console.log('[API] Calendario guardado en MySQL correctamente');
         console.log('[API] Timestamp:', datos.ultimaActualizacion);
-        console.log('[API] Cache persistirá por 5 minutos para sincronización');
+        console.log('[API] Actualizado por:', actualizadoPor);
         return true;
     } catch (error) {
-        console.error('[API] Error guardando calendario:', error);
+        console.error('[API] Error guardando calendario en MySQL:', error);
         return false;
+    } finally {
+        if (conexion) {
+            await conexion.end();
+        }
     }
 }
 
@@ -129,14 +126,15 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET') {
         // Obtener calendario (público)
-        const calendario = leerCalendario();
-        
-        if (calendario) {
+        try {
+            const calendario = await leerCalendario();
+            
             return res.status(200).json({
                 success: true,
                 calendario: calendario
             });
-        } else {
+        } catch (error) {
+            console.error('[API] Error en GET:', error);
             return res.status(500).json({
                 error: 'Error al leer el calendario'
             });
@@ -145,8 +143,6 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
         // Guardar calendario
-        // NOTA: Si viene desde FiveM, no requiere autenticación (confianza interna)
-        // Si viene desde la web, requiere autenticación
         const authHeader = req.headers.authorization;
         const { calendario } = req.body;
         
@@ -156,6 +152,24 @@ export default async function handler(req, res) {
             });
         }
         
+        // ✅ VALIDAR que los datos no estén vacíos antes de guardar
+        const datosValidos = (
+            (calendario.semanas && Array.isArray(calendario.semanas) && calendario.semanas.length > 0) ||
+            (calendario.semanas && typeof calendario.semanas === 'object' && Object.keys(calendario.semanas).length > 0) ||
+            (calendario.separadores && typeof calendario.separadores === 'object' && Object.keys(calendario.separadores).length > 0) ||
+            (calendario.climasHorario && typeof calendario.climasHorario === 'object' && Object.keys(calendario.climasHorario).length > 0) ||
+            (calendario.meses && Array.isArray(calendario.meses) && calendario.meses.length > 0)
+        );
+        
+        if (!datosValidos) {
+            console.warn('[API] ⚠️ Intento de guardar calendario vacío - RECHAZADO');
+            return res.status(400).json({
+                error: 'No se pueden guardar datos vacíos del calendario'
+            });
+        }
+        
+        let actualizadoPor = 'FiveM';
+        
         // Si hay token, verificar (viene desde web)
         if (authHeader && authHeader.startsWith('Bearer ')) {
             try {
@@ -164,7 +178,8 @@ export default async function handler(req, res) {
                 const token = authHeader.replace('Bearer ', '');
                 const decoded = jwt.verify(token, JWT_SECRET);
                 
-                console.log('[API] Guardando calendario desde web (usuario autenticado)');
+                actualizadoPor = decoded.username || 'web';
+                console.log('[API] Guardando calendario desde web (usuario:', actualizadoPor, ')');
             } catch (error) {
                 return res.status(401).json({
                     error: 'Token inválido'
@@ -172,18 +187,25 @@ export default async function handler(req, res) {
             }
         } else {
             // Sin token = viene desde FiveM (confianza interna)
-            console.log('[API] Guardando calendario desde FiveM (sin autenticación)');
+            console.log('[API] Guardando calendario desde FiveM');
         }
 
-        const guardado = guardarCalendario(calendario);
-        
-        if (guardado) {
-            return res.status(200).json({
-                success: true,
-                message: 'Calendario guardado correctamente',
-                ultimaActualizacion: calendario.ultimaActualizacion
-            });
-        } else {
+        try {
+            const guardado = await guardarCalendario(calendario, actualizadoPor);
+            
+            if (guardado) {
+                return res.status(200).json({
+                    success: true,
+                    message: 'Calendario guardado correctamente',
+                    ultimaActualizacion: calendario.ultimaActualizacion
+                });
+            } else {
+                return res.status(500).json({
+                    error: 'Error al guardar el calendario'
+                });
+            }
+        } catch (error) {
+            console.error('[API] Error en POST:', error);
             return res.status(500).json({
                 error: 'Error al guardar el calendario'
             });
@@ -194,4 +216,3 @@ export default async function handler(req, res) {
         error: 'Method not allowed'
     });
 }
-

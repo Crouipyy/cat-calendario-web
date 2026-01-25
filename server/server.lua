@@ -528,11 +528,46 @@ local function SincronizarDesdeAPIWeb()
             if datos and datos.success and datos.calendario then
                 local calendarioWeb = datos.calendario
                 
+                -- ✅ VALIDAR que los datos de la web no estén vacíos antes de sobrescribir
+                local datosWebValidos = false
+                
+                -- Verificar si tiene semanas con datos
+                if calendarioWeb.semanas and type(calendarioWeb.semanas) == "table" and next(calendarioWeb.semanas) ~= nil then
+                    -- Verificar que al menos una semana tenga días con datos
+                    for _, semana in pairs(calendarioWeb.semanas) do
+                        if semana and semana.dias and next(semana.dias) ~= nil then
+                            datosWebValidos = true
+                            break
+                        end
+                    end
+                end
+                
+                -- Si no tiene semanas válidas, verificar otros datos
+                if not datosWebValidos then
+                    if calendarioWeb.separadores and type(calendarioWeb.separadores) == "table" and next(calendarioWeb.separadores) ~= nil then
+                        datosWebValidos = true
+                    elseif calendarioWeb.climasHorario and type(calendarioWeb.climasHorario) == "table" and next(calendarioWeb.climasHorario) ~= nil then
+                        datosWebValidos = true
+                    elseif calendarioWeb.meses and type(calendarioWeb.meses) == "table" and next(calendarioWeb.meses) ~= nil then
+                        datosWebValidos = true
+                    end
+                end
+                
+                -- Log para diagnóstico
+                if not datosWebValidos then
+                    print('[Calendario] ⚠️ Datos de la web están vacíos o inválidos')
+                    print('[Calendario] ⚠️ semanas:', calendarioWeb.semanas and 'existe' or 'nil', type(calendarioWeb.semanas))
+                    if calendarioWeb.semanas then
+                        print('[Calendario] ⚠️ semanas vacías:', next(calendarioWeb.semanas) == nil)
+                    end
+                end
+                
                 -- Comparar timestamps
                 local timestampWeb = calendarioWeb.ultimaActualizacion or 0
                 local timestampLocal = calendarioData.ultimaActualizacion or 0
                 
-                if timestampWeb > timestampLocal then
+                -- Solo actualizar si los datos de la web son válidos Y el timestamp es mayor
+                if timestampWeb > timestampLocal and datosWebValidos then
                     print('[Calendario] 🌐 Cambios detectados desde servidor web (API)')
                     print('[Calendario] Timestamp web:', timestampWeb, 'vs local:', timestampLocal)
                     
@@ -546,6 +581,10 @@ local function SincronizarDesdeAPIWeb()
                     -- Notificar a todos los clientes
                     TriggerClientEvent('cat_calendario:actualizarCalendario', -1, calendarioData)
                     print('[Calendario] ✅ Calendario sincronizado desde servidor web')
+                elseif timestampWeb > timestampLocal and not datosWebValidos then
+                    print('[Calendario] ⚠️ La web tiene timestamp más reciente pero datos vacíos - IGNORANDO para evitar resetear')
+                    print('[Calendario] ⚠️ Timestamp web:', timestampWeb, 'vs local:', timestampLocal)
+                    print('[Calendario] ⚠️ Manteniendo datos locales para evitar pérdida de información')
                 else
                     print('[Calendario] 🔄 Calendario ya está actualizado (web:', timestampWeb, 'local:', timestampLocal, ')')
                 end
