@@ -4,6 +4,74 @@ local calendarioData = {}
 local climaInterval = nil
 local ultimoClimaAplicado = nil
 
+-- Función para guardar en MySQL
+local function GuardarCalendarioEnMySQL(datos)
+    if not Config.Database or not Config.Database.enabled then
+        return false
+    end
+    
+    if not datos or next(datos) == nil then
+        print('[Calendario] No hay datos para guardar en MySQL')
+        return false
+    end
+    
+    -- Actualizar timestamp
+    datos.ultimaActualizacion = os.time()
+    local datosJSON = json.encode(datos)
+    
+    -- Usar oxmysql para guardar en MySQL
+    -- INSERT ... ON DUPLICATE KEY UPDATE para actualizar el registro con id=1
+    MySQL.Async.execute(
+        [[INSERT INTO calendario (id, datos, ultima_actualizacion, actualizado_por) 
+          VALUES (1, ?, ?, 'FiveM')
+          ON DUPLICATE KEY UPDATE 
+          datos = VALUES(datos), 
+          ultima_actualizacion = VALUES(ultima_actualizacion),
+          actualizado_por = VALUES(actualizado_por)]],
+        {datosJSON, datos.ultimaActualizacion},
+        function(affectedRows)
+            if affectedRows > 0 then
+                print('[Calendario] ✅ Calendario guardado en MySQL correctamente')
+            else
+                print('[Calendario] ⚠️ No se pudo guardar en MySQL')
+            end
+        end
+    )
+    
+    return true
+end
+
+-- Función para cargar desde MySQL
+local function CargarCalendarioDesdeMySQL()
+    if not Config.Database or not Config.Database.enabled then
+        return false
+    end
+    
+    MySQL.Async.fetchAll(
+        'SELECT datos, ultima_actualizacion FROM calendario WHERE id = 1 LIMIT 1',
+        {},
+        function(result)
+            if result and #result > 0 then
+                local datos, error = json.decode(result[1].datos)
+                if datos then
+                    calendarioData = datos
+                    print('[Calendario] ✅ Calendario cargado desde MySQL')
+                    print('[Calendario] Timestamp MySQL:', result[1].ultima_actualizacion)
+                    
+                    -- Asegurar que climasHorario existe
+                    AsegurarClimasHorario()
+                else
+                    print('[Calendario] ⚠️ Error decodificando datos de MySQL:', error)
+                end
+            else
+                print('[Calendario] ⚠️ No hay datos en MySQL, usando archivo local')
+            end
+        end
+    )
+    
+    return true
+end
+
 -- Función para asegurar que climasHorario tenga valores
 local function AsegurarClimasHorario()
     if not calendarioData.climasHorario then
@@ -118,32 +186,88 @@ local function SincronizarConWebServer(datos)
         return false
     end
     
+    -- Asegurar que los datos tengan timestamp actualizado
+    if not datos then
+        datos = calendarioData
+    end
+    
+    -- Actualizar timestamp antes de sincronizar para que la web sepa que hay cambios
+    datos.ultimaActualizacion = os.time()
+    
+    -- Asegurar que climasHorario existe antes de sincronizar
+    AsegurarClimasHorario()
+    
     -- Usar PerformHttpRequest para enviar datos a la API
-    local datosJSON = json.encode(datos)
+    -- El API espera { calendario: datos }, no solo los datos
+    local payload = {
+        calendario = datos
+    }
+    local datosJSON = json.encode(payload)
     local apiUrl = url .. '/api/calendario'
     
     print('[Calendario] 🌐 Sincronizando con servidor web: ' .. apiUrl)
     print('[Calendario] 🌐 Enviando datos del juego a la web...')
+    print('[Calendario] 🌐 Timestamp:', datos.ultimaActualizacion)
     
-    -- Enviar POST a la API web para actualizar el cache
-    -- NOTA: Esto actualiza el cache en memoria de Vercel, no el archivo del repo
-    -- El archivo del repo se actualiza cuando FiveM guarda localmente
+    -- Enviar POST a la API web para actualizar MySQL
     PerformHttpRequest(apiUrl, function(statusCode, response, headers)
         if statusCode == 200 then
             print('[Calendario] ✅ Calendario sincronizado con servidor web correctamente')
-            local datos, error = json.decode(response)
-            if datos and datos.success then
+            local datosRespuesta, error = json.decode(response)
+            if datosRespuesta and datosRespuesta.success then
                 print('[Calendario] ✅ Confirmación del servidor web recibida')
+                print('[Calendario] ✅ Timestamp confirmado:', datosRespuesta.ultimaActualizacion or 'N/A')
             end
         else
             print('[Calendario] ⚠️ Error sincronizando con servidor web. Status:', statusCode)
             if response then
                 print('[Calendario] ⚠️ Respuesta:', response)
+                -- Intentar decodificar el error para más información
+                local errorData, err = json.decode(response)
+                if errorData and errorData.error then
+                    print('[Calendario] ⚠️ Error detallado:', errorData.error)
+                end
             end
         end
     end, 'POST', datosJSON, {
         ['Content-Type'] = 'application/json'
     })
+    
+    return true
+end
+
+-- Función para guardar en MySQL
+local function GuardarCalendarioEnMySQL(datos)
+    if not Config.Database or not Config.Database.enabled then
+        return false
+    end
+    
+    if not datos or next(datos) == nil then
+        print('[Calendario] No hay datos para guardar en MySQL')
+        return false
+    end
+    
+    -- Actualizar timestamp
+    datos.ultimaActualizacion = os.time()
+    local datosJSON = json.encode(datos)
+    
+    -- Usar oxmysql para guardar en MySQL
+    MySQL.Async.execute(
+        [[INSERT INTO calendario (id, datos, ultima_actualizacion, actualizado_por) 
+          VALUES (1, ?, ?, 'FiveM')
+          ON DUPLICATE KEY UPDATE 
+          datos = VALUES(datos), 
+          ultima_actualizacion = VALUES(ultima_actualizacion),
+          actualizado_por = VALUES(actualizado_por)]],
+        {datosJSON, datos.ultimaActualizacion},
+        function(affectedRows)
+            if affectedRows > 0 then
+                print('[Calendario] ✅ Calendario guardado en MySQL correctamente')
+            else
+                print('[Calendario] ⚠️ No se pudo guardar en MySQL')
+            end
+        end
+    )
     
     return true
 end
@@ -155,6 +279,18 @@ local function GuardarCalendarioEnArchivo()
         return false
     end
     
+    -- Actualizar timestamp antes de guardar
+    calendarioData.ultimaActualizacion = os.time()
+    
+    -- Asegurar que climasHorario existe antes de guardar
+    AsegurarClimasHorario()
+    
+    -- PRIORIDAD 1: Guardar en MySQL si está habilitado
+    if Config.Database and Config.Database.enabled then
+        GuardarCalendarioEnMySQL(calendarioData)
+    end
+    
+    -- PRIORIDAD 2: Guardar en archivo local (backup)
     local resourcePath = GetResourcePath(GetCurrentResourceName())
     local dataPath = resourcePath .. '/calendario_data.json'
     
@@ -164,21 +300,102 @@ local function GuardarCalendarioEnArchivo()
         file:write(datosJSON)
         file:close()
         print('[Calendario] Calendario guardado en archivo correctamente')
-        
-        -- Intentar sincronizar con servidor web
-        if Config.WebServer and Config.WebServer.enabled then
-            SincronizarConWebServer(calendarioData)
-        end
-        
-        return true
     else
-        print('[Calendario] Error: No se pudo abrir el archivo para escritura')
-        return false
+        print('[Calendario] ⚠️ Error: No se pudo abrir el archivo para escritura')
     end
+    
+    -- PRIORIDAD 3: Sincronizar con servidor web (para que la web también tenga los datos)
+    -- IMPORTANTE: Sincronizar después de guardar en MySQL para asegurar consistencia
+    if Config.WebServer and Config.WebServer.enabled then
+        -- Esperar un poco para que MySQL termine de guardar antes de sincronizar
+        CreateThread(function()
+            Wait(500) -- Esperar 500ms para que MySQL termine
+            SincronizarConWebServer(calendarioData)
+        end)
+    end
+    
+    return true
 end
 
 -- Función mejorada para cargar desde archivo
-local function CargarCalendarioDesdeArchivo()
+local function CargarCalendarioDesdeArchivo(callback)
+    -- PRIORIDAD 1: Intentar cargar desde MySQL si está habilitado
+    if Config.Database and Config.Database.enabled then
+        local cargadoDesdeMySQL = false
+        MySQL.Async.fetchAll(
+            'SELECT datos, ultima_actualizacion FROM calendario WHERE id = 1 LIMIT 1',
+            {},
+            function(result)
+                if result and #result > 0 then
+                    local datos, error = json.decode(result[1].datos)
+                    if datos then
+                        calendarioData = datos
+                        print('[Calendario] ✅ Calendario cargado desde MySQL')
+                        print('[Calendario] Timestamp MySQL:', result[1].ultima_actualizacion)
+                        AsegurarClimasHorario()
+                        cargadoDesdeMySQL = true
+                        
+                        -- Ejecutar callback si existe
+                        if callback then
+                            callback(true)
+                        end
+                    else
+                        print('[Calendario] ⚠️ Error decodificando datos de MySQL:', error)
+                    end
+                end
+                
+                -- Si no se pudo cargar desde MySQL, intentar desde archivo
+                if not cargadoDesdeMySQL then
+                    local resourcePath = GetResourcePath(GetCurrentResourceName())
+                    local filePath = resourcePath .. '/calendario_data.json'
+                    
+                    local file = io.open(filePath, "r")
+                    if file then
+                        local contenido = file:read("*a")
+                        file:close()
+                        
+                        if contenido and contenido ~= "" then
+                            local datos, error = json.decode(contenido)
+                            if datos then
+                                calendarioData = datos
+                                print('[Calendario] Calendario cargado desde archivo (fallback)')
+                                AsegurarClimasHorario()
+                                -- Guardar en MySQL para sincronizar
+                                GuardarCalendarioEnMySQL(calendarioData)
+                                
+                                -- Ejecutar callback si existe
+                                if callback then
+                                    callback(true)
+                                end
+                            else
+                                print('[Calendario] Error decodificando archivo:', error)
+                                InicializarCalendario()
+                                if callback then
+                                    callback(false)
+                                end
+                            end
+                        else
+                            InicializarCalendario()
+                            if callback then
+                                callback(false)
+                            end
+                        end
+                    else
+                        print('[Calendario] No se pudo cargar el archivo, inicializando nuevo calendario')
+                        InicializarCalendario()
+                        if callback then
+                            callback(false)
+                        end
+                    end
+                end
+            end
+        )
+        
+        -- Retornar true inmediatamente (la carga es asíncrona)
+        return true
+    end
+    
+    -- PRIORIDAD 2: Cargar desde archivo si MySQL no está habilitado
     local resourcePath = GetResourcePath(GetCurrentResourceName())
     local filePath = resourcePath .. '/calendario_data.json'
     
@@ -196,6 +413,9 @@ local function CargarCalendarioDesdeArchivo()
                 -- ✅ ASEGURAR QUE CLIMAS HORARIO EXISTA Y ESTÉ COMPLETO
                 AsegurarClimasHorario()
                 
+                if callback then
+                    callback(true)
+                end
                 return true
             else
                 print('[Calendario] Error decodificando archivo:', error)
@@ -204,7 +424,11 @@ local function CargarCalendarioDesdeArchivo()
     end
     
     print('[Calendario] No se pudo cargar el archivo, inicializando nuevo calendario')
-    return InicializarCalendario()
+    local resultado = InicializarCalendario()
+    if callback then
+        callback(resultado)
+    end
+    return resultado
 end
 
 -- Función para verificar permisos en el servidor
@@ -409,23 +633,34 @@ CreateThread(function()
     
     RegistrarCallbacks()
     
-    if not CargarCalendarioDesdeArchivo() then
-        print('[Calendario] Error al inicializar calendario')
-    else
-        -- Inicializar timestamp de última modificación
-        if calendarioData.ultimaActualizacion then
-            ultimaModificacionArchivo = calendarioData.ultimaActualizacion
+    -- Cargar calendario con callback para sincronizar después
+    CargarCalendarioDesdeArchivo(function(cargado)
+        if cargado then
+            -- Inicializar timestamp de última modificación
+            if calendarioData.ultimaActualizacion then
+                ultimaModificacionArchivo = calendarioData.ultimaActualizacion
+            end
+            
+            -- ✅ SINCRONIZAR CON LA WEB DESPUÉS DE CARGAR AL INICIAR EL SERVIDOR
+            if Config.WebServer and Config.WebServer.enabled then
+                print('[Calendario] 🌐 Sincronizando calendario con servidor web al iniciar...')
+                -- Esperar un poco para asegurar que todo esté listo
+                Wait(2000)
+                SincronizarConWebServer(calendarioData)
+            end
+        else
+            print('[Calendario] Error al inicializar calendario')
         end
-    end
-    
-    print('[Calendario] Recurso completamente inicializado')
-    
-    if Config.WebServer and Config.WebServer.enabled then
-        print('[Calendario] 🌐 Sincronización con servidor web ACTIVADA')
-        if Config.WebServer.syncInterval and Config.WebServer.syncInterval > 0 then
-            print('[Calendario] 🔄 Verificando cambios cada ' .. Config.WebServer.syncInterval .. ' segundos')
+        
+        print('[Calendario] Recurso completamente inicializado')
+        
+        if Config.WebServer and Config.WebServer.enabled then
+            print('[Calendario] 🌐 Sincronización con servidor web ACTIVADA')
+            if Config.WebServer.syncInterval and Config.WebServer.syncInterval > 0 then
+                print('[Calendario] 🔄 Verificando cambios cada ' .. Config.WebServer.syncInterval .. ' segundos')
+            end
         end
-    end
+    end)
 end)
 
 -- Función para obtener el clima según la hora actual
