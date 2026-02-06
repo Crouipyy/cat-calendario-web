@@ -54,7 +54,7 @@ Config.EstacionesPorDia = {
 
 -- Días de la semana
 Config.DiasSemana = {
-    "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"
+    "Sábado", "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"
 }
 
 -- Meses del año para roleo
