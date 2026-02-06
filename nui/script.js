@@ -78,7 +78,7 @@ console.log('[Calendario] API URL:', API_URL);
 const configPorDefecto = {
     cursos: ["1º", "2º", "3º", "4º", "5º", "6º", "7º", "Todos"],
     meses: ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"],
-    diasSemana: ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"],
+    diasSemana: ["Sábado", "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"],
     horarios: [
         {hora: "16:10 - 17:00", inicio: 16.17, fin: 17, clima: "CLEARING"},
         {hora: "17:00 - 18:00", inicio: 17, fin: 18, clima: "CLEARING"},
