@@ -8,6 +8,184 @@ let claseParaEliminar = null;
 let separadorParaEditar = null;
 let separadorParaEliminar = null;
 
+/** Pestañas del tablón (Índice, Horario, textos). Misma UI en GMod y web. */
+const TABLON_SECCION_KEYS = ['normas', 'optativas', 'clubes', 'notas'];
+const TABLON_TABS_ORDER = ['indice', 'horario', 'normas', 'optativas', 'clubes', 'notas'];
+let pestanaTablonActual = 'indice';
+
+function asegurarTablonSecciones() {
+    if (!calendarioData.tablonSecciones || typeof calendarioData.tablonSecciones !== 'object') {
+        calendarioData.tablonSecciones = {};
+    }
+    const d = calendarioData.tablonSecciones;
+    TABLON_SECCION_KEYS.forEach(function (k) {
+        if (typeof d[k] !== 'string') {
+            d[k] = '';
+        }
+    });
+}
+
+function aplicarTablonSeccionesAlDOM() {
+    asegurarTablonSecciones();
+    const ts = calendarioData.tablonSecciones;
+    TABLON_SECCION_KEYS.forEach(function (key) {
+        const v = document.getElementById('tablon-view-' + key);
+        const e = document.getElementById('tablon-edit-' + key);
+        const txt = ts[key] || '';
+        if (v) {
+            v.textContent = txt;
+        }
+        if (e) {
+            e.value = txt;
+        }
+        if (v && e) {
+            if (esProfesor) {
+                v.style.display = 'none';
+                e.style.display = 'block';
+            } else {
+                v.style.display = 'block';
+                e.style.display = 'none';
+            }
+        }
+    });
+}
+
+function leerTablonSeccionesDelDOM() {
+    if (!esProfesor) {
+        return;
+    }
+    asegurarTablonSecciones();
+    TABLON_SECCION_KEYS.forEach(function (key) {
+        const el = document.getElementById('tablon-edit-' + key);
+        if (el) {
+            calendarioData.tablonSecciones[key] = el.value;
+        }
+    });
+}
+
+function cambiarPestanaTablon(id) {
+    if (TABLON_TABS_ORDER.indexOf(id) === -1) {
+        id = 'indice';
+    }
+    pestanaTablonActual = id;
+    TABLON_TABS_ORDER.forEach(function (pid) {
+        const panel = document.getElementById('panel-' + pid);
+        if (panel) {
+            panel.classList.toggle('tablon-panel--activa', pid === id);
+        }
+    });
+    document.querySelectorAll('.tablon-nav-principal [data-catcal-tab]').forEach(function (btn) {
+        btn.classList.toggle('tablon-nav-activa', btn.getAttribute('data-catcal-tab') === id);
+    });
+    if (id === 'horario') {
+        try {
+            mostrarCalendario();
+        } catch (e1) {
+            catCalDebugLog('cambiarPestanaTablon mostrarCalendario: ' + String(e1));
+        }
+    }
+}
+
+function refrescarTablonTrasAbrir() {
+    asegurarTablonSecciones();
+    aplicarTablonSeccionesAlDOM();
+    cambiarPestanaTablon('indice');
+}
+
+// Garry's Mod DHTML: URL suele ser asset://garrysmod/... — forzar modo embebido (nunca API Vercel/MySQL).
+(function () {
+    try {
+        var href = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+        var proto = (typeof window !== 'undefined' && window.location && window.location.protocol) || '';
+        if (proto === 'asset:' || href.indexOf('asset://') === 0 || href.indexOf('garrysmod/html/cat_calendario') !== -1) {
+            window.MODO_GMOD = true;
+            window.MODO_WEB = false;
+            window.API_URL = '';
+        }
+    } catch (e) {}
+})();
+
+/** Debug (solo modo web / consola navegador). En GMod no se usa para no spamear ni mostrar overlay. */
+function catCalDebugLog(msg) {
+    if (typeof window !== 'undefined' && window.MODO_GMOD === true) {
+        return;
+    }
+    var t = '';
+    try {
+        t = new Date().toISOString().substring(11, 23);
+    } catch (e0) {
+        t = '?';
+    }
+    var line = '[' + t + '] ' + String(msg);
+    try {
+        console.log('[CAT_CAL]', line);
+    } catch (e1) {}
+    try {
+        if (typeof gmod !== 'undefined' && gmod && typeof gmod.CalLog === 'function') {
+            gmod.CalLog('[CAT_CAL] ' + line);
+        }
+    } catch (e2) {}
+    try {
+        var o = document.getElementById('catcal-debug-overlay');
+        if (o) {
+            o.style.display = 'block';
+            o.appendChild(document.createTextNode(line + '\n'));
+        }
+    } catch (e3) {}
+}
+try {
+    window.catCalDebugLog = catCalDebugLog;
+} catch (e4) {}
+
+catCalDebugLog('script.js: inicio parse (tras IIFE MODO_GMOD)');
+
+/**
+ * Helix/Lua y MySQL pueden devolver tablas como {"1": sem1, "2": sem2} o arrays con [null, sem1, sem2].
+ * El UI usa semanas[0] y semanas[1]. Normaliza para evitar "No hay datos para esta semana".
+ */
+function normalizarCalendarioRecibido(cal) {
+    if (!cal || typeof cal !== 'object') {
+        return {};
+    }
+    const out = Object.assign({}, cal);
+
+    function arrayDesdeObjetoOAgujero(arrOrObj) {
+        if (arrOrObj == null) {
+            return [];
+        }
+        if (Array.isArray(arrOrObj)) {
+            if (arrOrObj.length > 1 && arrOrObj[0] == null && arrOrObj[1] != null) {
+                return arrOrObj.slice(1);
+            }
+            return arrOrObj;
+        }
+        const keys = Object.keys(arrOrObj).sort(function (a, b) {
+            return Number(a) - Number(b);
+        });
+        return keys.map(function (k) {
+            return arrOrObj[k];
+        }).filter(function (x) {
+            return x != null;
+        });
+    }
+
+    out.semanas = arrayDesdeObjetoOAgujero(out.semanas);
+
+    if (Array.isArray(out.semanas)) {
+        out.semanas = out.semanas.map(function (semana) {
+            if (!semana || typeof semana !== 'object') {
+                return semana;
+            }
+            const dias = arrayDesdeObjetoOAgujero(semana.dias);
+            return Object.assign({}, semana, { dias: dias });
+        });
+    }
+
+    out.meses = arrayDesdeObjetoOAgujero(out.meses);
+
+    return out;
+}
+
 // Guardar referencia a la función nativa de FiveM ANTES de definir nuestra función
 // Esto evita que nuestra función sobrescriba la nativa y cause recursión
 const NATIVE_GET_PARENT_RESOURCE_NAME = (typeof window !== 'undefined' && typeof window.GetParentResourceName === 'function') 
@@ -16,6 +194,14 @@ const NATIVE_GET_PARENT_RESOURCE_NAME = (typeof window !== 'undefined' && typeof
 
 // Detectar modo web automáticamente (SIN llamar a GetParentResourceName para evitar recursión)
 function detectarModoWeb() {
+    if (typeof window !== 'undefined' && window.MODO_GMOD === true) {
+        return false;
+    }
+    const href0 = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+    const proto0 = (typeof window !== 'undefined' && window.location && window.location.protocol) || '';
+    if (proto0 === 'asset:' || href0.indexOf('asset://') === 0 || href0.indexOf('garrysmod/html/cat_calendario') !== -1) {
+        return false;
+    }
     // Si window.MODO_WEB está definido explícitamente, usarlo
     if (typeof window.MODO_WEB !== 'undefined') {
         return window.MODO_WEB === true;
@@ -45,6 +231,14 @@ function detectarModoWeb() {
 }
 
 function obtenerAPIURL() {
+    if (typeof window !== 'undefined' && window.MODO_GMOD === true) {
+        return '';
+    }
+    const href0 = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+    const proto0 = (typeof window !== 'undefined' && window.location && window.location.protocol) || '';
+    if (proto0 === 'asset:' || href0.indexOf('asset://') === 0 || href0.indexOf('garrysmod/html/cat_calendario') !== -1) {
+        return '';
+    }
     // Si está definido explícitamente, usarlo
     if (window.API_URL && window.API_URL !== '' && window.API_URL !== 'https://cfx-nui-cat_calendario') {
         return window.API_URL;
@@ -146,11 +340,171 @@ const configPorDefecto = {
         {nombre: "Negro", valor: "#000000"},
         {nombre: "Blanco", valor: "#ffffff"}
     ],
-    climas: ["EXTRASUNNY", "CLEAR", "NEUTRAL", "SMOG", "FOGGY", "OVERCAST", "CLOUDS", "CLEARING", "RAIN", "THUNDER", "SNOW", "BLIZZARD", "SNOWLIGHT", "XMAS", "HALLOWEEN"]
+    climas: ["CLEAR", "CLOUDS", "CLEARING", "RAIN", "THUNDER", "FOGGY"]
 };
+
+// Compatibilidad CEF antiguo (GMod): sin optional chaining (?.) en todo el archivo.
+function elOn(id, eventName, handler) {
+    var el = document.getElementById(id);
+    if (el) {
+        el.addEventListener(eventName, handler);
+    }
+}
+
+function celdaDiaCal(semanaIndex, diaIndex) {
+    var sm = calendarioData.semanas;
+    if (!sm || sm[semanaIndex] == null) {
+        return null;
+    }
+    var dias = sm[semanaIndex].dias;
+    if (!dias || dias[diaIndex] == null) {
+        return null;
+    }
+    return dias[diaIndex];
+}
+
+function clasesEnFranjaCal(semanaIndex, diaIndex, horario) {
+    var d = celdaDiaCal(semanaIndex, diaIndex);
+    if (!d || !d.clases) {
+        return [];
+    }
+    var c = d.clases[horario];
+    return c || [];
+}
+
+function eventosHorarioComoArray(semanaIndex, diaIndex, horario) {
+    var d = celdaDiaCal(semanaIndex, diaIndex);
+    if (!d || !d.eventosHorario) {
+        return [];
+    }
+    var ev = d.eventosHorario[horario];
+    if (!ev) {
+        return [];
+    }
+    return Array.isArray(ev) ? ev : [ev];
+}
+
+function claseEnFranjaCal(semanaIndex, diaIndex, horario, claseIndex) {
+    var arr = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
+    if (claseIndex === '' || claseIndex == null) {
+        return undefined;
+    }
+    return arr[claseIndex];
+}
+
+function handleCalendarioPostMessage(event) {
+    catCalDebugLog('handleCalendarioPostMessage: entrando');
+    var data = event.data;
+    catCalDebugLog('handleCal: typeof data=' + typeof data);
+    if (typeof data === 'string') {
+        try {
+            data = JSON.parse(data);
+            catCalDebugLog('handleCal: JSON.parse string OK');
+        } catch (e0) {
+            catCalDebugLog('handleCal: JSON.parse string FALLA ' + String(e0));
+            return;
+        }
+    }
+    if (!data || !data.action) {
+        catCalDebugLog('handleCal: sin data o sin action, ignorado');
+        return;
+    }
+    catCalDebugLog('handleCal: action=' + String(data.action));
+
+    if (data.action === 'abrirCalendario') {
+        catCalDebugLog('abrirCalendario: normalizando calendario…');
+        try {
+            var rawSem = data.calendario && data.calendario.semanas;
+            catCalDebugLog('abrirCal: semanas typeof=' + typeof rawSem + (Array.isArray(rawSem) ? ' len=' + rawSem.length : ' keys=' + (rawSem && typeof rawSem === 'object' ? Object.keys(rawSem).length : 'n/a')));
+        } catch (eSz) {
+            catCalDebugLog('abrirCal: error inspeccion semanas ' + String(eSz));
+        }
+
+        calendarioData = normalizarCalendarioRecibido(data.calendario || {});
+        esProfesor = data.esProfesor || false;
+        config = data.config || {};
+
+        if (!config.cursos) {
+            config.cursos = [];
+        }
+        if (!config.meses) {
+            config.meses = [];
+        }
+        if (!config.diasSemana) {
+            config.diasSemana = [];
+        }
+        if (!config.horarios) {
+            config.horarios = [];
+        }
+        if (!config.lunas) {
+            config.lunas = [];
+        }
+        if (!config.eventos) {
+            config.eventos = [];
+        }
+        if (!config.separadores) {
+            config.separadores = [];
+        }
+
+        if (!config.diasSemana || config.diasSemana.length === 0) {
+            config.diasSemana = configPorDefecto.diasSemana.slice();
+        }
+        if (!config.horarios || config.horarios.length === 0) {
+            config.horarios = JSON.parse(JSON.stringify(configPorDefecto.horarios));
+        }
+
+        if (!config.climas || config.climas.length === 0) {
+            catCalDebugLog('config.climas vacio -> por defecto');
+            config.climas = [
+                'CLEAR', 'CLOUDS', 'CLEARING', 'RAIN', 'THUNDER', 'FOGGY'
+            ];
+        }
+
+        if (data.tituloVentana) {
+            var tituloHeader = document.querySelector('.header h1');
+            if (tituloHeader) {
+                tituloHeader.textContent = data.tituloVentana;
+            }
+        }
+
+        document.body.style.display = 'block';
+        catCalDebugLog('abrirCal: body display block, llamando mostrarCalendario()');
+        try {
+            mostrarCalendario();
+            catCalDebugLog('abrirCal: mostrarCalendario() retorno OK');
+        } catch (eMc) {
+            catCalDebugLog('abrirCal: mostrarCalendario EXC ' + String(eMc));
+        }
+
+        var btnGuardar = document.getElementById('btnGuardar');
+        if (btnGuardar) {
+            btnGuardar.style.display = esProfesor ? 'block' : 'none';
+        }
+        refrescarTablonTrasAbrir();
+    }
+
+    if (data.action === 'cerrarCalendario') {
+        catCalDebugLog('cerrarCalendario');
+        document.body.style.display = 'none';
+        cerrarContextMenu();
+    }
+
+    if (data.action === 'actualizarCalendario') {
+        catCalDebugLog('actualizarCalendario');
+        if (data.calendario) {
+            calendarioData = normalizarCalendarioRecibido(data.calendario);
+            mostrarCalendario();
+            asegurarTablonSecciones();
+            aplicarTablonSeccionesAlDOM();
+        }
+    }
+}
 
 // Función para cargar datos desde API (modo web)
 async function cargarDatosDesdeAPI() {
+    if (typeof window !== 'undefined' && window.MODO_GMOD === true) {
+        return;
+    }
     // Verificar que estamos realmente en modo web (no FiveM)
     if (!MODO_WEB || !API_URL || API_URL === '' || API_URL.includes('cfx-nui')) {
         console.log('[Calendario] No se puede cargar desde API - estamos en FiveM o API_URL inválida');
@@ -171,18 +525,17 @@ async function cargarDatosDesdeAPI() {
         console.log('[Calendario] Datos recibidos:', data);
         
         if (data.success && data.calendario) {
-            // Comparar timestamps para detectar cambios
             const nuevoTimestamp = data.calendario.ultimaActualizacion || 0;
-            
+
             if (ultimoTimestamp !== null && nuevoTimestamp > ultimoTimestamp) {
                 console.log('[Calendario] 🔄 Cambios detectados! Timestamp anterior:', ultimoTimestamp, 'Nuevo:', nuevoTimestamp);
                 mostrarNotificacion('🔄 Calendario actualizado', 'info');
             }
-            
+
             ultimoTimestamp = nuevoTimestamp;
-            calendarioData = data.calendario;
-            
-            // Si el calendario está visible, actualizar la vista
+            config = configPorDefecto;
+            calendarioData = normalizarCalendarioRecibido(data.calendario);
+
             if (document.body.style.display !== 'none') {
                 mostrarCalendario();
             }
@@ -190,9 +543,11 @@ async function cargarDatosDesdeAPI() {
             console.warn('[Calendario] No hay datos del calendario, usando estructura vacía');
             calendarioData = { semanas: [], meses: [], separadores: {}, climasHorario: {} };
         }
-        
-        // Cargar configuración
-        config = configPorDefecto;
+
+        // Cargar configuración (por si el bloque anterior no entró)
+        if (!config || !config.horarios || config.horarios.length === 0) {
+            config = configPorDefecto;
+        }
         
         // Verificar autenticación si hay token
         if (tokenAutenticacion) {
@@ -226,7 +581,11 @@ async function cargarDatosDesdeAPI() {
         if (btnGuardar) {
             btnGuardar.style.display = esProfesor ? 'block' : 'none';
         }
-        
+
+        asegurarTablonSecciones();
+        aplicarTablonSeccionesAlDOM();
+        cambiarPestanaTablon('indice');
+
         // Mostrar botón de login si no está autenticado
         mostrarLoginSiNecesario();
         
@@ -257,6 +616,9 @@ async function cargarDatosDesdeAPI() {
 
 // Función para iniciar polling periódico (solo en modo web)
 function iniciarPollingPeriodico() {
+    if (typeof window !== 'undefined' && window.MODO_GMOD === true) {
+        return;
+    }
     // Solo en modo web y si no hay un intervalo ya activo
     if (!MODO_WEB || !API_URL || API_URL === '' || API_URL.includes('cfx-nui')) {
         return;
@@ -300,11 +662,13 @@ function iniciarPollingPeriodico() {
                     
                     // Actualizar datos
                     ultimoTimestamp = nuevoTimestamp;
-                    calendarioData = data.calendario;
+                    calendarioData = normalizarCalendarioRecibido(data.calendario);
                     
                     // Actualizar la vista si el calendario está visible
                     if (document.body.style.display !== 'none') {
                         mostrarCalendario();
+                        asegurarTablonSecciones();
+                        aplicarTablonSeccionesAlDOM();
                         mostrarNotificacion('🔄 Calendario actualizado automáticamente', 'info');
                     }
                 } else if (ultimoTimestamp === null) {
@@ -450,6 +814,7 @@ function GetParentResourceName() {
 
 // Inicializar
 document.addEventListener('DOMContentLoaded', function() {
+    catCalDebugLog('DOMContentLoaded: MODO_WEB=' + MODO_WEB + ' MODO_GMOD=' + (typeof window !== 'undefined' ? window.MODO_GMOD : '?'));
     console.log('NUI: Interfaz cargada, inicializando eventos...');
     console.log('Modo Web:', MODO_WEB);
     console.log('API URL:', API_URL);
@@ -470,49 +835,44 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Iniciar polling periódico para detectar cambios (cada 30 segundos)
             iniciarPollingPeriodico();
+        } else if (typeof window !== 'undefined' && window.MODO_GMOD === true) {
+            // GMod DHTML: no ocultar body (display:none deja panel blanco si falla postMessage o la cola JS).
+            document.body.style.display = 'block';
+            console.log('[NUI] GMod: panel visible; esperando mensaje del cliente Lua');
         } else {
-            // En modo FiveM, ocultar hasta recibir mensaje
+            // FiveM u otros embebidos: ocultar hasta recibir mensaje
             document.body.style.display = 'none';
-            console.log('[NUI] Modo FiveM detectado - Esperando mensaje del cliente');
+            console.log('[NUI] Modo embebido (no web): esperando mensaje del cliente');
         }
     } catch (error) {
         console.error('Error en inicialización:', error);
+        try {
+            catCalDebugLog('DOMContentLoaded CATCH: ' + String(error));
+        } catch (e2) {}
         document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><h2>Error al cargar el calendario</h2><p>Revisa la consola para más detalles.</p></div>';
         document.body.style.display = 'block';
     }
 });
 
 function inicializarEventos() {
-    
+    catCalDebugLog('inicializarEventos: entrada');
     console.log('NUI: Inicializando eventos...');
 
     // Inicializar selectores de color
     inicializarSelectoresColor();
 
     // Configurar eventos de clima horario
-    const btnCancelarClimaHorario = document.getElementById('btnCancelarClimaHorario');
-    const formClimaHorario = document.getElementById('formClimaHorario');
-    
-    if (btnCancelarClimaHorario) {
-        btnCancelarClimaHorario.addEventListener('click', cerrarModalClimaHorario);
-    }
-    
-    if (formClimaHorario) {
-        formClimaHorario.addEventListener('submit', guardarClimaHorario);
-    }
-
-    document.getElementById('btnCancelarClimaHorario')?.addEventListener('click', cerrarModalClimaHorario);
-    document.getElementById('formClimaHorario')?.addEventListener('submit', guardarClimaHorario);   
-    document.getElementById('horaPruebaClima')?.addEventListener('input', function() {
+    elOn('btnCancelarClimaHorario', 'click', cerrarModalClimaHorario);
+    elOn('horaPruebaClima', 'input', function() {
         calcularClimaParaHora(this.value);
     });
 
-    document.getElementById('btnAplicarClimaPrueba')?.addEventListener('click', aplicarClimaPrueba);
-    document.getElementById('btnProbarClimas')?.addEventListener('click', abrirModalProbarClimas);
-    document.getElementById('btnCerrarProbarClimas')?.addEventListener('click', cerrarModalProbarClimas);
+    elOn('btnAplicarClimaPrueba', 'click', aplicarClimaPrueba);
+    elOn('btnProbarClimas', 'click', abrirModalProbarClimas);
+    elOn('btnCerrarProbarClimas', 'click', cerrarModalProbarClimas);
 
-    document.getElementById('btnConfirmarEliminarSeparador')?.addEventListener('click', confirmarEliminarSeparador);
-    document.getElementById('btnCancelarEliminarSeparador')?.addEventListener('click', cerrarModalEliminarSeparador);
+    elOn('btnConfirmarEliminarSeparador', 'click', confirmarEliminarSeparador);
+    elOn('btnCancelarEliminarSeparador', 'click', cerrarModalEliminarSeparador);
     
     // Botones de cierre (con verificación de existencia)
     const btnCerrar = document.getElementById('btnCerrar');
@@ -527,6 +887,20 @@ function inicializarEventos() {
             cambiarSemana(parseInt(this.dataset.semana));
         });
     });
+
+    const tablonMain = document.getElementById('tablon-main');
+    if (tablonMain) {
+        tablonMain.addEventListener('click', function (ev) {
+            const el = ev.target.closest('[data-catcal-tab]');
+            if (!el || !tablonMain.contains(el)) {
+                return;
+            }
+            const id = el.getAttribute('data-catcal-tab');
+            if (id) {
+                cambiarPestanaTablon(id);
+            }
+        });
+    }
     
     // Modals principales (con verificación de existencia)
     const elementosModals = [
@@ -554,7 +928,8 @@ function inicializarEventos() {
         { id: 'formSeparador', fn: guardarSeparador },
         { id: 'formClase', fn: guardarClase },
         { id: 'formMeses', fn: guardarMeses },
-        { id: 'formClima', fn: guardarClima }
+        { id: 'formClima', fn: guardarClima },
+        { id: 'formClimaHorario', fn: guardarClimaHorario }
     ];
     
     elementosForms.forEach(item => {
@@ -591,69 +966,6 @@ function inicializarEventos() {
         }
     });
     
-    // Escuchar mensajes de NUI
-    window.addEventListener('message', function(event) {
-        const data = event.data;
-        console.log('NUI: Mensaje recibido:', data.action);
-        
-        if (data.action === 'abrirCalendario') {
-            console.log('NUI: Abriendo calendario con datos:', data.calendario);
-            console.log('NUI: Configuración recibida:', data.config);
-            
-            calendarioData = data.calendario || {};
-            esProfesor = data.esProfesor || false;
-            config = data.config || {};
-            
-            // Asegurar que los arrays existan
-            if (!config.cursos) config.cursos = [];
-            if (!config.meses) config.meses = [];
-            if (!config.diasSemana) config.diasSemana = [];
-            if (!config.horarios) config.horarios = [];
-            if (!config.lunas) config.lunas = [];
-            if (!config.eventos) config.eventos = [];
-            if (!config.separadores) config.separadores = [];
-            
-            // Asegurar que climas existe y tiene valores
-            if (!config.climas || config.climas.length === 0) {
-                console.log('NUI: Config.climas vacío, usando valores por defecto');
-                config.climas = [
-                    "EXTRASUNNY", "CLEAR", "NEUTRAL", "SMOG", "FOGGY", 
-                    "OVERCAST", "CLOUDS", "CLEARING", "RAIN", "THUNDER", 
-                    "SNOW", "BLIZZARD", "SNOWLIGHT", "XMAS", "HALLOWEEN"
-                ];
-            }
-            
-            console.log('NUI: Climas disponibles:', config.climas);
-            
-            document.body.style.display = 'block';
-            mostrarCalendario();
-            
-            // Mostrar botón guardar solo si es profesor
-            const btnGuardar = document.getElementById('btnGuardar');
-            if (btnGuardar) {
-                btnGuardar.style.display = esProfesor ? 'block' : 'none';
-            }
-        }
-        
-        if (data.action === 'cerrarCalendario') {
-            console.log('[Calendario] DEBUG: Mensaje "cerrarCalendario" recibido del cliente');
-            console.log('[Calendario] DEBUG: Ocultando body');
-            document.body.style.display = 'none';
-            // Limpiar cualquier context menu abierto
-            cerrarContextMenu();
-            console.log('[Calendario] DEBUG: Body oculto, context menu cerrado');
-        }
-        
-        if (data.action === 'actualizarCalendario') {
-            console.log('[Calendario] DEBUG: Mensaje "actualizarCalendario" recibido del cliente');
-            // Actualizar datos sin cerrar el calendario
-            if (data.calendario) {
-                calendarioData = data.calendario;
-                mostrarCalendario();
-                console.log('[Calendario] DEBUG: Calendario actualizado sin cerrar');
-            }
-        }
-    });
 }
 
 function cambiarSemana(semana) {
@@ -667,7 +979,10 @@ function cambiarSemana(semana) {
 function mostrarCalendario() {
     const semanaIndex = semanaActual - 1;
     const semana = calendarioData.semanas && calendarioData.semanas[semanaIndex];
-    
+    try {
+        catCalDebugLog('mostrarCalendario: semanaActual=' + semanaActual + ' semanaIndex=' + semanaIndex + ' tieneSemana=' + !!semana + ' numHorarios=' + ((config.horarios && config.horarios.length) || 0));
+    } catch (eDbg) {}
+
     if (!semana) {
         document.getElementById('calendario').innerHTML = '<p>Error: No hay datos para esta semana</p>';
         return;
@@ -685,6 +1000,7 @@ function mostrarCalendario() {
             const colorEstacion = obtenerColorEstacion(barra.nombre);
             const clickHandler = esProfesor ? `onclick="abrirModalBarrasEstacion(${semanaActual})"` : '';
             const cursorStyle = esProfesor ? 'cursor: pointer;' : '';
+            const nombreBarra = (typeof barra.nombre === 'string') ? barra.nombre : '';
             htmlBarrasEstacion += `
                 <div class="barra-estacion" 
                      ${clickHandler}
@@ -692,7 +1008,7 @@ function mostrarCalendario() {
                             width: calc((100% - 120px) * ${barra.diasDuracion} / ${numDias}); 
                             background: ${colorEstacion};
                             ${cursorStyle}">
-                    ${iconoEstacion} ${barra.nombre}
+                    ${iconoEstacion} ${nombreBarra}
                     ${esProfesor ? '<br><small style="font-size: 10px;">✏️ Click para editar</small>' : ''}
                 </div>
             `;
@@ -720,8 +1036,11 @@ function mostrarCalendario() {
     // Encabezados de días con meses
     (config.diasSemana || []).forEach((dia, index) => {
         const diaData = semana.dias && semana.dias[index];
-        const mesData = calendarioData.meses && calendarioData.meses[semanaIndex] && calendarioData.meses[semanaIndex][index];
+        let mesData = calendarioData.meses && calendarioData.meses[semanaIndex] && calendarioData.meses[semanaIndex][index];
         const mesesDisponibles = config.meses || ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        if (typeof mesData !== 'string' || !mesData.trim()) {
+            mesData = mesesDisponibles[0] || 'Enero';
+        }
         
         html += `<th style="min-width: 180px;">
             <div class="mes-header" onclick="${esProfesor ? `abrirModalMeses(${semanaActual})` : ''}">
@@ -732,9 +1051,9 @@ function mostrarCalendario() {
                 ${esProfesor ? '<br><small>👆 Click para editar clima</small>' : ''}
             </div>
             <div class="info-dia">
-                🌡️ ${diaData?.temperatura || '--'}°C<br>
-                🌙 ${diaData?.luna || '--'}<br>
-                ${obtenerIconoEvento(diaData?.evento) || '🎉'} ${diaData?.evento || '--'}<br>
+                🌡️ ${(diaData && diaData.temperatura) || '--'}°C<br>
+                🌙 ${(diaData && diaData.luna) || '--'}<br>
+                ${obtenerIconoEvento(diaData && diaData.evento) || '🎉'} ${(diaData && diaData.evento) || '--'}<br>
             </div>
         </th>`;
     });
@@ -823,7 +1142,7 @@ function mostrarCalendario() {
                 
                 // Mostrar clases existentes
                 if (Array.isArray(clases) && clases.length > 0) {
-                    const clasesOrdenadas = [...clases].sort((a, b) => {
+                    const clasesOrdenadas = clases.slice().sort((a, b) => {
                         const horaA = a.horaExacta || '00:00';
                         const horaB = b.horaExacta || '00:00';
                         return horaA.localeCompare(horaB);
@@ -1039,7 +1358,7 @@ function obtenerOpcionesHorario(semana, dia, horario, claseIndex) {
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
     
-    const clasesExistentes = calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.clases[horario] || [];
+    const clasesExistentes = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
     
     console.log('🔍 Analizando franja:', horario);
     
@@ -1205,7 +1524,7 @@ function abrirModalClaseNueva(elemento) {
     const diaIndex = dia - 1;
     
     // Obtener el array de clases existentes
-    const clasesArray = calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.clases[horario] || [];
+    const clasesArray = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
     
     console.log('🔍 Verificando límites para franja:', horario);
     
@@ -1295,9 +1614,16 @@ function generarHTMLSeparador(separador, horario, separadorIndex) {
         const horaInicioFormateada = formatearHoraConMinutos(separador.horaInicio);
         const horaFinFormateada = formatearHoraConMinutos(separador.horaFin);
         
-        const horaMostrar = horaInicioFormateada && horaFinFormateada 
-            ? `${horaInicioFormateada} - ${horaFinFormateada}`
-            : horario;
+        let horaMostrar;
+        if (horaInicioFormateada && horaFinFormateada) {
+            horaMostrar = `${horaInicioFormateada} - ${horaFinFormateada}`;
+        } else {
+            // ✅ FIX: Si no hay hora personalizada, formatear el horario del config también
+            const { inicio, fin } = extraerHorasDelHorario(horario);
+            const inicioFormateado = formatearHoraConMinutos(inicio);
+            const finFormateado = formatearHoraConMinutos(fin);
+            horaMostrar = `${inicioFormateado} - ${finFormateado}`;
+        }
         
         contenido = `
             <div style="display: flex; align-items: center; justify-content: space-between; height: 100%; padding: 0 10px;"
@@ -1438,7 +1764,7 @@ function abrirModalClaseExistente(elemento) {
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
     
-    const clasesArray = calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.clases[horario];
+    const clasesArray = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
     const claseData = clasesArray && clasesArray[claseIndex] ? clasesArray[claseIndex] : {
         titulo: "",
         descripcion: "",
@@ -1594,7 +1920,7 @@ function abrirModalEliminar(contextMenuElement) {
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
     
-    const claseData = calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.clases[horario]?.[claseIndex];
+    const claseData = claseEnFranjaCal(semanaIndex, diaIndex, horario, claseIndex);
     
     if (claseData) {
         claseParaEliminar = { semanaIndex, diaIndex, horario, claseIndex };
@@ -1613,8 +1939,9 @@ function confirmarEliminarClase() {
     if (claseParaEliminar) {
         const { semanaIndex, diaIndex, horario, claseIndex } = claseParaEliminar;
         
-        if (calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.clases[horario]) {
-            calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario].splice(claseIndex, 1);
+        var dDel = celdaDiaCal(semanaIndex, diaIndex);
+        if (dDel && dDel.clases && dDel.clases[horario]) {
+            dDel.clases[horario].splice(claseIndex, 1);
         }
         
         claseParaEliminar = null;
@@ -1629,7 +1956,7 @@ function abrirModalClima(semana, dia) {
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
     
-    const diaData = calendarioData.semanas[semanaIndex]?.dias[diaIndex] || {
+    const diaData = celdaDiaCal(semanaIndex, diaIndex) || {
         temperatura: 20,
         luna: config.lunas ? config.lunas[0] : 'Luna Nueva',
         evento: 'Ninguno'
@@ -1816,7 +2143,16 @@ function formatearHoraConMinutos(horaString) {
     
     // Si ya está en formato HH:MM, devolverlo
     if (horaString.includes(':')) {
-        const [horas, minutos] = horaString.split(':');
+        let [horas, minutos] = horaString.split(':');
+        
+        // ✅ FIX: Convertir cualquier hora "12:xx" a "00:xx" (medianoche)
+        // Esto corrige el problema donde medianoche se muestra como "12:00", "12:15", "12:20", etc.
+        // en lugar de "00:00", "00:15", "00:20", etc.
+        // Nota: En este calendario no hay horas de mediodía (12:xx PM), así que es seguro convertir todas
+        if (horas === '12') {
+            horas = '00';
+        }
+        
         return `${horas.padStart(2, '0')}:${minutos.padStart(2, '0')}`;
     }
     
@@ -2010,7 +2346,7 @@ function mostrarTooltip(event, elemento) {
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
     
-    const claseData = calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.clases[horario]?.[claseIndex];
+    const claseData = claseEnFranjaCal(semanaIndex, diaIndex, horario, claseIndex);
     
     if (!claseData) return;
     
@@ -2065,6 +2401,8 @@ function cerrarCalendario() {
         // En modo web, solo ocultar (no hay que cerrar NUI)
         console.log('[Calendario] DEBUG: Modo web, ocultando body');
         document.body.style.display = 'none';
+    } else if (typeof gmod !== 'undefined' && gmod && typeof gmod.CalCerrar === 'function') {
+        gmod.CalCerrar();
     } else {
         // En modo FiveM, simplemente llamar al callback y dejar que el cliente maneje el cierre
         // NO ocultar el body aquí, el cliente lo hará con SendNUIMessage
@@ -2227,11 +2565,8 @@ function abrirModalEventoNuevo(elemento) {
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
     
-    const clasesArray = calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.clases[horario] || [];
-    const eventosArray = calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario && calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario] ? 
-        (Array.isArray(calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario]) ? 
-         calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario] : 
-         [calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario]]) : [];
+    const clasesArray = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
+    const eventosArray = eventosHorarioComoArray(semanaIndex, diaIndex, horario);
     
     const eventosActivos = eventosArray.filter(evento => evento && evento.texto).length;
     const elementosExistentes = clasesArray.length + eventosActivos;
@@ -2333,10 +2668,7 @@ function abrirModalEventoExistente(semana, dia, horario, eventoIndex) {
     const diaIndex = dia - 1;
     
     // ✅ FIX: Obtener el evento específico del array
-    const eventosArray = calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario && calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario] ? 
-        (Array.isArray(calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario]) ? 
-         calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario] : 
-         [calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario]]) : [];
+    const eventosArray = eventosHorarioComoArray(semanaIndex, diaIndex, horario);
     
     const eventoData = eventosArray[eventoIndex] || {
         texto: "",
@@ -2393,11 +2725,11 @@ function abrirModalSeparador(horario, separadorIndex = null) {
         if (Array.isArray(separadoresFranja)) {
             // Si es un array y tenemos un índice válido, obtener ese separador
             if (separadorIndex !== null && separadoresFranja[separadorIndex]) {
-                separadorData = { ...separadorData, ...separadoresFranja[separadorIndex] };
+                separadorData = Object.assign({}, separadorData, separadoresFranja[separadorIndex]);
             }
         } else if (separadorIndex === null || separadorIndex === 0) {
             // Si es un objeto individual y es el primer separador (o nuevo)
-            separadorData = { ...separadorData, ...separadoresFranja };
+            separadorData = Object.assign({}, separadorData, separadoresFranja);
         }
     }
     
@@ -2434,8 +2766,9 @@ function abrirModalSeparador(horario, separadorIndex = null) {
     
     if (horaInicio && horaFin) {
         // Convertir formato de hora si es necesario
-        let horaInicioValue = separadorData.horaInicio || "";
-        let horaFinValue = separadorData.horaFin || "";
+        // ✅ FIX: Formatear las horas antes de cargarlas en el input para corregir "12:xx" a "00:xx"
+        let horaInicioValue = formatearHoraConMinutos(separadorData.horaInicio || "");
+        let horaFinValue = formatearHoraConMinutos(separadorData.horaFin || "");
         
         // Si la hora está en formato HH:MM sin segundos, convertir a formato time
         if (horaInicioValue && horaInicioValue.length === 5 && horaInicioValue.includes(':')) {
@@ -2524,11 +2857,8 @@ function guardarEvento(event) {
     const diaIndex = dia - 1;
     
     // ✅ FIX: Verificar límites antes de guardar
-    const clasesArray = calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.clases[horario] || [];
-    const eventosArray = calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario && calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario] ? 
-        (Array.isArray(calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario]) ? 
-         calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario] : 
-         [calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario]]) : [];
+    const clasesArray = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
+    const eventosArray = eventosHorarioComoArray(semanaIndex, diaIndex, horario);
     
     const eventosActivos = eventosArray.filter(evento => evento && evento.texto).length;
     const elementosExistentes = clasesArray.length + eventosActivos;
@@ -2598,12 +2928,30 @@ function guardarSeparador(event) {
     // MEJORADO: Convertir formato de hora (quitar segundos si existen)
     if (horaInicio && horaInicio.includes(':')) {
         const partes = horaInicio.split(':');
-        horaInicio = `${partes[0]}:${partes[1]}`; // Mantener solo HH:MM
+        let horas = partes[0];
+        let minutos = partes[1];
+        
+        // ✅ FIX: Convertir cualquier hora "12:xx" a "00:xx" (medianoche) al guardar
+        // Esto corrige el problema donde medianoche se guarda como "12:00", "12:15", "12:20", etc.
+        if (horas === '12') {
+            horas = '00';
+        }
+        
+        horaInicio = `${horas.padStart(2, '0')}:${minutos.padStart(2, '0')}`; // Mantener solo HH:MM
     }
     
     if (horaFin && horaFin.includes(':')) {
         const partes = horaFin.split(':');
-        horaFin = `${partes[0]}:${partes[1]}`; // Mantener solo HH:MM
+        let horas = partes[0];
+        let minutos = partes[1];
+        
+        // ✅ FIX: Convertir cualquier hora "12:xx" a "00:xx" (medianoche) al guardar
+        // Esto corrige el problema donde medianoche se guarda como "12:00", "12:15", "12:20", etc.
+        if (horas === '12') {
+            horas = '00';
+        }
+        
+        horaFin = `${horas.padStart(2, '0')}:${minutos.padStart(2, '0')}`; // Mantener solo HH:MM
     }
     
     const textoFinal = textoPersonalizado || textoSeparador;
@@ -2672,15 +3020,16 @@ function eliminarEvento(semana, dia, horario, eventoIndex) {
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
     
-    if (calendarioData.semanas[semanaIndex]?.dias[diaIndex]?.eventosHorario[horario]) {
+    var dEv = celdaDiaCal(semanaIndex, diaIndex);
+    if (dEv && dEv.eventosHorario && dEv.eventosHorario[horario]) {
         // ✅ FIX: Manejar tanto arrays como objetos individuales
-        if (Array.isArray(calendarioData.semanas[semanaIndex].dias[diaIndex].eventosHorario[horario])) {
+        if (Array.isArray(dEv.eventosHorario[horario])) {
             // Es un array, eliminar el elemento específico
-            calendarioData.semanas[semanaIndex].dias[diaIndex].eventosHorario[horario].splice(eventoIndex, 1);
+            dEv.eventosHorario[horario].splice(eventoIndex, 1);
             
             // Si el array queda vacío, limpiarlo
-            if (calendarioData.semanas[semanaIndex].dias[diaIndex].eventosHorario[horario].length === 0) {
-                calendarioData.semanas[semanaIndex].dias[diaIndex].eventosHorario[horario] = {
+            if (dEv.eventosHorario[horario].length === 0) {
+                dEv.eventosHorario[horario] = {
                     texto: "",
                     colorFondo: "",
                     colorTexto: "",
@@ -2689,7 +3038,7 @@ function eliminarEvento(semana, dia, horario, eventoIndex) {
             }
         } else {
             // Es un objeto individual, limpiarlo
-            calendarioData.semanas[semanaIndex].dias[diaIndex].eventosHorario[horario] = {
+            dEv.eventosHorario[horario] = {
                 texto: "",
                 colorFondo: "",
                 colorTexto: "",
@@ -2814,9 +3163,7 @@ function abrirModalClimaHorario(horario) {
     
     // Usar climas de config o lista por defecto
     const climasDisponibles = config.climas || [
-        "EXTRASUNNY", "CLEAR", "NEUTRAL", "SMOG", "FOGGY", 
-        "OVERCAST", "CLOUDS", "CLEARING", "RAIN", "THUNDER", 
-        "SNOW", "BLIZZARD", "SNOWLIGHT", "XMAS", "HALLOWEEN"
+        "CLEAR", "CLOUDS", "CLEARING", "RAIN", "THUNDER", "FOGGY"
     ];
     
     console.log('Climas disponibles:', climasDisponibles);
@@ -2825,6 +3172,15 @@ function abrirModalClimaHorario(horario) {
         console.error('No hay climas disponibles en la configuración');
         mostrarNotificacion('Error: No hay climas configurados', 'error');
         return;
+    }
+    
+    const setClimas = new Set(climasDisponibles);
+    if (climaActual && !setClimas.has(climaActual)) {
+        const optLegacy = document.createElement('option');
+        optLegacy.value = climaActual;
+        optLegacy.textContent = traducirClima(climaActual) + ' (legacy)';
+        optLegacy.selected = true;
+        climaSelect.appendChild(optLegacy);
     }
     
     climasDisponibles.forEach(clima => {
@@ -2879,7 +3235,9 @@ function guardarCalendario() {
         mostrarNotificacion('No tienes permisos para guardar cambios', 'error');
         return;
     }
-    
+
+    leerTablonSeccionesDelDOM();
+
     console.log('[Calendario] DEBUG: Enviando datos al servidor:', calendarioData);
     
     if (MODO_WEB) {
@@ -2930,6 +3288,14 @@ function guardarCalendario() {
             console.error('Error al guardar:', error);
             mostrarNotificacion('❌ Error de conexión al guardar: ' + error.message, 'error');
         });
+    } else if (typeof gmod !== 'undefined' && gmod && typeof gmod.CalGuardar === 'function') {
+        try {
+            gmod.CalGuardar(JSON.stringify({ calendario: calendarioData }));
+            mostrarNotificacion('Guardado enviado. El clima automático solo usa datos ya guardados en el servidor; confirma con el aviso en el juego.', 'info');
+        } catch (e) {
+            console.error(e);
+            mostrarNotificacion('❌ Error al guardar cambios', 'error');
+        }
     } else {
         // Modo FiveM: usar NUI callback
         console.log('[Calendario] DEBUG: Modo FiveM, obteniendo resourceName para guardar...');
@@ -3095,6 +3461,21 @@ function aplicarClimaPrueba() {
         mostrarNotificacion('Primero selecciona una hora para probar', 'error');
         return;
     }
+
+    if (typeof window !== 'undefined' && window.MODO_GMOD === true) {
+        if (typeof gmod !== 'undefined' && gmod && typeof gmod.CalClimaPrueba === 'function') {
+            try {
+                gmod.CalClimaPrueba(JSON.stringify({ clima: clima, hora: hora }));
+                mostrarNotificacion(`Solicitud enviada: ${traducirClima(clima)} (StormFox)`, 'success');
+            } catch (e) {
+                console.error(e);
+                mostrarNotificacion('Error al enviar clima de prueba', 'error');
+            }
+            return;
+        }
+        mostrarNotificacion('Puente GMod no disponible para clima de prueba.', 'error');
+        return;
+    }
     
     fetch(`https://${GetParentResourceName()}/aplicarClimaPrueba`, {
         method: 'POST',
@@ -3215,7 +3596,7 @@ function cerrarModalConfirmarEliminarBarra() {
     barraParaEliminar = null;
 }
 
-document.getElementById('btnAgregarBarra')?.addEventListener('click', function() {
+elOn('btnAgregarBarra', 'click', function() {
     document.getElementById('modalBarraIndex').value = '-1';
     document.getElementById('estacionBarra').value = 'Primavera';
     document.getElementById('diaInicioBarra').value = '0';
@@ -3226,20 +3607,20 @@ document.getElementById('btnAgregarBarra')?.addEventListener('click', function()
     document.getElementById('modalEditarBarra').style.display = 'block';
 });
 
-document.getElementById('btnCerrarBarrasEstacion')?.addEventListener('click', cerrarModalBarrasEstacion);
-document.getElementById('btnCancelarEditarBarra')?.addEventListener('click', cerrarModalEditarBarra);
-document.getElementById('btnConfirmarEliminarBarra')?.addEventListener('click', confirmarEliminarBarraEstacion);
-document.getElementById('btnCancelarEliminarBarra')?.addEventListener('click', cerrarModalConfirmarEliminarBarra);
+elOn('btnCerrarBarrasEstacion', 'click', cerrarModalBarrasEstacion);
+elOn('btnCancelarEditarBarra', 'click', cerrarModalEditarBarra);
+elOn('btnConfirmarEliminarBarra', 'click', confirmarEliminarBarraEstacion);
+elOn('btnCancelarEliminarBarra', 'click', cerrarModalConfirmarEliminarBarra);
 
-document.getElementById('formEditarBarra')?.addEventListener('submit', function(e) {
+elOn('formEditarBarra', 'submit', function(e) {
     e.preventDefault();
     guardarBarra();
 });
 
 // Event listeners para actualizar preview en tiempo real
-document.getElementById('estacionBarra')?.addEventListener('change', actualizarPreviewBarra);
-document.getElementById('diaInicioBarra')?.addEventListener('input', actualizarPreviewBarra);
-document.getElementById('diasDuracionBarra')?.addEventListener('input', actualizarPreviewBarra);
+elOn('estacionBarra', 'change', actualizarPreviewBarra);
+elOn('diaInicioBarra', 'input', actualizarPreviewBarra);
+elOn('diasDuracionBarra', 'input', actualizarPreviewBarra);
 
 function actualizarPreviewBarra() {
     const estacion = document.getElementById('estacionBarra').value;
@@ -3310,3 +3691,8 @@ function guardarBarra() {
     
     document.getElementById('btnGuardar').style.display = 'block';
 }
+
+// GMod DHTML: el postMessage desde Lua puede ejecutarse antes de DOMContentLoaded;
+// el listener debe existir en cuanto se parsea este archivo (handleCalendarioPostMessage es function hoisted).
+catCalDebugLog('registrando window.addEventListener(message) al final de script.js');
+window.addEventListener('message', handleCalendarioPostMessage);

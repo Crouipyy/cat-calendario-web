@@ -55,9 +55,137 @@ body {
     transform: scale(1.05);
 }
 
+/* Tablón: pestañas principales + índice */
+.tablon-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.tablon-nav-principal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+    background: #e8e4dc;
+    border-bottom: 1px solid #c8c2b8;
+    flex-shrink: 0;
+}
+
+.tablon-nav-btn {
+    padding: 8px 12px;
+    border: 1px solid #8a8174;
+    border-radius: 6px;
+    background: #f5f2eb;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+    color: #2c2c2c;
+}
+
+.tablon-nav-btn:hover {
+    background: #ebe6dc;
+}
+
+.tablon-nav-btn.tablon-nav-activa {
+    background: #372e29;
+    color: #f0e6d2;
+    border-color: #372e29;
+}
+
+.tablon-panel {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.tablon-panel--activa {
+    display: flex;
+}
+
+.tablon-indice {
+    padding: 16px 20px;
+    overflow: auto;
+    flex: 1;
+}
+
+.tablon-indice-intro {
+    margin-bottom: 14px;
+    color: #444;
+    font-size: 14px;
+    line-height: 1.45;
+    max-width: 52rem;
+}
+
+.tablon-indice-links {
+    max-width: 28rem;
+}
+
+.tablon-acceso {
+    display: block;
+    width: 100%;
+    margin: 8px 0;
+    padding: 12px 14px;
+    text-align: left;
+    border: 1px solid #9a9a9a;
+    border-radius: 8px;
+    background: #fafafa;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #222;
+}
+
+.tablon-acceso:hover {
+    background: #eee;
+}
+
+.tablon-panel-texto {
+    padding: 12px 16px;
+}
+
+.tablon-seccion-titulo {
+    font-size: 18px;
+    margin-bottom: 10px;
+    color: #372e29;
+    flex-shrink: 0;
+}
+
+.tablon-texto-view {
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+    flex: 1;
+    overflow: auto;
+    min-height: 120px;
+    padding: 10px;
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.tablon-texto-edit {
+    flex: 1;
+    min-height: 200px;
+    width: 100%;
+    padding: 12px;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.45;
+    resize: vertical;
+    box-sizing: border-box;
+    border: 1px solid #aaa;
+    border-radius: 8px;
+}
+
 /* Selector de semanas */
 .semanas-selector {
     display: flex;
+    flex-shrink: 0;
     background: #f0f0f0;
     padding: 10px;
     border-bottom: 2px solid #ddd;

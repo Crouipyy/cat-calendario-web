@@ -2,9 +2,11 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <script>(function(){try{var h=(typeof location!=="undefined"&&location.href)||"";var p=(typeof location!=="undefined"&&location.protocol)||"";if(p==="asset:"||h.indexOf("asset://")===0||h.indexOf("garrysmod/html/cat_calendario")!==-1){window.MODO_GMOD=true;window.MODO_WEB=false;window.API_URL="";}}catch(e){}})();</script>
+    <script>(function(){try{function L(m){try{if(typeof gmod!=="undefined"&&gmod&&gmod.CalLog)gmod.CalLog("[cal HEAD] "+m);}catch(e1){}try{console.log("[cal HEAD]",m);}catch(e2){}}L("inline head ejecutado href="+String(typeof location!=="undefined"&&location.href));window.addEventListener("message",function(ev){L("message ev tipo="+typeof ev.data);var d=ev.data;if(typeof d==="string"){try{d=JSON.parse(d);L("message parseado string ok");}catch(x){L("message string NO json: "+String(x));return;}}if(d&&d.action==="abrirCalendario"){L("abrirCalendario -> body block");document.body.style.display="block";}});}catch(e){try{if(typeof gmod!=="undefined"&&gmod&&gmod.CalLog)gmod.CalLog("[cal HEAD] EXC "+String(e));}catch(e2){}}})();</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Calendario Escolar - Hogwarts</title>
-    <link rel="stylesheet" href="/nui/style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="app">
@@ -14,15 +16,62 @@
             <button id="btnCerrar" class="btn-cerrar">✕</button>
         </div>
 
-        <!-- Selector de Semanas -->
-        <div class="semanas-selector">
-            <button class="btn-semana" data-semana="1">1º Semana</button>
-            <button class="btn-semana" data-semana="2">2º Semana</button>
-        </div>
+        <div id="tablon-main" class="tablon-main">
+            <nav class="tablon-nav-principal" aria-label="Secciones del tablón">
+                <button type="button" class="tablon-nav-btn tablon-nav-activa" data-catcal-tab="indice">Índice</button>
+                <button type="button" class="tablon-nav-btn" data-catcal-tab="horario">Horario</button>
+                <button type="button" class="tablon-nav-btn" data-catcal-tab="normas">Normas de Hogwarts</button>
+                <button type="button" class="tablon-nav-btn" data-catcal-tab="optativas">Optativas</button>
+                <button type="button" class="tablon-nav-btn" data-catcal-tab="clubes">Clubes</button>
+                <button type="button" class="tablon-nav-btn" data-catcal-tab="notas">Notas</button>
+            </nav>
 
-        <!-- Calendario con scroll -->
-        <div id="calendario" class="calendario">
-            <!-- Se llena dinámicamente con JavaScript -->
+            <div id="panel-indice" class="tablon-panel tablon-panel--activa">
+                <div class="tablon-indice">
+                    <p class="tablon-indice-intro">Elegí una sección del tablón. En <strong>Horario</strong> podés alternar entre la <strong>1ª</strong> y la <strong>2ª semana</strong> (misma barra de pestañas para ambas).</p>
+                    <div class="tablon-indice-links">
+                        <button type="button" class="tablon-acceso" data-catcal-tab="horario">Horario — semanas y clases</button>
+                        <button type="button" class="tablon-acceso" data-catcal-tab="normas">Normas de Hogwarts</button>
+                        <button type="button" class="tablon-acceso" data-catcal-tab="optativas">Optativas</button>
+                        <button type="button" class="tablon-acceso" data-catcal-tab="clubes">Clubes</button>
+                        <button type="button" class="tablon-acceso" data-catcal-tab="notas">Notas</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-horario" class="tablon-panel">
+                <div class="semanas-selector">
+                    <button type="button" class="btn-semana" data-semana="1">1º Semana</button>
+                    <button type="button" class="btn-semana" data-semana="2">2º Semana</button>
+                </div>
+                <div id="calendario" class="calendario">
+                    <!-- Se llena dinámicamente con JavaScript -->
+                </div>
+            </div>
+
+            <div id="panel-normas" class="tablon-panel tablon-panel-texto">
+                <h2 class="tablon-seccion-titulo">Normas de Hogwarts</h2>
+                <div id="tablon-view-normas" class="tablon-texto-view"></div>
+                <textarea id="tablon-edit-normas" class="tablon-texto-edit" style="display:none" placeholder="Texto del tablón (visible para todos al guardar)…"></textarea>
+            </div>
+
+            <div id="panel-optativas" class="tablon-panel tablon-panel-texto">
+                <h2 class="tablon-seccion-titulo">Optativas</h2>
+                <div id="tablon-view-optativas" class="tablon-texto-view"></div>
+                <textarea id="tablon-edit-optativas" class="tablon-texto-edit" style="display:none" placeholder="Texto del tablón…"></textarea>
+            </div>
+
+            <div id="panel-clubes" class="tablon-panel tablon-panel-texto">
+                <h2 class="tablon-seccion-titulo">Clubes</h2>
+                <div id="tablon-view-clubes" class="tablon-texto-view"></div>
+                <textarea id="tablon-edit-clubes" class="tablon-texto-edit" style="display:none" placeholder="Texto del tablón…"></textarea>
+            </div>
+
+            <div id="panel-notas" class="tablon-panel tablon-panel-texto">
+                <h2 class="tablon-seccion-titulo">Notas</h2>
+                <div id="tablon-view-notas" class="tablon-texto-view"></div>
+                <textarea id="tablon-edit-notas" class="tablon-texto-edit" style="display:none" placeholder="Texto del tablón…"></textarea>
+            </div>
         </div>
 
         <!-- Botones de acción -->
@@ -133,9 +182,8 @@
                 <div class="form-group">
                     <label>Información del Sistema de Clima Automático:</label>
                     <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 12px;">
-                        <strong>El clima se controla automáticamente por horarios</strong><br>
-                        • Los profesores pueden usar: <code>/cambiarclima [tipo]</code><br>
-                        • Ver horarios: <code>/horariosclima</code>
+                        <strong>StormFox 2</strong> aplica el clima del mapa segun las franjas del calendario (servidor).<br>
+                        Profesorado puede usar <strong>Probar climas</strong> para forzar un tipo GTA sobre el tiempo actual.
                     </div>
                 </div>
 
@@ -439,26 +487,6 @@
         </div>
     </div>
 
-    <!-- Script para modo web (debe ejecutarse ANTES de script.js) -->
-    <script>
-        // Detectar si estamos en modo web (si no está definido, lo definimos)
-        if (typeof window.MODO_WEB === 'undefined') {
-            const url = window.location.href;
-            const hostname = window.location.hostname;
-            
-            // Si la URL contiene "cfx-nui", estamos en FiveM (NO modo web)
-            if (url.includes('cfx-nui') || hostname.includes('cfx-nui')) {
-                window.MODO_WEB = false;
-                window.API_URL = '';
-                console.log('[HTML] Modo FiveM detectado (cfx-nui)');
-            } else {
-                // Estamos en un navegador web real
-                window.MODO_WEB = true;
-                window.API_URL = window.location.origin;
-                console.log('[HTML] Modo web detectado, API_URL:', window.API_URL);
-            }
-        }
-    </script>
-    <script src="/nui/script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
