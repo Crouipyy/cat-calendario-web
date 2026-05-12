@@ -1,5 +1,6 @@
 // API para manejar el calendario usando MySQL como almacenamiento persistente
 const mysql = require('mysql2/promise');
+const { calendarioPlantillaParaUI } = require('./calendarioPlantilla');
 
 // Función para obtener conexión a MySQL
 async function obtenerConexion() {
@@ -53,6 +54,17 @@ async function obtenerConexion() {
             console.error('[API] ⚠️ 3. Que la base de datos exista');
             console.error('[API] ⚠️ Base de datos intentada:', dbName);
         }
+
+        if (error.code === 'ER_ACCESS_DENIED_ERROR' || error.errno === 1045) {
+            console.error('[API] ⚠️ ACCESS DENIED (1045): usuario/contraseña O host de cliente no permitido.');
+            console.error('[API] ⚠️ Vercel entra a MySQL como usuario@ec2-....amazonaws.com (no es tu PC).');
+            console.error('[API] ⚠️ HeidiSQL funciona porque eres otro host (ej. localhost o tu IP).');
+            console.error('[API] ⚠️ Solución típica: en el servidor 37.187.25.84 ejecuta como root:');
+            console.error("[API]    CREATE USER IF NOT EXISTS 'fivemuser'@'%' IDENTIFIED BY 'TU_MISMA_CLAVE';");
+            console.error('[API]    GRANT SELECT,INSERT,UPDATE,DELETE ON gmodserverdb.* TO \'fivemuser\'@\'%\';');
+            console.error('[API]    FLUSH PRIVILEGES;');
+            console.error('[API] ⚠️ (Ajusta nombre de usuario/BD si usas otros.) Abre el puerto 3306 a Internet solo si asumes el riesgo.');
+        }
         
         // No lanzar el error, dejar que la función que llama lo maneje
         return null;
@@ -65,16 +77,10 @@ async function leerCalendario() {
     try {
         conexion = await obtenerConexion();
         
-        // Si no se pudo conectar, retornar estructura vacía
+        // Si no se pudo conectar, plantilla para la web
         if (!conexion) {
-            console.warn('[API] ⚠️ No se pudo conectar a MySQL, retornando estructura vacía');
-            return {
-                semanas: [],
-                meses: [],
-                separadores: {},
-                climasHorario: {},
-                ultimaActualizacion: Math.floor(Date.now() / 1000)
-            };
+            console.warn('[API] ⚠️ No se pudo conectar a MySQL, retornando plantilla UI (no vacía) para evitar pantalla en blanco');
+            return calendarioPlantillaParaUI();
         }
         
         // Obtener el último registro (id = 1 siempre, o el más reciente)
@@ -86,25 +92,42 @@ async function leerCalendario() {
         } catch (executeError) {
             console.error('[API] Error ejecutando query:', executeError);
             console.error('[API] Error details:', executeError.message);
-            // Si hay error en la query, retornar estructura vacía
-            return {
-                semanas: [],
-                meses: [],
-                separadores: {},
-                climasHorario: {},
-                ultimaActualizacion: Math.floor(Date.now() / 1000)
-            };
+            return calendarioPlantillaParaUI();
         }
-        
+
+        // Sin fila id=1: insertar plantilla para que el GET siguiente y la web tengan datos reales en MySQL
+        if (!rows || rows.length === 0) {
+            const plantilla = calendarioPlantillaParaUI();
+            const json = JSON.stringify(plantilla);
+            await conexion.execute(
+                'INSERT INTO calendario (id, datos, ultima_actualizacion, actualizado_por) VALUES (1, ?, ?, ?)',
+                [json, plantilla.ultimaActualizacion, 'api-seed']
+            );
+            console.log('[API] No existía fila id=1 en calendario: insertada plantilla inicial (2 semanas).');
+            return plantilla;
+        }
+
+        const rawDatos = rows[0].datos;
+        const trimmed = rawDatos != null ? String(rawDatos).trim() : '';
+        if (trimmed === '' || trimmed === '{}') {
+            const plantilla = calendarioPlantillaParaUI();
+            const json = JSON.stringify(plantilla);
+            await conexion.execute(
+                'UPDATE calendario SET datos = ?, ultima_actualizacion = ?, actualizado_por = ? WHERE id = 1',
+                [json, plantilla.ultimaActualizacion, 'api-seed-vacio']
+            );
+            console.log('[API] Columna datos vacía o {}: rellenada con plantilla inicial.');
+            return plantilla;
+        }
+
         if (rows && rows.length > 0) {
             try {
-                const datos = JSON.parse(rows[0].datos);
+                const datos = JSON.parse(trimmed);
                 console.log('[API] Calendario leído desde MySQL');
                 console.log('[API] Timestamp:', rows[0].ultima_actualizacion);
-                
-                // ✅ VALIDAR que los datos no estén vacíos de forma segura
+
                 let datosValidos = false;
-                
+
                 try {
                     if (datos && typeof datos === 'object') {
                         if (datos.semanas) {
@@ -113,7 +136,6 @@ async function leerCalendario() {
                             } else if (typeof datos.semanas === 'object' && datos.semanas !== null) {
                                 const keys = Object.keys(datos.semanas);
                                 if (keys.length > 0) {
-                                    // Verificar que al menos una semana tenga datos
                                     for (const key of keys) {
                                         const semana = datos.semanas[key];
                                         if (semana && semana.dias && typeof semana.dias === 'object' && Object.keys(semana.dias).length > 0) {
@@ -124,19 +146,19 @@ async function leerCalendario() {
                                 }
                             }
                         }
-                        
+
                         if (!datosValidos && datos.separadores && typeof datos.separadores === 'object' && datos.separadores !== null) {
                             if (Object.keys(datos.separadores).length > 0) {
                                 datosValidos = true;
                             }
                         }
-                        
+
                         if (!datosValidos && datos.climasHorario && typeof datos.climasHorario === 'object' && datos.climasHorario !== null) {
                             if (Object.keys(datos.climasHorario).length > 0) {
                                 datosValidos = true;
                             }
                         }
-                        
+
                         if (!datosValidos && datos.meses) {
                             if (Array.isArray(datos.meses) && datos.meses.length > 0) {
                                 datosValidos = true;
@@ -147,45 +169,44 @@ async function leerCalendario() {
                     }
                 } catch (validationError) {
                     console.error('[API] Error en validación:', validationError);
-                    // Si hay error en la validación, retornar los datos de todos modos
                     datosValidos = true;
                 }
-                
-                // Siempre retornar los datos, validados o no
+
+                if (!datosValidos) {
+                    const plantilla = calendarioPlantillaParaUI();
+                    const json = JSON.stringify(plantilla);
+                    await conexion.execute(
+                        'UPDATE calendario SET datos = ?, ultima_actualizacion = ?, actualizado_por = ? WHERE id = 1',
+                        [json, plantilla.ultimaActualizacion, 'api-seed-invalido']
+                    );
+                    console.log('[API] JSON en MySQL sin semanas útiles: sustituido por plantilla inicial.');
+                    return plantilla;
+                }
+
                 return datos;
             } catch (parseError) {
                 console.error('[API] Error parseando JSON desde MySQL:', parseError);
-                console.error('[API] Datos raw:', rows[0].datos ? rows[0].datos.substring(0, 100) : 'null');
-                // En lugar de lanzar error, retornar estructura vacía
-                return {
-                    semanas: [],
-                    meses: [],
-                    separadores: {},
-                    climasHorario: {},
-                    ultimaActualizacion: rows[0].ultima_actualizacion || Math.floor(Date.now() / 1000)
-                };
+                console.error('[API] Datos raw:', rows[0].datos ? String(rows[0].datos).substring(0, 100) : 'null');
+                const plantilla = calendarioPlantillaParaUI();
+                const json = JSON.stringify(plantilla);
+                try {
+                    await conexion.execute(
+                        'UPDATE calendario SET datos = ?, ultima_actualizacion = ?, actualizado_por = ? WHERE id = 1',
+                        [json, plantilla.ultimaActualizacion, 'api-seed-parse']
+                    );
+                    console.log('[API] JSON corrupto: columna datos sustituida por plantilla.');
+                } catch (e) {
+                    console.error('[API] No se pudo escribir plantilla tras parse error:', e.message);
+                }
+                return plantilla;
             }
         }
-        
-        // Si no existe, retornar estructura vacía
-        console.log('[API] No hay datos en MySQL, retornando estructura vacía');
-        return {
-            semanas: [],
-            meses: [],
-            separadores: {},
-            climasHorario: {},
-            ultimaActualizacion: Math.floor(Date.now() / 1000)
-        };
+
+        console.log('[API] Caso inesperado en leerCalendario; devolviendo plantilla UI');
+        return calendarioPlantillaParaUI();
     } catch (error) {
         console.error('[API] Error leyendo calendario desde MySQL:', error);
-        // Retornar estructura vacía en caso de error
-        return {
-            semanas: [],
-            meses: [],
-            separadores: {},
-            climasHorario: {},
-            ultimaActualizacion: Math.floor(Date.now() / 1000)
-        };
+        return calendarioPlantillaParaUI();
     } finally {
         if (conexion) {
             await conexion.end();
@@ -253,16 +274,10 @@ module.exports = async function handler(req, res) {
                 
                 // Asegurar que siempre retornamos un objeto válido
                 if (!calendario) {
-                    console.warn('[API] ⚠️ leerCalendario retornó null/undefined, usando estructura vacía');
+                    console.warn('[API] ⚠️ leerCalendario retornó null/undefined, usando plantilla UI');
                     return res.status(200).json({
                         success: true,
-                        calendario: {
-                            semanas: [],
-                            meses: [],
-                            separadores: {},
-                            climasHorario: {},
-                            ultimaActualizacion: Math.floor(Date.now() / 1000)
-                        }
+                        calendario: calendarioPlantillaParaUI()
                     });
                 }
                 
@@ -273,16 +288,10 @@ module.exports = async function handler(req, res) {
             } catch (error) {
                 console.error('[API] Error en GET:', error);
                 console.error('[API] Stack:', error.stack);
-                // Retornar estructura vacía en lugar de error 500 para que la web no se rompa
+                // Retornar plantilla UI si el GET falla
                 return res.status(200).json({
                     success: true,
-                    calendario: {
-                        semanas: [],
-                        meses: [],
-                        separadores: {},
-                        climasHorario: {},
-                        ultimaActualizacion: Math.floor(Date.now() / 1000)
-                    }
+                    calendario: calendarioPlantillaParaUI()
                 });
             }
         }
@@ -367,16 +376,10 @@ module.exports = async function handler(req, res) {
         console.error('[API] ⚠️ Error message:', globalError.message);
         console.error('[API] ⚠️ Error stack:', globalError.stack);
         
-        // SIEMPRE retornar 200 con estructura vacía, NUNCA 500
+        // SIEMPRE retornar 200 con plantilla UI, NUNCA 500
         return res.status(200).json({
             success: true,
-            calendario: {
-                semanas: [],
-                meses: [],
-                separadores: {},
-                climasHorario: {},
-                ultimaActualizacion: Math.floor(Date.now() / 1000)
-            }
+            calendario: calendarioPlantillaParaUI()
         });
     }
 }
