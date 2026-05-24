@@ -9,26 +9,994 @@ let separadorParaEditar = null;
 let separadorParaEliminar = null;
 
 /** Pestañas del tablón (Índice, Horario, textos). Misma UI en GMod y web. */
-const TABLON_SECCION_KEYS = ['normas', 'optativas', 'clubes', 'notas'];
+const TABLON_TEXTO_PLANO_KEYS = ['optativas', 'clubes'];
 const TABLON_TABS_ORDER = ['indice', 'horario', 'normas', 'optativas', 'clubes', 'notas'];
 let pestanaTablonActual = 'indice';
+/** Profesor: vista tablón por defecto; true = formulario de edición. */
+let normasModoEdicion = false;
+/** Profesor: boletín notas vista vs editor. */
+let notasModoEdicion = false;
+/** Contexto del personaje que abre el panel (GMod). */
+let contextoVisor = {};
+/** Recorte servidor para alumnos (sin filas ajenas). */
+let notasVistaAlumno = null;
+
+function arrayDesdeObjetoNormasApartados(arrOrObj) {
+    if (arrOrObj == null) {
+        return [];
+    }
+    if (Array.isArray(arrOrObj)) {
+        return arrOrObj;
+    }
+    if (typeof arrOrObj === 'object') {
+        return Object.keys(arrOrObj)
+            .sort(function (a, b) {
+                return Number(a) - Number(b);
+            })
+            .map(function (k) {
+                return arrOrObj[k];
+            })
+            .filter(function (x) {
+                return x != null;
+            });
+    }
+    return [];
+}
+
+function asegurarNormasApartados(d) {
+    const arr = arrayDesdeObjetoNormasApartados(d.normasApartados);
+    const normalized = arr.map(function (x) {
+        if (!x || typeof x !== 'object') {
+            return { titulo: '', cuerpo: '' };
+        }
+        return {
+            titulo: typeof x.titulo === 'string' ? x.titulo : '',
+            cuerpo: typeof x.cuerpo === 'string' ? x.cuerpo : ''
+        };
+    });
+    if (normalized.length === 0) {
+        const leg = typeof d.normas === 'string' ? d.normas.trim() : '';
+        if (leg) {
+            d.normasApartados = [{ titulo: 'Normativa', cuerpo: leg }];
+            return;
+        }
+    }
+    d.normasApartados = normalized;
+}
+
+function obtenerDefNotas() {
+    return (config && config.notas) || configPorDefecto.notas || {};
+}
+
+function deepMergeAsignaturasPorCurso(def, cur) {
+    const out = {};
+    let i;
+    for (i = 1; i <= 7; i++) {
+        const k = String(i);
+        const base = def && def[k] && Array.isArray(def[k]) ? def[k].slice() : [];
+        const ext = cur && cur[k] && Array.isArray(cur[k]) ? cur[k] : null;
+        out[k] = ext && ext.length ? ext.slice() : base;
+    }
+    return out;
+}
+
+function asegurarNotasBoletin(d) {
+    const def = obtenerDefNotas();
+    const legacy = typeof d.notas === 'string' ? d.notas.trim() : '';
+
+    if (!d.notasBoletin || typeof d.notasBoletin !== 'object') {
+        d.notasBoletin = {
+            publicado: false,
+            tituloListado: def.tituloListadoDefault || 'LISTADO DE NOTAS',
+            anioEscolarLabel: def.anioEscolarLabelDefault || '',
+            leyenda: '',
+            asignaturasPorCurso: deepMergeAsignaturasPorCurso(def.asignaturasPorCursoDefault, null),
+            filas: []
+        };
+        if (legacy) {
+            d.notasBoletin.legacyTextoPlano = legacy;
+        }
+        d.notas = '';
+        return;
+    }
+    const nb = d.notasBoletin;
+    nb.publicado = !!nb.publicado;
+    if (typeof nb.tituloListado !== 'string') {
+        nb.tituloListado = def.tituloListadoDefault || '';
+    }
+    if (typeof nb.anioEscolarLabel !== 'string') {
+        nb.anioEscolarLabel = def.anioEscolarLabelDefault || '';
+    }
+    nb.leyenda = '';
+    nb.asignaturasPorCurso = deepMergeAsignaturasPorCurso(
+        def.asignaturasPorCursoDefault,
+        nb.asignaturasPorCurso
+    );
+    if (!Array.isArray(nb.filas)) {
+        nb.filas = [];
+    }
+    nb.filas.forEach(function (row) {
+        if (!row || typeof row !== 'object') {
+            return;
+        }
+        row.characterId = Number(row.characterId) || 0;
+        row.nombreIc = typeof row.nombreIc === 'string' ? row.nombreIc : '';
+        row.casa = typeof row.casa === 'string' ? row.casa : 'Otra';
+        row.factionIndex = Number(row.factionIndex) || 0;
+        row.anyo = Math.max(0, Math.min(7, Number(row.anyo) || 0));
+        if (!row.notas || typeof row.notas !== 'object') {
+            row.notas = {};
+        }
+        if (typeof row.promocion !== 'string') {
+            row.promocion = '';
+        }
+    });
+    if (typeof d.notas !== 'string') {
+        d.notas = '';
+    }
+}
+
+function notasFilasOrdenadasConIndice(filas) {
+    const arr = [];
+    if (!Array.isArray(filas)) {
+        return arr;
+    }
+    filas.forEach(function (row, oi) {
+        arr.push({ row: row, oi: oi });
+    });
+    arr.sort(function (a, b) {
+        const ya = Number(a.row.anyo) || 0;
+        const yb = Number(b.row.anyo) || 0;
+        if (ya !== yb) {
+            return yb - ya;
+        }
+        const ca = String(a.row.casa || '').localeCompare(String(b.row.casa || ''));
+        if (ca !== 0) {
+            return ca;
+        }
+        return String(a.row.nombreIc || '').localeCompare(String(b.row.nombreIc || ''));
+    });
+    return arr;
+}
+
+function notasColorCasa(casa) {
+    const col = (obtenerDefNotas().coloresCasa && obtenerDefNotas().coloresCasa[casa]) || null;
+    return col || (obtenerDefNotas().coloresCasa && obtenerDefNotas().coloresCasa.Otra) || '#5c4a3a';
+}
+
+function notasCasasEdicionLista() {
+    const def = obtenerDefNotas();
+    const base = ['Gryffindor', 'Hufflepuff', 'Ravenclaw', 'Slytherin'];
+    const arr = def.casasBoletinOpciones;
+    if (Array.isArray(arr) && arr.length) {
+        const out = arr
+            .map(function (x) {
+                return String(x);
+            })
+            .filter(function (name) {
+                return name && name !== 'Otra';
+            });
+        if (out.length) {
+            return out;
+        }
+    }
+    return base.slice();
+}
+
+function notasCalificacionesSelectLista() {
+    const def = obtenerDefNotas();
+    const arr = def.calificacionesBoletin;
+    if (Array.isArray(arr) && arr.length) {
+        return arr
+            .map(function (x) {
+                return String(x).trim();
+            })
+            .filter(function (x) {
+                return x.length > 0;
+            });
+    }
+    return ['E', 'S', 'A', 'I', 'D', 'T'];
+}
+
+/** Rango visual tipo hoja IC (E/S/A/I/D/T). '' = sin clase; 'vac' = guion; 'texto' = APTO etc. */
+function notasRangoCalificacion(val) {
+    if (val == null || val === '') {
+        return '';
+    }
+    const s = String(val).trim();
+    if (s === '-' || s === '—') {
+        return 'vac';
+    }
+    const n = parseFloat(s.replace(',', '.'));
+    if (!isNaN(n)) {
+        if (n >= 100) {
+            return 'e';
+        }
+        if (n >= 75) {
+            return 's';
+        }
+        if (n >= 50) {
+            return 'a';
+        }
+        if (n >= 35) {
+            return 'i';
+        }
+        if (n >= 25) {
+            return 'd';
+        }
+        return 't';
+    }
+    const up = s.toUpperCase();
+    const letterMap = {
+        E: 'e',
+        S: 's',
+        A: 'a',
+        I: 'i',
+        D: 'd',
+        T: 't',
+        O: 'e',
+        P: 'i',
+        NP: 't',
+        IN: 'd',
+        NT: 'd'
+    };
+    if (letterMap[up]) {
+        return letterMap[up];
+    }
+    return 'texto';
+}
+
+function notasAplicarClaseACelda(td, rawVal) {
+    if (!td) {
+        return;
+    }
+    td.className = (td.className || '')
+        .replace(/\btablon-notas-val--\w+/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const r = notasRangoCalificacion(rawVal);
+    const base = 'tablon-notas-celda-nota';
+    if (r) {
+        td.className = (base + ' tablon-notas-val--' + r).trim();
+    } else {
+        td.className = base;
+    }
+}
+
+function notasAppendAnioEscolarBar(parent, labelText) {
+    const bar = document.createElement('div');
+    bar.className = 'tablon-notas-anio-bar';
+    bar.textContent = labelText ? String(labelText) : '';
+    parent.appendChild(bar);
+}
+
+/** Tablas de lectura por curso (7º → 1º): mismo criterio que vista profesor. */
+function notasAppendTablasLecturaPorCurso(wrap, nb) {
+    if (!wrap || !nb) {
+        return;
+    }
+    let curso;
+    for (curso = 7; curso >= 1; curso--) {
+        const filasC = (nb.filas || []).filter(function (f) {
+            return f && (Number(f.anyo) || 0) === curso;
+        });
+        if (filasC.length === 0) {
+            continue;
+        }
+        filasC.sort(function (a, b) {
+            const ca = String(a.casa || '').localeCompare(String(b.casa || ''));
+            if (ca !== 0) {
+                return ca;
+            }
+            return String(a.nombreIc || '').localeCompare(String(b.nombreIc || ''));
+        });
+        const cols =
+            (nb.asignaturasPorCurso && nb.asignaturasPorCurso[String(curso)]) ||
+            (nb.asignaturasPorCurso && nb.asignaturasPorCurso[curso]) ||
+            [];
+        const tw = document.createElement('div');
+        tw.className = 'tablon-notas-tabla-wrap';
+        const table = document.createElement('table');
+        table.className = 'tablon-notas-tabla tablon-notas-tabla--hogwarts';
+        const thead = document.createElement('thead');
+        const trTot = document.createElement('tr');
+        const thTot = document.createElement('th');
+        thTot.colSpan = 4 + cols.length;
+        thTot.className = 'tablon-notas-total-bar';
+        thTot.textContent = 'TOTAL ALUMNOS ' + curso + 'º | ' + filasC.length;
+        trTot.appendChild(thTot);
+        thead.appendChild(trTot);
+        const hr = document.createElement('tr');
+        hr.className = 'tablon-notas-head-cols';
+        ['Nombre', 'Casa', 'Curso', 'Promoción'].concat(cols).forEach(function (lab) {
+            const th = document.createElement('th');
+            th.textContent = lab;
+            hr.appendChild(th);
+        });
+        thead.appendChild(hr);
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        filasC.forEach(function (f, idx) {
+            const tr = document.createElement('tr');
+            tr.className = idx % 2 === 0 ? 'tablon-notas-fila--a' : 'tablon-notas-fila--b';
+            const promo = f.promocion != null && String(f.promocion).trim() !== '' ? String(f.promocion) : '—';
+            [f.nombreIc || '', f.casa || '', f.anyo ? String(f.anyo) + 'º' : '—', promo].forEach(function (txt, j) {
+                const td = document.createElement('td');
+                td.textContent = txt;
+                if (j === 1) {
+                    td.className = 'tablon-notas-celda-casa';
+                    td.style.color = '#fff';
+                    td.style.background = notasColorCasa(f.casa);
+                    td.style.fontWeight = '700';
+                }
+                tr.appendChild(td);
+            });
+            cols.forEach(function (col) {
+                const td = document.createElement('td');
+                const v =
+                    f.notas && Object.prototype.hasOwnProperty.call(f.notas, col) ? f.notas[col] : '—';
+                const disp = v === '' || v == null ? '—' : String(v);
+                td.textContent = disp;
+                notasAplicarClaseACelda(td, disp === '—' ? '' : disp);
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        tw.appendChild(table);
+        wrap.appendChild(tw);
+    }
+}
+
+function renderVistaNotasAlumno() {
+    const wrap = document.getElementById('tablon-notas-alumno');
+    if (!wrap) {
+        return;
+    }
+    wrap.innerHTML = '';
+    const def = obtenerDefNotas();
+    const nv = notasVistaAlumno;
+
+    if (nv && nv.publicado === false) {
+        const p = document.createElement('div');
+        p.className = 'tablon-notas-msg';
+        p.textContent = nv.mensaje || def.msgNoPublicado || 'Las notas aún no están publicadas.';
+        wrap.appendChild(p);
+        return;
+    }
+
+    if (nv && nv.publicado === true) {
+        const hero = document.createElement('header');
+        hero.className = 'tablon-notas-hero';
+        const t = document.createElement('h2');
+        t.className = 'tablon-notas-hero-tit';
+        t.textContent = nv.tituloListado || def.tituloListadoDefault || 'Notas';
+        hero.appendChild(t);
+        wrap.appendChild(hero);
+        if (nv.anioEscolarLabel && String(nv.anioEscolarLabel).trim()) {
+            notasAppendAnioEscolarBar(wrap, 'AÑO ESCOLAR ' + String(nv.anioEscolarLabel).trim());
+        }
+        const estado = document.createElement('p');
+        estado.className = 'tablon-notas-estado';
+        estado.textContent = 'Publicado · listado completo por curso';
+        wrap.appendChild(estado);
+
+        const filasNv = Array.isArray(nv.filas) ? nv.filas : [];
+        if (filasNv.length > 0) {
+            const nbView = {
+                filas: filasNv,
+                asignaturasPorCurso: deepMergeAsignaturasPorCurso(
+                    def.asignaturasPorCursoDefault,
+                    nv.asignaturasPorCurso || null
+                )
+            };
+            notasAppendTablasLecturaPorCurso(wrap, nbView);
+            return;
+        }
+
+        if (nv.fila) {
+            const cols = Array.isArray(nv.columnas) ? nv.columnas : [];
+            const f = nv.fila;
+            const tw = document.createElement('div');
+            tw.className = 'tablon-notas-tabla-wrap';
+            const table = document.createElement('table');
+            table.className = 'tablon-notas-tabla tablon-notas-tabla--hogwarts';
+            const thead = document.createElement('thead');
+            const hr = document.createElement('tr');
+            hr.className = 'tablon-notas-head-cols';
+            ['Nombre', 'Casa', 'Curso', 'Promoción'].concat(cols).forEach(function (lab) {
+                const th = document.createElement('th');
+                th.textContent = lab;
+                hr.appendChild(th);
+            });
+            thead.appendChild(hr);
+            table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            const tr = document.createElement('tr');
+            tr.className = 'tablon-notas-fila--a';
+            const casaColor = notasColorCasa(f.casa);
+            const promo = f.promocion != null && String(f.promocion).trim() !== '' ? String(f.promocion) : '—';
+            [f.nombreIc || '', f.casa || '', f.anyo ? String(f.anyo) + 'º' : '—', promo].forEach(function (txt) {
+                const td = document.createElement('td');
+                td.textContent = txt;
+                if (txt === f.casa) {
+                    td.className = 'tablon-notas-celda-casa';
+                    td.style.color = '#fff';
+                    td.style.background = casaColor;
+                    td.style.fontWeight = '700';
+                }
+                tr.appendChild(td);
+            });
+            cols.forEach(function (col) {
+                const td = document.createElement('td');
+                const key = col;
+                const v =
+                    f.notas && Object.prototype.hasOwnProperty.call(f.notas, key)
+                        ? f.notas[key]
+                        : f.notas && f.notas[col] != null
+                          ? f.notas[col]
+                          : '—';
+                const disp = v === '' || v == null ? '—' : String(v);
+                td.textContent = disp;
+                notasAplicarClaseACelda(td, disp === '—' ? '' : disp);
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+            table.appendChild(tbody);
+            tw.appendChild(table);
+            wrap.appendChild(tw);
+            return;
+        }
+
+        const p2 = document.createElement('div');
+        p2.className = 'tablon-notas-msg';
+        p2.textContent = def.msgBoletinPublicadoVacio || 'El boletín publicado está vacío.';
+        wrap.appendChild(p2);
+        return;
+    }
+
+    const p3 = document.createElement('div');
+    p3.className = 'tablon-notas-msg';
+    p3.textContent =
+        'No se pudo cargar la vista de notas. Si estás en la web pública, solo el equipo ve el listado completo.';
+    wrap.appendChild(p3);
+}
+
+function renderVistaNotasProfe(nb) {
+    const wrap = document.getElementById('tablon-notas-vista-profe');
+    if (!wrap) {
+        return;
+    }
+    wrap.innerHTML = '';
+    const def = obtenerDefNotas();
+    const hero = document.createElement('header');
+    hero.className = 'tablon-notas-hero';
+    const t = document.createElement('h2');
+    t.className = 'tablon-notas-hero-tit';
+    t.textContent = nb.tituloListado || def.tituloListadoDefault || 'Notas';
+    hero.appendChild(t);
+    wrap.appendChild(hero);
+    if (nb.anioEscolarLabel && String(nb.anioEscolarLabel).trim()) {
+        notasAppendAnioEscolarBar(wrap, 'AÑO ESCOLAR ' + String(nb.anioEscolarLabel).trim());
+    }
+    const estado = document.createElement('p');
+    estado.className = 'tablon-notas-estado';
+    estado.textContent = nb.publicado
+        ? 'Publicado (alumnos ven el listado completo por curso)'
+        : 'Borrador · oculto para alumnos';
+    wrap.appendChild(estado);
+
+    notasAppendTablasLecturaPorCurso(wrap, nb);
+}
+
+function renderEditorNotasProfe(nb) {
+    const root = document.getElementById('tablon-notas-cursos-edit');
+    if (!root) {
+        return;
+    }
+    root.innerHTML = '';
+    const casasLista = notasCasasEdicionLista();
+    const gradesLista = notasCalificacionesSelectLista();
+    const pub = document.getElementById('tablon-notas-publicado');
+    if (pub) {
+        pub.checked = !!nb.publicado;
+    }
+    const tit = document.getElementById('tablon-notas-titulo');
+    if (tit) {
+        tit.value = nb.tituloListado || '';
+    }
+    const an = document.getElementById('tablon-notas-anio');
+    if (an) {
+        an.value = nb.anioEscolarLabel || '';
+    }
+
+    let curso;
+    for (curso = 7; curso >= 1; curso--) {
+        const sec = document.createElement('section');
+        sec.className = 'tablon-notas-curso-sec';
+        const h3 = document.createElement('h3');
+        h3.className = 'tablon-notas-curso-tit';
+        h3.textContent = curso + 'º curso';
+        sec.appendChild(h3);
+        const cols =
+            (nb.asignaturasPorCurso && nb.asignaturasPorCurso[String(curso)]) ||
+            (nb.asignaturasPorCurso && nb.asignaturasPorCurso[curso]) ||
+            [];
+        let nEnCurso = 0;
+        const ordenPrev = notasFilasOrdenadasConIndice(nb.filas);
+        ordenPrev.forEach(function (item) {
+            if ((Number(item.row.anyo) || 0) === curso) {
+                nEnCurso++;
+            }
+        });
+        const colsLine = document.createElement('div');
+        colsLine.className = 'tablon-notas-meta-lbl';
+        colsLine.textContent = 'Asignaturas (nombres separados por coma)';
+        const colsIn = document.createElement('input');
+        colsIn.type = 'text';
+        colsIn.className = 'tablon-notas-meta-in';
+        colsIn.setAttribute('data-notas-cols-curso', String(curso));
+        colsIn.value = cols.join(', ');
+        colsLine.appendChild(colsIn);
+        sec.appendChild(colsLine);
+
+        const tw = document.createElement('div');
+        tw.className = 'tablon-notas-tabla-wrap';
+        const table = document.createElement('table');
+        table.className = 'tablon-notas-tabla tablon-notas-tabla--hogwarts';
+        const thead = document.createElement('thead');
+        const trTot = document.createElement('tr');
+        const thTot = document.createElement('th');
+        thTot.colSpan = 5 + cols.length;
+        thTot.className = 'tablon-notas-total-bar';
+        thTot.textContent = 'TOTAL ALUMNOS ' + curso + 'º | ' + nEnCurso;
+        trTot.appendChild(thTot);
+        thead.appendChild(trTot);
+        const hr = document.createElement('tr');
+        hr.className = 'tablon-notas-fila-head tablon-notas-head-cols';
+        ['Nombre IC', 'Casa', 'Curso', 'Promoción', 'ID'].concat(cols).forEach(function (lab) {
+            const th = document.createElement('th');
+            th.textContent = lab;
+            hr.appendChild(th);
+        });
+        thead.appendChild(hr);
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        const orden = notasFilasOrdenadasConIndice(nb.filas);
+        let ridx = 0;
+        orden.forEach(function (item) {
+            const f = item.row;
+            if ((Number(f.anyo) || 0) !== curso) {
+                return;
+            }
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-orig-idx', String(item.oi));
+            tr.className = ridx % 2 === 0 ? 'tablon-notas-fila--a' : 'tablon-notas-fila--b';
+            ridx++;
+            const tdNom = document.createElement('td');
+            const inNom = document.createElement('input');
+            inNom.className = 'tablon-notas-meta-in tablon-notas-in-nombre';
+            inNom.value = f.nombreIc || '';
+            tdNom.appendChild(inNom);
+            tr.appendChild(tdNom);
+            const tdCasa = document.createElement('td');
+            const inCasa = document.createElement('select');
+            inCasa.className = 'tablon-notas-meta-in tablon-notas-in-casa';
+            const curCasa = String(f.casa || '').trim();
+            if (curCasa && casasLista.indexOf(curCasa) === -1) {
+                const oLegacy = document.createElement('option');
+                oLegacy.value = curCasa;
+                oLegacy.textContent = curCasa + ' (legacy)';
+                inCasa.appendChild(oLegacy);
+            }
+            casasLista.forEach(function (nombreCasa) {
+                const opt = document.createElement('option');
+                opt.value = nombreCasa;
+                opt.textContent = nombreCasa;
+                inCasa.appendChild(opt);
+            });
+            if (curCasa && casasLista.indexOf(curCasa) === -1) {
+                inCasa.value = curCasa;
+            } else {
+                inCasa.value =
+                    curCasa && casasLista.indexOf(curCasa) !== -1
+                        ? curCasa
+                        : casasLista[0] || 'Gryffindor';
+            }
+            tdCasa.appendChild(inCasa);
+            tr.appendChild(tdCasa);
+            const tdAnyo = document.createElement('td');
+            const sel = document.createElement('select');
+            sel.className = 'tablon-notas-in-anyo';
+            let a;
+            for (a = 0; a <= 7; a++) {
+                const opt = document.createElement('option');
+                opt.value = String(a);
+                opt.textContent = a === 0 ? '—' : String(a) + 'º';
+                if ((Number(f.anyo) || 0) === a) {
+                    opt.selected = true;
+                }
+                sel.appendChild(opt);
+            }
+            tdAnyo.appendChild(sel);
+            tr.appendChild(tdAnyo);
+            const tdProm = document.createElement('td');
+            const inProm = document.createElement('input');
+            inProm.className = 'tablon-notas-meta-in tablon-notas-in-prom';
+            inProm.setAttribute('maxlength', '40');
+            inProm.value = f.promocion != null ? String(f.promocion) : '';
+            tdProm.appendChild(inProm);
+            tr.appendChild(tdProm);
+            const tdId = document.createElement('td');
+            tdId.textContent = String(f.characterId || '');
+            tdId.className = 'tablon-notas-celda-id';
+            tr.appendChild(tdId);
+            cols.forEach(function (col) {
+                const td = document.createElement('td');
+                const sel = document.createElement('select');
+                sel.className = 'tablon-notas-celda-in tablon-notas-celda-sel';
+                sel.setAttribute('data-asig', col);
+                const val =
+                    f.notas && Object.prototype.hasOwnProperty.call(f.notas, col) ? f.notas[col] : '';
+                const rawStr = val == null ? '' : String(val).trim();
+                const vacio = rawStr === '' || rawStr === '-' || rawStr === '—';
+                const dispVal = vacio ? '' : rawStr;
+                const optVac = document.createElement('option');
+                optVac.value = '';
+                optVac.textContent = '—';
+                sel.appendChild(optVac);
+                gradesLista.forEach(function (g) {
+                    const op = document.createElement('option');
+                    op.value = g;
+                    op.textContent = g;
+                    sel.appendChild(op);
+                });
+                let found = false;
+                if (!vacio) {
+                    let gi;
+                    for (gi = 0; gi < gradesLista.length; gi++) {
+                        if (
+                            gradesLista[gi] === dispVal ||
+                            String(gradesLista[gi]).toUpperCase() === dispVal.toUpperCase()
+                        ) {
+                            sel.value = gradesLista[gi];
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        const oL = document.createElement('option');
+                        oL.value = dispVal;
+                        oL.textContent = dispVal + ' (legacy)';
+                        sel.appendChild(oL);
+                        sel.value = dispVal;
+                    }
+                } else {
+                    sel.value = '';
+                }
+                notasAplicarClaseACelda(td, vacio ? '' : dispVal);
+                td.appendChild(sel);
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        tw.appendChild(table);
+        sec.appendChild(tw);
+        root.appendChild(sec);
+    }
+}
+
+function aplicarNotasAlDOM() {
+    const panel = document.getElementById('panel-notas');
+    const alumno = document.getElementById('tablon-notas-alumno');
+    const vistaP = document.getElementById('tablon-notas-vista-profe');
+    const editP = document.getElementById('tablon-notas-editor-profe');
+    if (!panel || !alumno || !vistaP || !editP) {
+        return;
+    }
+    asegurarTablonSecciones();
+    const nb = calendarioData.tablonSecciones.notasBoletin;
+    panel.classList.toggle('tablon-notas-es-profe', !!esProfesor);
+    panel.classList.toggle('tablon-notas--editando', !!esProfesor && !!notasModoEdicion);
+
+    if (!esProfesor) {
+        alumno.style.display = 'block';
+        vistaP.style.display = 'none';
+        editP.style.display = 'none';
+        renderVistaNotasAlumno();
+        return;
+    }
+
+    alumno.style.display = 'none';
+    if (notasModoEdicion) {
+        vistaP.style.display = 'none';
+        editP.style.display = 'flex';
+        renderEditorNotasProfe(nb);
+    } else {
+        vistaP.style.display = 'block';
+        editP.style.display = 'none';
+        renderVistaNotasProfe(nb);
+    }
+}
+
+function leerNotasBoletinDelDOM() {
+    if (!esProfesor) {
+        return;
+    }
+    const d = calendarioData.tablonSecciones;
+    if (!d || !d.notasBoletin) {
+        return;
+    }
+    const nb = d.notasBoletin;
+    const pub = document.getElementById('tablon-notas-publicado');
+    if (pub) {
+        nb.publicado = !!pub.checked;
+    }
+    const tit = document.getElementById('tablon-notas-titulo');
+    if (tit) {
+        nb.tituloListado = tit.value;
+    }
+    const an = document.getElementById('tablon-notas-anio');
+    if (an) {
+        nb.anioEscolarLabel = an.value;
+    }
+    nb.leyenda = '';
+    let c;
+    for (c = 1; c <= 7; c++) {
+        const inp = document.querySelector('input[data-notas-cols-curso="' + String(c) + '"]');
+        if (inp && typeof inp.value === 'string') {
+            const parts = inp.value.split(',');
+            const cleaned = [];
+            parts.forEach(function (p) {
+                const t = p.replace(/^\s+|\s+$/g, '');
+                if (t) {
+                    cleaned.push(t);
+                }
+            });
+            if (!nb.asignaturasPorCurso) {
+                nb.asignaturasPorCurso = {};
+            }
+            nb.asignaturasPorCurso[String(c)] = cleaned;
+        }
+    }
+    const root = document.getElementById('tablon-notas-cursos-edit');
+    if (!root) {
+        return;
+    }
+    root.querySelectorAll('tr[data-orig-idx]').forEach(function (tr) {
+        const oi = parseInt(tr.getAttribute('data-orig-idx'), 10);
+        if (isNaN(oi) || !nb.filas || !nb.filas[oi]) {
+            return;
+        }
+        const row = nb.filas[oi];
+        const ni = tr.querySelector('.tablon-notas-in-nombre');
+        const ci = tr.querySelector('.tablon-notas-in-casa');
+        const si = tr.querySelector('.tablon-notas-in-anyo');
+        if (ni) {
+            row.nombreIc = ni.value;
+        }
+        if (ci) {
+            row.casa = ci.value;
+        }
+        if (si) {
+            row.anyo = Math.max(0, Math.min(7, parseInt(si.value, 10) || 0));
+        }
+        const pi = tr.querySelector('.tablon-notas-in-prom');
+        if (pi) {
+            row.promocion = pi.value;
+        }
+        if (!row.notas) {
+            row.notas = {};
+        }
+        tr.querySelectorAll('input[data-asig], select[data-asig]').forEach(function (inp) {
+            const col = inp.getAttribute('data-asig');
+            if (col) {
+                row.notas[col] = inp.value;
+            }
+        });
+    });
+}
+
+function inicializarEditorNotasBoletin() {
+    if (window._catCalNotasEditorWired) {
+        return;
+    }
+    window._catCalNotasEditorWired = true;
+    const pan = document.getElementById('panel-notas');
+    if (pan && !pan._catCalNotasInputColor) {
+        pan._catCalNotasInputColor = true;
+        function catCalActualizarColorCeldaNota(ev) {
+            const t = ev.target;
+            if (
+                !t ||
+                !t.classList ||
+                !t.classList.contains('tablon-notas-celda-in') ||
+                !t.parentNode ||
+                t.parentNode.tagName !== 'TD'
+            ) {
+                return;
+            }
+            notasAplicarClaseACelda(t.parentNode, t.value);
+        }
+        pan.addEventListener('input', catCalActualizarColorCeldaNota);
+        pan.addEventListener('change', catCalActualizarColorCeldaNota);
+    }
+}
+
+function inicializarModoNotasLecturaEditor() {
+    if (window._catCalNotasModoWired) {
+        return;
+    }
+    window._catCalNotasModoWired = true;
+    const btnE = document.getElementById('tablon-notas-modo-editar');
+    const btnV = document.getElementById('tablon-notas-modo-ver');
+    if (btnE) {
+        btnE.addEventListener('click', function () {
+            if (!esProfesor) {
+                return;
+            }
+            notasModoEdicion = true;
+            aplicarNotasAlDOM();
+        });
+    }
+    if (btnV) {
+        btnV.addEventListener('click', function () {
+            if (!esProfesor) {
+                return;
+            }
+            leerNotasBoletinDelDOM();
+            notasModoEdicion = false;
+            aplicarNotasAlDOM();
+        });
+    }
+}
 
 function asegurarTablonSecciones() {
     if (!calendarioData.tablonSecciones || typeof calendarioData.tablonSecciones !== 'object') {
         calendarioData.tablonSecciones = {};
     }
     const d = calendarioData.tablonSecciones;
-    TABLON_SECCION_KEYS.forEach(function (k) {
+    TABLON_TEXTO_PLANO_KEYS.forEach(function (k) {
         if (typeof d[k] !== 'string') {
             d[k] = '';
         }
     });
+    if (typeof d.notas !== 'string') {
+        d.notas = '';
+    }
+    asegurarNormasApartados(d);
+    asegurarNotasBoletin(d);
+}
+
+function renderVistaNormasApartados(ts) {
+    const v = document.getElementById('tablon-view-normas');
+    if (!v) {
+        return;
+    }
+    v.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'tablon-normas-lectura';
+    const cab = document.createElement('div');
+    cab.className = 'tablon-normas-lectura-cabecera';
+    cab.textContent = 'NORMATIVAS DE LA ESCUELA DE MAGIA Y HECHICERÍA HOGWARTS';
+    const cuerpo = document.createElement('div');
+    cuerpo.className = 'tablon-normas-lectura-cuerpo';
+    wrap.appendChild(cab);
+    wrap.appendChild(cuerpo);
+    v.appendChild(wrap);
+
+    const arr = ts.normasApartados || [];
+    if (arr.length === 0) {
+        const p = document.createElement('p');
+        p.className = 'tablon-normas-lectura-vacia';
+        p.textContent = esProfesor
+            ? 'Todavía no hay capítulos en el tablón. Entrá en «Editar capítulos» para añadir el primero y guardá los cambios.'
+            : 'Aquí aparecerá la normativa cuando el equipo la publique en el calendario.';
+        cuerpo.appendChild(p);
+        return;
+    }
+    arr.forEach(function (bloque, idx) {
+        const fila = document.createElement('div');
+        fila.className =
+            'tablon-normas-lectura-fila ' + (idx % 2 === 0 ? 'tablon-normas-lectura-fila--a' : 'tablon-normas-lectura-fila--b');
+        const num = document.createElement('div');
+        num.className = 'tablon-normas-lectura-num';
+        num.textContent = String(idx + 1);
+        const col = document.createElement('div');
+        col.className = 'tablon-normas-lectura-col';
+        const titulo = (bloque.titulo || '').trim() || 'Capítulo ' + (idx + 1);
+        const lineaTit = document.createElement('div');
+        lineaTit.className = 'tablon-normas-lectura-titulo';
+        lineaTit.textContent = titulo;
+        const cuerpoTxt = document.createElement('div');
+        cuerpoTxt.className = 'tablon-normas-lectura-parrafos';
+        cuerpoTxt.style.whiteSpace = 'pre-wrap';
+        cuerpoTxt.textContent = bloque.cuerpo || '';
+        col.appendChild(lineaTit);
+        col.appendChild(cuerpoTxt);
+        fila.appendChild(num);
+        fila.appendChild(col);
+        cuerpo.appendChild(fila);
+    });
+}
+
+function crearDomBloqueEditNormas(bloque, idx, len) {
+    const wrap = document.createElement('div');
+    wrap.className = 'tablon-normas-bloque-edit';
+    wrap.setAttribute('data-idx', String(idx));
+    wrap.innerHTML =
+        '<div class="tablon-normas-edit-toolbar">' +
+        '<span class="tablon-normas-edit-num">Capítulo ' +
+        (idx + 1) +
+        '</span>' +
+        '<div class="tablon-normas-edit-acciones">' +
+        '<button type="button" class="tablon-normas-subir" title="Subir" aria-label="Subir">↑</button>' +
+        '<button type="button" class="tablon-normas-bajar" title="Bajar" aria-label="Bajar">↓</button>' +
+        '<button type="button" class="tablon-normas-quitar" title="Quitar apartado">Quitar</button>' +
+        '</div></div>' +
+        '<div class="tablon-normas-campo">' +
+        '<label class="tablon-normas-label">Título</label>' +
+        '<input type="text" class="tablon-normas-titulo-in" maxlength="160" placeholder="Ej.: Conducta en pasillos y aulas" />' +
+        '</div>' +
+        '<div class="tablon-normas-campo">' +
+        '<label class="tablon-normas-label">Normas</label>' +
+        '<textarea class="tablon-normas-cuerpo-in" rows="7" placeholder="Párrafos y listas; se respetan los saltos de línea al publicar…"></textarea>' +
+        '</div>';
+    wrap.querySelector('.tablon-normas-titulo-in').value = bloque.titulo || '';
+    wrap.querySelector('.tablon-normas-cuerpo-in').value = bloque.cuerpo || '';
+    const sub = wrap.querySelector('.tablon-normas-subir');
+    const baj = wrap.querySelector('.tablon-normas-bajar');
+    if (sub) {
+        sub.disabled = idx <= 0;
+    }
+    if (baj) {
+        baj.disabled = idx >= len - 1;
+    }
+    return wrap;
+}
+
+function renderEditorNormasApartados(ts) {
+    const root = document.getElementById('tablon-normas-bloques-edit');
+    if (!root) {
+        return;
+    }
+    root.innerHTML = '';
+    const arr = ts.normasApartados || [];
+    const len = arr.length;
+    arr.forEach(function (bloque, idx) {
+        root.appendChild(crearDomBloqueEditNormas(bloque, idx, len));
+    });
+}
+
+function aplicarNormasApartadosAlDOM() {
+    const ts = calendarioData.tablonSecciones;
+    const v = document.getElementById('tablon-view-normas');
+    const editor = document.getElementById('tablon-edit-normas');
+    const panel = document.getElementById('panel-normas');
+    if (!v || !editor) {
+        return;
+    }
+    if (panel) {
+        panel.classList.toggle('tablon-normas-es-profe', !!esProfesor);
+        panel.classList.toggle('tablon-normas--editando', !!esProfesor && !!normasModoEdicion);
+    }
+    renderVistaNormasApartados(ts);
+    renderEditorNormasApartados(ts);
+    const enEdicion = !!esProfesor && !!normasModoEdicion;
+    if (enEdicion) {
+        v.style.display = 'none';
+        editor.style.display = 'flex';
+    } else {
+        v.style.display = 'flex';
+        editor.style.display = 'none';
+    }
 }
 
 function aplicarTablonSeccionesAlDOM() {
     asegurarTablonSecciones();
     const ts = calendarioData.tablonSecciones;
-    TABLON_SECCION_KEYS.forEach(function (key) {
+    TABLON_TEXTO_PLANO_KEYS.forEach(function (key) {
         const v = document.getElementById('tablon-view-' + key);
         const e = document.getElementById('tablon-edit-' + key);
         const txt = ts[key] || '';
@@ -48,6 +1016,27 @@ function aplicarTablonSeccionesAlDOM() {
             }
         }
     });
+    aplicarNormasApartadosAlDOM();
+    aplicarNotasAlDOM();
+}
+
+function leerNormasApartadosDelDOM() {
+    const root = document.getElementById('tablon-normas-bloques-edit');
+    if (!root) {
+        return;
+    }
+    const rows = root.querySelectorAll('.tablon-normas-bloque-edit');
+    const arr = [];
+    rows.forEach(function (row) {
+        const t = row.querySelector('.tablon-normas-titulo-in');
+        const c = row.querySelector('.tablon-normas-cuerpo-in');
+        arr.push({
+            titulo: t ? t.value : '',
+            cuerpo: c ? c.value : ''
+        });
+    });
+    calendarioData.tablonSecciones.normasApartados = arr;
+    calendarioData.tablonSecciones.normas = '';
 }
 
 function leerTablonSeccionesDelDOM() {
@@ -55,17 +1044,114 @@ function leerTablonSeccionesDelDOM() {
         return;
     }
     asegurarTablonSecciones();
-    TABLON_SECCION_KEYS.forEach(function (key) {
+    TABLON_TEXTO_PLANO_KEYS.forEach(function (key) {
         const el = document.getElementById('tablon-edit-' + key);
-        if (el) {
+        if (el && typeof el.value === 'string') {
             calendarioData.tablonSecciones[key] = el.value;
         }
     });
+    leerNormasApartadosDelDOM();
+    leerNotasBoletinDelDOM();
+}
+
+function inicializarEditorNormasApartados() {
+    if (window._catCalNormasEditorWired) {
+        return;
+    }
+    window._catCalNormasEditorWired = true;
+    const ed = document.getElementById('tablon-edit-normas');
+    if (!ed) {
+        return;
+    }
+    ed.addEventListener('click', function (ev) {
+        const t = ev.target;
+        if (t && t.id === 'tablon-normas-anadir') {
+            if (!esProfesor) {
+                return;
+            }
+            leerNormasApartadosDelDOM();
+            if (!Array.isArray(calendarioData.tablonSecciones.normasApartados)) {
+                calendarioData.tablonSecciones.normasApartados = [];
+            }
+            calendarioData.tablonSecciones.normasApartados.push({ titulo: 'Nuevo capítulo', cuerpo: '' });
+            aplicarNormasApartadosAlDOM();
+            return;
+        }
+        const sub = t && t.closest ? t.closest('.tablon-normas-subir') : null;
+        const baj = t && t.closest ? t.closest('.tablon-normas-bajar') : null;
+        const del = t && t.closest ? t.closest('.tablon-normas-quitar') : null;
+        const row = t && t.closest ? t.closest('.tablon-normas-bloque-edit') : null;
+        if (!esProfesor || !row) {
+            return;
+        }
+        const idx = parseInt(row.getAttribute('data-idx'), 10);
+        if (del) {
+            leerNormasApartadosDelDOM();
+            const arr = calendarioData.tablonSecciones.normasApartados;
+            if (!isNaN(idx) && arr && idx >= 0 && idx < arr.length) {
+                arr.splice(idx, 1);
+            }
+            aplicarNormasApartadosAlDOM();
+            return;
+        }
+        leerNormasApartadosDelDOM();
+        const arr = calendarioData.tablonSecciones.normasApartados;
+        if (!arr || isNaN(idx)) {
+            return;
+        }
+        if (sub && idx > 0) {
+            const tmp = arr[idx - 1];
+            arr[idx - 1] = arr[idx];
+            arr[idx] = tmp;
+            aplicarNormasApartadosAlDOM();
+            return;
+        }
+        if (baj && idx < arr.length - 1) {
+            const tmp2 = arr[idx + 1];
+            arr[idx + 1] = arr[idx];
+            arr[idx] = tmp2;
+            aplicarNormasApartadosAlDOM();
+        }
+    });
+}
+
+function inicializarModoNormasLecturaEditor() {
+    if (window._catCalNormasModoWired) {
+        return;
+    }
+    window._catCalNormasModoWired = true;
+    const btnEditar = document.getElementById('tablon-normas-modo-editar');
+    const btnVer = document.getElementById('tablon-normas-modo-ver');
+    if (btnEditar) {
+        btnEditar.addEventListener('click', function () {
+            if (!esProfesor) {
+                return;
+            }
+            normasModoEdicion = true;
+            aplicarNormasApartadosAlDOM();
+        });
+    }
+    if (btnVer) {
+        btnVer.addEventListener('click', function () {
+            if (!esProfesor) {
+                return;
+            }
+            leerNormasApartadosDelDOM();
+            normasModoEdicion = false;
+            aplicarNormasApartadosAlDOM();
+        });
+    }
 }
 
 function cambiarPestanaTablon(id) {
     if (TABLON_TABS_ORDER.indexOf(id) === -1) {
         id = 'indice';
+    }
+    if (id !== 'normas') {
+        normasModoEdicion = false;
+    }
+    if (id !== 'notas') {
+        notasModoEdicion = false;
     }
     pestanaTablonActual = id;
     TABLON_TABS_ORDER.forEach(function (pid) {
@@ -84,9 +1170,18 @@ function cambiarPestanaTablon(id) {
             catCalDebugLog('cambiarPestanaTablon mostrarCalendario: ' + String(e1));
         }
     }
+    if (id === 'notas') {
+        try {
+            aplicarNotasAlDOM();
+        } catch (e2) {
+            catCalDebugLog('cambiarPestanaTablon notas: ' + String(e2));
+        }
+    }
 }
 
 function refrescarTablonTrasAbrir() {
+    normasModoEdicion = false;
+    notasModoEdicion = false;
     asegurarTablonSecciones();
     aplicarTablonSeccionesAlDOM();
     cambiarPestanaTablon('indice');
@@ -340,7 +1435,35 @@ const configPorDefecto = {
         {nombre: "Negro", valor: "#000000"},
         {nombre: "Blanco", valor: "#ffffff"}
     ],
-    climas: ["CLEAR", "CLOUDS", "CLEARING", "RAIN", "THUNDER", "FOGGY"]
+    climas: ["CLEAR", "CLOUDS", "CLEARING", "RAIN", "THUNDER", "FOGGY"],
+    notas: {
+        msgNoPublicado:
+            'Las notas del curso aún no están publicadas. Consultá con el profesorado.',
+        msgSinFila: 'No hay una fila de boletín asociada a tu personaje. Si debiera aparecer, contactá al profesorado.',
+        msgPublicadoSinFila: 'Tu personaje no figura en el listado de notas publicado.',
+        msgBoletinPublicadoVacio: 'Las notas están publicadas pero el boletín aún no tiene filas.',
+        tituloListadoDefault: 'LISTADO DE NOTAS DEL COLEGIO HOGWARTS DE MAGIA Y HECHICERÍA',
+        anioEscolarLabelDefault: 'Año escolar IC',
+        leyendaDefault: '',
+        asignaturasPorCursoDefault: {
+            '1': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Vuelo'],
+            '2': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Vuelo'],
+            '3': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Vuelo'],
+            '4': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Cuidado Criaturas'],
+            '5': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Aritmancia'],
+            '6': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Runas Antiguas'],
+            '7': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Estudios Muggle']
+        },
+        coloresCasa: {
+            Gryffindor: '#740001',
+            Ravenclaw: '#0e1a40',
+            Hufflepuff: '#ecb939',
+            Slytherin: '#1a472a',
+            Otra: '#5c4a3a'
+        },
+        casasBoletinOpciones: ['Gryffindor', 'Hufflepuff', 'Ravenclaw', 'Slytherin'],
+        calificacionesBoletin: ['E', 'S', 'A', 'I', 'D', 'T']
+    }
 };
 
 // Compatibilidad CEF antiguo (GMod): sin optional chaining (?.) en todo el archivo.
@@ -423,6 +1546,9 @@ function handleCalendarioPostMessage(event) {
         calendarioData = normalizarCalendarioRecibido(data.calendario || {});
         esProfesor = data.esProfesor || false;
         config = data.config || {};
+        contextoVisor = data.contextoVisor && typeof data.contextoVisor === 'object' ? data.contextoVisor : {};
+        notasVistaAlumno =
+            data.notasVistaAlumno && typeof data.notasVistaAlumno === 'object' ? data.notasVistaAlumno : null;
 
         if (!config.cursos) {
             config.cursos = [];
@@ -460,6 +1586,12 @@ function handleCalendarioPostMessage(event) {
             ];
         }
 
+        if (!config.notas || typeof config.notas !== 'object') {
+            config.notas = Object.assign({}, configPorDefecto.notas);
+        } else {
+            config.notas = Object.assign({}, configPorDefecto.notas, config.notas);
+        }
+
         if (data.tituloVentana) {
             var tituloHeader = document.querySelector('.header h1');
             if (tituloHeader) {
@@ -492,6 +1624,7 @@ function handleCalendarioPostMessage(event) {
     if (data.action === 'actualizarCalendario') {
         catCalDebugLog('actualizarCalendario');
         if (data.calendario) {
+            notasVistaAlumno = null;
             calendarioData = normalizarCalendarioRecibido(data.calendario);
             mostrarCalendario();
             asegurarTablonSecciones();
@@ -899,6 +2032,13 @@ function inicializarEventos() {
             if (id) {
                 cambiarPestanaTablon(id);
             }
+            const semRaw = el.getAttribute('data-catcal-semana');
+            if (semRaw) {
+                const n = parseInt(semRaw, 10);
+                if (n === 1 || n === 2) {
+                    cambiarSemana(n);
+                }
+            }
         });
     }
     
@@ -965,7 +2105,11 @@ function inicializarEventos() {
             cerrarContextMenu();
         }
     });
-    
+
+    inicializarEditorNormasApartados();
+    inicializarModoNormasLecturaEditor();
+    inicializarEditorNotasBoletin();
+    inicializarModoNotasLecturaEditor();
 }
 
 function cambiarSemana(semana) {
@@ -1042,7 +2186,7 @@ function mostrarCalendario() {
             mesData = mesesDisponibles[0] || 'Enero';
         }
         
-        html += `<th style="min-width: 180px;">
+        html += `<th>
             <div class="mes-header" onclick="${esProfesor ? `abrirModalMeses(${semanaActual})` : ''}">
                 ${mesData || mesesDisponibles[0] || 'Enero'} 📅
             </div>

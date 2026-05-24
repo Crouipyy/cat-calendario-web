@@ -183,6 +183,18 @@ async function leerCalendario() {
                     return plantilla;
                 }
 
+                // GMod compara ultimaActualizacion del JSON; asegurar que refleje la columna SQL (evita pull sin efecto si el JSON viejo no traía el campo).
+                const tsCol = rows[0].ultima_actualizacion;
+                const tsJson = Math.floor(Number(datos.ultimaActualizacion)) || 0;
+                let tsMerged = tsJson;
+                if (tsCol != null && tsCol !== '') {
+                    const tc = Math.floor(Number(tsCol));
+                    if (!Number.isNaN(tc) && tc > 0) {
+                        tsMerged = Math.max(tc, tsJson);
+                    }
+                }
+                datos.ultimaActualizacion = tsMerged;
+
                 return datos;
             } catch (parseError) {
                 console.error('[API] Error parseando JSON desde MySQL:', parseError);
@@ -261,7 +273,7 @@ module.exports = async function handler(req, res) {
         // Configurar CORS
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CatCal-Sync-Token');
 
         if (req.method === 'OPTIONS') {
             return res.status(200).end();
@@ -283,7 +295,8 @@ module.exports = async function handler(req, res) {
                 
                 return res.status(200).json({
                     success: true,
-                    calendario: calendario
+                    calendario: calendario,
+                    ultimaActualizacion: Math.floor(Number(calendario && calendario.ultimaActualizacion)) || 0
                 });
             } catch (error) {
                 console.error('[API] Error en GET:', error);
@@ -299,6 +312,11 @@ module.exports = async function handler(req, res) {
         if (req.method === 'POST') {
         // Guardar calendario
         const authHeader = req.headers.authorization;
+        const syncSecret = (process.env.CAT_CAL_SYNC_SECRET || '').trim();
+        const syncHeaderRaw = req.headers['x-catcal-sync-token'];
+        const syncHeader = typeof syncHeaderRaw === 'string' ? syncHeaderRaw.trim() : '';
+        const syncOk = syncSecret !== '' && syncHeader !== '' && syncHeader === syncSecret;
+
         const { calendario } = req.body;
         
         if (!calendario) {
@@ -325,8 +343,10 @@ module.exports = async function handler(req, res) {
         
         let actualizadoPor = 'FiveM';
         
-        // Si hay token, verificar (viene desde web)
-        if (authHeader && authHeader.startsWith('Bearer ')) {
+        if (syncOk) {
+            actualizadoPor = 'gmod';
+            console.log('[API] Guardando calendario desde GMod (X-CatCal-Sync-Token)');
+        } else if (authHeader && authHeader.startsWith('Bearer ')) {
             try {
                 const jwt = require('jsonwebtoken');
                 const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_seguro_cambiar_en_produccion';
@@ -340,9 +360,13 @@ module.exports = async function handler(req, res) {
                     error: 'Token inválido'
                 });
             }
+        } else if (syncSecret !== '') {
+            return res.status(401).json({
+                error: 'No autorizado: usa Bearer (web) o header X-CatCal-Sync-Token (GMod) con CAT_CAL_SYNC_SECRET'
+            });
         } else {
-            // Sin token = viene desde FiveM (confianza interna)
-            console.log('[API] Guardando calendario desde FiveM');
+            // Sin CAT_CAL_SYNC_SECRET en entorno: compatibilidad FiveM (confianza interna)
+            console.log('[API] Guardando calendario desde FiveM (sin CAT_CAL_SYNC_SECRET)');
         }
 
             try {

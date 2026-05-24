@@ -29,14 +29,53 @@
             </nav>
 
             <div id="panel-indice" class="tablon-panel tablon-panel--activa">
-                <div class="tablon-indice">
-                    <p class="tablon-indice-intro">Elegí una sección del tablón. En <strong>Horario</strong> podés alternar entre la <strong>1ª</strong> y la <strong>2ª semana</strong> (misma barra de pestañas para ambas).</p>
-                    <div class="tablon-indice-links">
-                        <button type="button" class="tablon-acceso" data-catcal-tab="horario">Horario — semanas y clases</button>
-                        <button type="button" class="tablon-acceso" data-catcal-tab="normas">Normas de Hogwarts</button>
-                        <button type="button" class="tablon-acceso" data-catcal-tab="optativas">Optativas</button>
-                        <button type="button" class="tablon-acceso" data-catcal-tab="clubes">Clubes</button>
-                        <button type="button" class="tablon-acceso" data-catcal-tab="notas">Notas</button>
+                <div class="tablon-indice tablon-indice--cartel">
+                    <header class="tablon-indice-cabecera">
+                        <h2 class="tablon-indice-cabecera-titulo">Tablón de anuncios</h2>
+                        <p class="tablon-indice-cabecera-texto">Elegí una semana para ver el horario, o una sección del tablón a la derecha.</p>
+                    </header>
+                    <div class="tablon-indice-marco">
+                    <div class="tablon-indice-rejilla">
+                        <section class="tablon-indice-columna tablon-indice-columna--horarios" aria-labelledby="tablon-rubric-horarios">
+                            <p id="tablon-rubric-horarios" class="tablon-indice-rubrica tablon-indice-rubrica--horarios">Horarios divididos semanalmente:</p>
+                            <div class="tablon-indice-semanas">
+                                <button type="button" class="tablon-indice-ficha" data-catcal-tab="horario" data-catcal-semana="1">
+                                    <span class="tablon-indice-ficha-titulo">
+                                        <span class="tablon-indice-ficha-horario">Horario</span>
+                                        <span class="tablon-indice-ficha-semana">(1.ª semana)</span>
+                                    </span>
+                                </button>
+                                <button type="button" class="tablon-indice-ficha tablon-indice-ficha--alt" data-catcal-tab="horario" data-catcal-semana="2">
+                                    <span class="tablon-indice-ficha-titulo">
+                                        <span class="tablon-indice-ficha-horario">Horario</span>
+                                        <span class="tablon-indice-ficha-semana">(2.ª semana)</span>
+                                    </span>
+                                </button>
+                            </div>
+                        </section>
+                        <div class="tablon-indice-separador" aria-hidden="true"></div>
+                        <section class="tablon-indice-columna tablon-indice-columna--secciones" aria-labelledby="tablon-rubric-secciones">
+                            <p id="tablon-rubric-secciones" class="tablon-indice-rubrica">Información y apartados</p>
+                            <div class="tablon-indice-pila">
+                                <button type="button" class="tablon-acceso tablon-acceso--normas" data-catcal-tab="normas">
+                                    <span class="tablon-acceso-fila"><span class="tablon-acceso-titulo">Normas de Hogwarts</span><span class="tablon-acceso-ico" aria-hidden="true">📜</span></span>
+                                    <span class="tablon-acceso-desc">Reglas de convivencia y del rol dentro del castillo.</span>
+                                </button>
+                                <button type="button" class="tablon-acceso tablon-acceso--optativas" data-catcal-tab="optativas">
+                                    <span class="tablon-acceso-fila"><span class="tablon-acceso-titulo">Optativas</span><span class="tablon-acceso-ico" aria-hidden="true">📑</span></span>
+                                    <span class="tablon-acceso-desc">Materias optativas y avisos del tablón.</span>
+                                </button>
+                                <button type="button" class="tablon-acceso tablon-acceso--clubes" data-catcal-tab="clubes">
+                                    <span class="tablon-acceso-fila"><span class="tablon-acceso-titulo">Clubes y actividades</span><span class="tablon-acceso-ico" aria-hidden="true">🎭</span></span>
+                                    <span class="tablon-acceso-desc">Clubes, ligas y actividades fuera del horario de clase.</span>
+                                </button>
+                                <button type="button" class="tablon-acceso tablon-acceso--notas" data-catcal-tab="notas">
+                                    <span class="tablon-acceso-fila"><span class="tablon-acceso-titulo">Notas</span><span class="tablon-acceso-ico" aria-hidden="true">✏️</span></span>
+                                    <span class="tablon-acceso-desc">Boletín de calificaciones por curso (publicación controlada).</span>
+                                </button>
+                            </div>
+                        </section>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -51,10 +90,21 @@
                 </div>
             </div>
 
-            <div id="panel-normas" class="tablon-panel tablon-panel-texto">
-                <h2 class="tablon-seccion-titulo">Normas de Hogwarts</h2>
-                <div id="tablon-view-normas" class="tablon-texto-view"></div>
-                <textarea id="tablon-edit-normas" class="tablon-texto-edit" style="display:none" placeholder="Texto del tablón (visible para todos al guardar)…"></textarea>
+            <div id="panel-normas" class="tablon-panel tablon-panel-texto tablon-panel-normas">
+                <div id="tablon-normas-modo-bar" class="tablon-normas-modo-bar">
+                    <button type="button" id="tablon-normas-modo-ver" class="tablon-normas-modo-btn">← Ver tablón</button>
+                    <button type="button" id="tablon-normas-modo-editar" class="tablon-normas-modo-btn tablon-normas-modo-btn--prim">Editar capítulos</button>
+                </div>
+                <header class="tablon-normas-hero">
+                    <h2 class="tablon-normas-hero-titulo">Normas de Hogwarts</h2>
+                    <p class="tablon-normas-hero-sub">Normativa del castillo, capítulo por capítulo.</p>
+                </header>
+                <div id="tablon-view-normas" class="tablon-normas-vista" aria-live="polite"></div>
+                <div id="tablon-edit-normas" class="tablon-normas-editor" style="display:none">
+                    <p class="tablon-normas-ayuda-editor">Cada bloque es un capítulo del tablón. Escribí título y texto, ordená con las flechas y no olvides <strong>guardar cambios</strong>.</p>
+                    <div id="tablon-normas-bloques-edit" class="tablon-normas-bloques-edit"></div>
+                    <button type="button" id="tablon-normas-anadir" class="tablon-normas-btn-anadir">+ Añadir capítulo</button>
+                </div>
             </div>
 
             <div id="panel-optativas" class="tablon-panel tablon-panel-texto">
@@ -69,10 +119,48 @@
                 <textarea id="tablon-edit-clubes" class="tablon-texto-edit" style="display:none" placeholder="Texto del tablón…"></textarea>
             </div>
 
-            <div id="panel-notas" class="tablon-panel tablon-panel-texto">
-                <h2 class="tablon-seccion-titulo">Notas</h2>
-                <div id="tablon-view-notas" class="tablon-texto-view"></div>
-                <textarea id="tablon-edit-notas" class="tablon-texto-edit" style="display:none" placeholder="Texto del tablón…"></textarea>
+            <div id="panel-notas" class="tablon-panel tablon-panel-texto tablon-panel-notas">
+                <div id="tablon-notas-modo-bar" class="tablon-notas-modo-bar">
+                    <button type="button" id="tablon-notas-modo-ver" class="tablon-notas-modo-btn">← Ver tablón</button>
+                    <button type="button" id="tablon-notas-modo-editar" class="tablon-notas-modo-btn tablon-notas-modo-btn--prim">Editar boletín</button>
+                </div>
+                <div class="tablon-notas-leyenda-row" role="group" aria-label="Leyenda de calificaciones">
+                    <div class="tablon-notas-leyenda-pill tablon-notas-leyenda-pill--e">
+                        <span class="tablon-notas-leyenda-pill-tit">Extraordinario [E]</span>
+                        <span class="tablon-notas-leyenda-pill-sub">100</span>
+                    </div>
+                    <div class="tablon-notas-leyenda-pill tablon-notas-leyenda-pill--s">
+                        <span class="tablon-notas-leyenda-pill-tit">Supera las expectativas [S]</span>
+                        <span class="tablon-notas-leyenda-pill-sub">75–99</span>
+                    </div>
+                    <div class="tablon-notas-leyenda-pill tablon-notas-leyenda-pill--a">
+                        <span class="tablon-notas-leyenda-pill-tit">Aceptable [A]</span>
+                        <span class="tablon-notas-leyenda-pill-sub">50–74</span>
+                    </div>
+                    <div class="tablon-notas-leyenda-pill tablon-notas-leyenda-pill--i">
+                        <span class="tablon-notas-leyenda-pill-tit">Insatisfactorio [I]</span>
+                        <span class="tablon-notas-leyenda-pill-sub">35–49</span>
+                    </div>
+                    <div class="tablon-notas-leyenda-pill tablon-notas-leyenda-pill--d">
+                        <span class="tablon-notas-leyenda-pill-tit">Desastroso [D]</span>
+                        <span class="tablon-notas-leyenda-pill-sub">25–34</span>
+                    </div>
+                    <div class="tablon-notas-leyenda-pill tablon-notas-leyenda-pill--t">
+                        <span class="tablon-notas-leyenda-pill-tit">Trol [T]</span>
+                        <span class="tablon-notas-leyenda-pill-sub">0–24</span>
+                    </div>
+                </div>
+                <div id="tablon-notas-alumno" class="tablon-notas-alumno" aria-live="polite"></div>
+                <div id="tablon-notas-vista-profe" class="tablon-notas-vista-profe"></div>
+                <div id="tablon-notas-editor-profe" class="tablon-notas-editor-profe" style="display:none">
+                    <p class="tablon-notas-ayuda-editor">Las filas del boletín se sincronizan con los alumnos de casas en línea; para carga masiva usá el comando servidor <code>CatCalNotasImportar</code>. Marcá <strong>Publicar notas</strong> y guardá.</p>
+                    <div class="tablon-notas-meta-edit">
+                        <label class="tablon-notas-meta-lbl"><input type="checkbox" id="tablon-notas-publicado" /> Publicar notas (visibles para alumnos)</label>
+                        <label class="tablon-notas-meta-lbl">Título listado <input type="text" id="tablon-notas-titulo" maxlength="200" class="tablon-notas-meta-in" /></label>
+                        <label class="tablon-notas-meta-lbl">Año escolar (etiqueta) <input type="text" id="tablon-notas-anio" maxlength="120" class="tablon-notas-meta-in" /></label>
+                    </div>
+                    <div id="tablon-notas-cursos-edit" class="tablon-notas-cursos-edit"></div>
+                </div>
             </div>
         </div>
 
