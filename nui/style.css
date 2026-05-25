@@ -2722,3 +2722,29 @@ select.tablon-notas-in-casa {
     .panel-admin-form { grid-template-columns: 1fr; }
     .barra-sesion-admin { top: 8px; right: 8px; }
 }
+
+/* Curso bloqueado: otra clase ya cogió este curso en la misma media hora.
+ * Se aplica tanto en modo web (Vercel) como en GMod NUI, porque la regla
+ * de conflicto por curso es la misma en ambos contextos. */
+.curso-option.curso-bloqueado {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(0, 0, 0, 0.08),
+        rgba(0, 0, 0, 0.08) 6px,
+        transparent 6px,
+        transparent 12px
+    );
+    text-decoration: line-through;
+    pointer-events: auto; /* mantener tooltip al pasar el ratón */
+}
+.curso-option.curso-bloqueado:hover {
+    opacity: 0.4;
+    transform: none;
+    box-shadow: none;
+}
+.curso-option.curso-bloqueado::before {
+    content: "🚫 ";
+    margin-right: 2px;
+}

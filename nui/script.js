@@ -1848,10 +1848,24 @@ function detenerPollingPeriodico() {
     }
 }
 
-// Función para mostrar login si es necesario
+// Función para mostrar login si es necesario.
+// Si el modal ya existe (porque el usuario lo cerró antes con "Cerrar" o
+// ya pasó por aquí en una sesión previa), lo volvemos a hacer visible sin
+// crearlo de nuevo. Eso permite re-abrirlo desde el botón "Iniciar sesión"
+// que aparece tras cerrar sesión, sin recargar la página.
 function mostrarLoginSiNecesario() {
     if (!MODO_WEB || tokenAutenticacion) return;
-    
+
+    const yaExistente = document.getElementById('modalLogin');
+    if (yaExistente) {
+        yaExistente.style.display = 'block';
+        const inputUser = document.getElementById('loginUsername');
+        if (inputUser) {
+            try { inputUser.focus(); } catch (_) {}
+        }
+        return;
+    }
+
     // Crear modal de login si no existe
     if (!document.getElementById('modalLogin')) {
         const modalLogin = document.createElement('div');
@@ -1968,6 +1982,9 @@ function actualizarBotonesSesionWeb() {
         barra.className = 'barra-sesion-admin';
         barra.innerHTML = `
             <span id="barraSesionAdminUser" class="barra-sesion-admin__user"></span>
+            <button type="button" id="btnIniciarSesionWeb" class="btn-panel-admin" style="display:none;">
+                🔐 Iniciar sesión
+            </button>
             <button type="button" id="btnPanelAdmin" class="btn-panel-admin" style="display:none;">
                 ⚙️ Administración
             </button>
@@ -1978,11 +1995,15 @@ function actualizarBotonesSesionWeb() {
         document.body.appendChild(barra);
         document.getElementById('btnPanelAdmin').addEventListener('click', abrirPanelAdministracion);
         document.getElementById('btnCerrarSesionWeb').addEventListener('click', cerrarSesionWeb);
+        document.getElementById('btnIniciarSesionWeb').addEventListener('click', () => {
+            mostrarLoginSiNecesario();
+        });
     }
 
     const userLabel = document.getElementById('barraSesionAdminUser');
     const btnAdmin = document.getElementById('btnPanelAdmin');
     const btnSalir = document.getElementById('btnCerrarSesionWeb');
+    const btnEntrar = document.getElementById('btnIniciarSesionWeb');
 
     if (tokenAutenticacion && usuarioActual) {
         const rolTxt = esAdmin ? 'admin' : 'profesor';
@@ -1990,10 +2011,12 @@ function actualizarBotonesSesionWeb() {
         userLabel.style.display = 'inline-block';
         btnSalir.style.display = 'inline-block';
         btnAdmin.style.display = esAdmin ? 'inline-block' : 'none';
+        btnEntrar.style.display = 'none';
     } else {
         userLabel.style.display = 'none';
         btnSalir.style.display = 'none';
         btnAdmin.style.display = 'none';
+        btnEntrar.style.display = 'inline-block';
     }
 }
 
@@ -2780,20 +2803,21 @@ function mostrarCalendario() {
                 // Botones para agregar
                 if (esProfesor) {
                     const clasesArray = diaData.clases[horario.hora] || [];
-                    const eventosArray = diaData.eventosHorario && diaData.eventosHorario[horario.hora] ? 
+                    const eventosArray = diaData.eventosHorario && diaData.eventosHorario[horario.hora] ?
                         (Array.isArray(diaData.eventosHorario[horario.hora]) ? diaData.eventosHorario[horario.hora] : [diaData.eventosHorario[horario.hora]]) : [];
-                    
+
                     const eventosActivos = eventosArray.filter(evento => evento && evento.texto).length;
-                    
+
                     const espaciosOcupados = clasesArray.length + eventosActivos;
-                    
-                    // ✅ FIX: Determinar límite de clases basado en la duración real de la franja
-                    const maxClasesPermitidas = obtenerLimiteClasesPorFranja(horario.hora);
-                    
-                    console.log(`📊 Franja ${horario.hora}: ${clasesArray.length}/${maxClasesPermitidas} clases, ${eventosActivos}/2 eventos`);
-                    
-                    // Mostrar botón de agregar clase solo si no se ha alcanzado el límite específico de la franja
-                    if (clasesArray.length < maxClasesPermitidas && espaciosOcupados < 4) {
+
+                    // El límite "duro" por franja ya no aplica: en cada media
+                    // hora caben varias clases siempre que no compartan curso
+                    // con otra clase ya creada en esa misma media hora.
+                    // Mantenemos un tope visual generoso (8) para que las celdas
+                    // no crezcan de forma incontrolable.
+                    console.log(`📊 Franja ${horario.hora}: ${clasesArray.length} clases, ${eventosActivos} eventos`);
+
+                    if (espaciosOcupados < 8) {
                         html += `
                             <div class="clase-vacia agregar-mas"
                                 data-semana="${semanaActual}"
@@ -2804,11 +2828,11 @@ function mostrarCalendario() {
                             </div>
                         `;
                     } else {
-                        console.log(`🚫 Botón clase oculto: ${clasesArray.length} clases >= ${maxClasesPermitidas} límite o ${espaciosOcupados}/4 espacios ocupados`);
+                        console.log(`🚫 Botón clase oculto: ${espaciosOcupados}/8 espacios ocupados`);
                     }
-                    
-                    // ✅ FIX: Mostrar botón de evento solo si no se ha alcanzado el límite de 2 eventos
-                    if (eventosActivos < 2 && espaciosOcupados < 4) {
+
+                    // Eventos: mantenemos el tope original (máximo 2 por franja).
+                    if (eventosActivos < 2 && espaciosOcupados < 8) {
                         html += `
                             <div class="clase-vacia agregar-evento"
                                 data-semana="${semanaActual}"
@@ -3042,28 +3066,58 @@ function obtenerOpcionesHorario(semana, dia, horario, claseIndex) {
         }
     }
     
-    // Si ya hay clases, determinar qué opciones están ocupadas
-    const horasOcupadas = clasesExistentes
-        .filter((clase, index) => index !== claseIndex)
-        .map(clase => {
-            if (clase.horaExacta) {
-                return clase.horaExacta.split(':').slice(0, 2).join(':');
-            }
-            return null;
-        })
-        .filter(hora => hora);
-    
-    console.log('⛔ Horas ocupadas:', horasOcupadas);
-    console.log('📋 Todas las opciones:', opciones.map(o => o.value));
-    
-    // Filtrar opciones disponibles
-    const opcionesDisponibles = opciones.filter(opcion => 
-        !horasOcupadas.includes(opcion.value)
-    );
-    
-    console.log('✅ Opciones disponibles:', opcionesDisponibles.map(o => o.value));
-    
-    return opcionesDisponibles;
+    // Nueva regla: NO filtramos por medias horas ocupadas. En una misma
+    // media hora pueden convivir varias clases siempre que no compartan
+    // curso (esa restricción la aplica cursosBloqueadosEnHora a nivel de
+    // selector de cursos y la valida guardarClase).
+    console.log('📋 Todas las opciones (sin filtrar por ocupación):', opciones.map(o => o.value));
+    return opciones;
+}
+
+// Devuelve un Set con los cursos que NO pueden volver a usarse en la
+// media hora (horaExacta, HH:MM) indicada, porque ya hay otra clase en
+// esa misma media hora con esos cursos. Comodín "Todos":
+//   * Si una clase existente usa "Todos" en esa media hora, se bloquean
+//     TODOS los cursos disponibles + "Todos".
+//   * Si una clase existente usa cualquier curso específico en esa media
+//     hora, también se bloquea "Todos" (no podemos meter un comodín que
+//     pisaría a una clase específica ya creada).
+function cursosBloqueadosEnHora(semana, dia, horario, horaExacta, claseIndexExclude) {
+    const bloqueados = new Set();
+    if (!horaExacta) return bloqueados;
+
+    const semanaIndex = semana - 1;
+    const diaIndex = dia - 1;
+    const clases = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
+
+    const horaExactaNorm = String(horaExacta).split(':').slice(0, 2).join(':');
+    const cursosDisponibles = (config && Array.isArray(config.cursos) && config.cursos.length)
+        ? config.cursos
+        : ['1º', '2º', '3º', '4º', '5º', '6º', '7º', 'Todos'];
+
+    let algunaUsaTodos = false;
+    let algunaUsaEspecifico = false;
+
+    clases.forEach((c, idx) => {
+        if (idx === claseIndexExclude) return;
+        if (!c || !c.horaExacta) return;
+        const hNorm = String(c.horaExacta).split(':').slice(0, 2).join(':');
+        if (hNorm !== horaExactaNorm) return;
+        const cs = Array.isArray(c.cursos) ? c.cursos : [];
+        cs.forEach(curso => {
+            if (curso === 'Todos') algunaUsaTodos = true;
+            else algunaUsaEspecifico = true;
+            bloqueados.add(curso);
+        });
+    });
+
+    if (algunaUsaTodos) {
+        cursosDisponibles.forEach(c => bloqueados.add(c));
+    }
+    if (algunaUsaEspecifico) {
+        bloqueados.add('Todos');
+    }
+    return bloqueados;
 }
 
 // Función auxiliar para convertir hora a minutos
@@ -3118,56 +3172,45 @@ function extraerHorasDelHorario(horarioStr) {
 
 function abrirModalClaseNueva(elemento) {
     if (!esProfesor) return;
-    
+
     const semana = elemento.dataset.semana;
     const dia = elemento.dataset.dia;
     const horario = elemento.dataset.horario;
-    
+
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
-    
-    // Obtener el array de clases existentes
+
     const clasesArray = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
-    
-    console.log('🔍 Verificando límites para franja:', horario);
-    
-    // ✅ FIX: Usar la función auxiliar para determinar límites
-    const maxClasesPermitidas = obtenerLimiteClasesPorFranja(horario);
-    
-    console.log('📚 Máximo de clases permitidas:', maxClasesPermitidas);
-    console.log('📊 Clases existentes:', clasesArray.length);
-    
-    // Verificar límite de clases según duración
-    if (clasesArray.length >= maxClasesPermitidas) {
-        mostrarNotificacion(`❌ Límite alcanzado: Máximo ${maxClasesPermitidas} clase(s) permitida(s) en esta franja`, 'error');
-        return;
-    }
-    
-    // Obtener opciones de horario disponibles
+    console.log('🔍 Abriendo modal de clase nueva. Franja:', horario, '| ya existen', clasesArray.length, 'clases');
+
+    // Ya no aplicamos el tope duro por franja: pueden coexistir varias
+    // clases en cada media hora siempre que no compartan curso.
+
+    // Obtener TODAS las medias horas candidatas (ya no se filtran las
+    // ocupadas: cada media hora puede tener varias clases con cursos
+    // distintos).
     const opcionesHorario = obtenerOpcionesHorario(semana, dia, horario, -1);
-    
+
     if (opcionesHorario.length === 0) {
         mostrarNotificacion('❌ No hay horarios disponibles en esta franja', 'error');
         return;
     }
-    
+
     document.getElementById('modalSemana').value = semana;
     document.getElementById('modalDia').value = dia;
     document.getElementById('modalHorario').value = horario;
     document.getElementById('modalClaseIndex').value = clasesArray.length;
-    
-    // Limpiar formulario
+
     document.getElementById('tituloClase').value = "";
     document.getElementById('descripcionClase').value = "";
     document.getElementById('profesorClase').value = "";
-    
-    // Configurar selector de hora automático
-    inicializarSelectorHora(opcionesHorario, "");
-    
-    inicializarSelectorCursos([]);
-    
+
+    const contexto = { semana, dia, horario, claseIndex: -1 };
+    inicializarSelectorHora(opcionesHorario, "", contexto);
+    inicializarSelectorCursos([], contexto);
+
     document.getElementById('modalClase').style.display = 'block';
-    
+
     console.log('✅ Modal abierto correctamente para nueva clase');
 }
 
@@ -3395,18 +3438,21 @@ function abrirModalClaseExistente(elemento) {
     document.getElementById('tituloClase').value = claseData.titulo || "";
     document.getElementById('descripcionClase').value = claseData.descripcion || "";
     document.getElementById('profesorClase').value = claseData.profesor || "";
-    
+
     // Configurar selector de hora con hora normalizada
-    inicializarSelectorHora(opcionesHorario, horaSeleccionadaNormalizada);
-    
-    inicializarSelectorCursos(Array.isArray(claseData.cursos) ? claseData.cursos : []);
-    
+    const contexto = { semana, dia, horario, claseIndex: parseInt(claseIndex) };
+    inicializarSelectorHora(opcionesHorario, horaSeleccionadaNormalizada, contexto);
+    inicializarSelectorCursos(Array.isArray(claseData.cursos) ? claseData.cursos : [], contexto);
+
     document.getElementById('modalClase').style.display = 'block';
 }
 
 
 // FUNCIÓN COMPLETAMENTE CORREGIDA para inicializar selector de hora (NO DESHABILITAR)
-function inicializarSelectorHora(opcionesDisponibles, horaSeleccionada) {
+// `contexto` (opcional) = { semana, dia, horario, claseIndex }; cuando se
+// pasa, al cambiar la media hora elegida se repinta el selector de cursos
+// para reflejar los cursos ya cogidos por otras clases en esa media hora.
+function inicializarSelectorHora(opcionesDisponibles, horaSeleccionada, contexto) {
     console.log('🕐 Inicializando selector de hora...');
     console.log('📋 Opciones disponibles:', opcionesDisponibles);
     console.log('🎯 Hora seleccionada:', horaSeleccionada);
@@ -3489,7 +3535,29 @@ function inicializarSelectorHora(opcionesDisponibles, horaSeleccionada) {
         helpText.textContent = 'Hora específica dentro de la franja horaria';
     }
     container.appendChild(helpText);
-    
+
+    // Al cambiar la media hora seleccionada, repintar el selector de
+    // cursos: los cursos ya cogidos por otra clase en esa media hora
+    // tienen que aparecer bloqueados, y los cursos previamente
+    // seleccionados que ahora chocan se de-seleccionan.
+    if (contexto) {
+        select.addEventListener('change', () => {
+            const seleccionadosAhora = Array.from(
+                document.querySelectorAll('#cursosSelector .curso-option.selected')
+            ).map(opt => {
+                const inp = opt.querySelector('input');
+                return inp ? inp.value : null;
+            }).filter(v => v);
+
+            const bloqueados = cursosBloqueadosEnHora(
+                contexto.semana, contexto.dia, contexto.horario,
+                select.value, contexto.claseIndex
+            );
+            const cursosFiltrados = seleccionadosAhora.filter(c => !bloqueados.has(c));
+            inicializarSelectorCursos(cursosFiltrados, contexto);
+        });
+    }
+
     console.log('✅ Selector de hora inicializado correctamente (SIEMPRE HABILITADO)');
 }
 
@@ -3635,23 +3703,44 @@ function traducirClima(clima) {
     return traducciones[clima] || clima;
 }
 
-function inicializarSelectorCursos(cursosSeleccionados) {
+// `contexto` (opcional): { semana, dia, horario, claseIndex }. Cuando se
+// pasa, los cursos que ya están cogidos por OTRA clase en la misma media
+// hora se pintan deshabilitados ("curso-bloqueado") y no se pueden marcar.
+function inicializarSelectorCursos(cursosSeleccionados, contexto) {
     const container = document.getElementById('cursosSelector');
     container.innerHTML = '';
-    
+
     const cursosDisponibles = config.cursos || ['1º', '2º', '3º', '4º', '5º', '6º', '7º', 'Todos'];
-    
+
+    let bloqueados = new Set();
+    if (contexto) {
+        const sel = document.getElementById('horaExactaClaseSelect');
+        const horaExacta = sel ? sel.value : '';
+        if (horaExacta) {
+            bloqueados = cursosBloqueadosEnHora(
+                contexto.semana, contexto.dia, contexto.horario,
+                horaExacta, contexto.claseIndex
+            );
+        }
+    }
+
     cursosDisponibles.forEach(curso => {
-        const isSelected = cursosSeleccionados.includes(curso);
+        const isBlocked = bloqueados.has(curso);
+        const isSelected = !isBlocked && cursosSeleccionados.includes(curso);
         const option = document.createElement('div');
-        option.className = `curso-option ${isSelected ? 'selected' : ''} ${curso === 'Todos' ? 'todos' : ''}`;
+        option.className = `curso-option ${isSelected ? 'selected' : ''} ${curso === 'Todos' ? 'todos' : ''} ${isBlocked ? 'curso-bloqueado' : ''}`;
         option.innerHTML = `
             <input type="checkbox" ${isSelected ? 'checked' : ''} value="${curso}" style="display: none;">
             ${curso}
         `;
+        if (isBlocked) {
+            option.title = 'Otra clase ya ha ocupado este curso en esta media hora';
+            container.appendChild(option);
+            return;
+        }
         option.addEventListener('click', function() {
             const checkbox = this.querySelector('input');
-            
+
             // Si se selecciona "Todos", deseleccionar los demás
             if (curso === 'Todos' && !checkbox.checked) {
                 document.querySelectorAll('#cursosSelector .curso-option').forEach(opt => {
@@ -3876,9 +3965,32 @@ function guardarClase(event) {
     // Obtener y normalizar la hora exacta (CORREGIDO: usar el select correcto)
     const horaExactaSelect = document.getElementById('horaExactaClaseSelect');
     const horaExacta = horaExactaSelect ? horaExactaSelect.value.split(':').slice(0, 2).join(':') : "";
-    
+
     console.log('💾 Guardando clase con hora:', horaExacta);
-    
+
+    if (!horaExacta) {
+        mostrarNotificacion('❌ Debes seleccionar una hora exacta', 'error');
+        return;
+    }
+    if (!cursosSeleccionados.length) {
+        mostrarNotificacion('❌ Selecciona al menos un curso', 'error');
+        return;
+    }
+
+    // Validación de cursos bloqueados por otra clase en la misma media
+    // hora. Excluimos la propia clase (claseIndex) cuando se está editando.
+    const bloqueados = cursosBloqueadosEnHora(
+        parseInt(semana), parseInt(dia), horario, horaExacta, claseIndex
+    );
+    const conflicto = cursosSeleccionados.filter(c => bloqueados.has(c));
+    if (conflicto.length) {
+        mostrarNotificacion(
+            '❌ Estos cursos ya están ocupados por otra clase en esa media hora: ' + conflicto.join(', '),
+            'error'
+        );
+        return;
+    }
+
     const nuevaClase = {
         titulo: document.getElementById('tituloClase').value,
         descripcion: document.getElementById('descripcionClase').value,
