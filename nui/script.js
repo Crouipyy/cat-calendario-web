@@ -1,5 +1,11 @@
 let calendarioData = {};
 let esProfesor = false;
+// Sólo aplica al modo web (Vercel). En GMod/FiveM se ignora.
+//   true  -> usuario con rol 'admin' (puede tocar clima, separadores,
+//            meses, gestionar cuentas y ver logs).
+//   false -> profesor o no autenticado: en web NO puede tocar la
+//            configuración del calendario, sólo clases / eventos / notas.
+let esAdmin = false;
 let config = {};
 let semanaActual = 1;
 let tooltipElement = null;
@@ -1356,6 +1362,14 @@ const MODO_WEB = detectarModoWeb();
 const API_URL = obtenerAPIURL();
 let tokenAutenticacion = localStorage.getItem('calendario_token') || null;
 let usuarioActual = null;
+
+// En la web (Vercel) sólo los admins pueden tocar la configuración global
+// del calendario (clima, separadores/franjas horarias, meses, barras de
+// estación, etc.). En GMod/FiveM no aplica esa restricción y devolvemos
+// true siempre.
+function puedeEditarConfig() {
+    return !MODO_WEB || esAdmin;
+}
 let ultimoTimestamp = null; // Para detectar cambios en modo web
 let pollingInterval = null; // Referencia al intervalo de polling
 
@@ -1694,9 +1708,11 @@ async function cargarDatosDesdeAPI() {
                 if (verifyData.success) {
                     usuarioActual = verifyData.usuario;
                     esProfesor = verifyData.usuario.permisos && verifyData.usuario.permisos.includes('editar');
+                    esAdmin = verifyData.usuario.rol === 'admin';
                 } else {
                     tokenAutenticacion = null;
                     localStorage.removeItem('calendario_token');
+                    esAdmin = false;
                 }
             } catch (e) {
                 console.error('Error verificando token:', e);
@@ -1718,6 +1734,9 @@ async function cargarDatosDesdeAPI() {
         asegurarTablonSecciones();
         aplicarTablonSeccionesAlDOM();
         cambiarPestanaTablon('indice');
+
+        // Botón de Administración (sólo web + admin) y de cerrar sesión.
+        actualizarBotonesSesionWeb();
 
         // Mostrar botón de login si no está autenticado
         mostrarLoginSiNecesario();
@@ -1896,12 +1915,15 @@ async function hacerLogin() {
             localStorage.setItem('calendario_token', tokenAutenticacion);
             usuarioActual = data.usuario;
             esProfesor = data.usuario.permisos && data.usuario.permisos.includes('editar');
-            
+            esAdmin = data.usuario.rol === 'admin';
+
             const btnGuardar = document.getElementById('btnGuardar');
             if (btnGuardar) {
                 btnGuardar.style.display = esProfesor ? 'block' : 'none';
             }
-            
+
+            actualizarBotonesSesionWeb();
+
             document.getElementById('modalLogin').style.display = 'none';
             mostrarNotificacion('Sesión iniciada correctamente', 'success');
         } else {
@@ -1910,6 +1932,443 @@ async function hacerLogin() {
     } catch (error) {
         console.error('Error en login:', error);
         mostrarNotificacion('Error de conexión', 'error');
+    }
+}
+
+// =====================================================================
+// PANEL DE ADMINISTRACIÓN (sólo en MODO_WEB y para usuarios con rol
+// admin). Permite crear/editar/eliminar usuarios y ver el log de
+// cambios del calendario.
+// =====================================================================
+
+function cerrarSesionWeb() {
+    tokenAutenticacion = null;
+    localStorage.removeItem('calendario_token');
+    usuarioActual = null;
+    esProfesor = false;
+    esAdmin = false;
+
+    const btnGuardar = document.getElementById('btnGuardar');
+    if (btnGuardar) btnGuardar.style.display = 'none';
+
+    actualizarBotonesSesionWeb();
+    mostrarNotificacion('Sesión cerrada', 'info');
+    mostrarLoginSiNecesario();
+}
+
+// Crea (si no existe) y actualiza la visibilidad de los botones flotantes
+// "Administración" y "Cerrar sesión". Sólo se montan en MODO_WEB.
+function actualizarBotonesSesionWeb() {
+    if (!MODO_WEB) return;
+
+    let barra = document.getElementById('barraSesionAdmin');
+    if (!barra) {
+        barra = document.createElement('div');
+        barra.id = 'barraSesionAdmin';
+        barra.className = 'barra-sesion-admin';
+        barra.innerHTML = `
+            <span id="barraSesionAdminUser" class="barra-sesion-admin__user"></span>
+            <button type="button" id="btnPanelAdmin" class="btn-panel-admin" style="display:none;">
+                ⚙️ Administración
+            </button>
+            <button type="button" id="btnCerrarSesionWeb" class="btn-cerrar-sesion" style="display:none;">
+                Cerrar sesión
+            </button>
+        `;
+        document.body.appendChild(barra);
+        document.getElementById('btnPanelAdmin').addEventListener('click', abrirPanelAdministracion);
+        document.getElementById('btnCerrarSesionWeb').addEventListener('click', cerrarSesionWeb);
+    }
+
+    const userLabel = document.getElementById('barraSesionAdminUser');
+    const btnAdmin = document.getElementById('btnPanelAdmin');
+    const btnSalir = document.getElementById('btnCerrarSesionWeb');
+
+    if (tokenAutenticacion && usuarioActual) {
+        const rolTxt = esAdmin ? 'admin' : 'profesor';
+        userLabel.textContent = '👤 ' + usuarioActual.username + ' (' + rolTxt + ')';
+        userLabel.style.display = 'inline-block';
+        btnSalir.style.display = 'inline-block';
+        btnAdmin.style.display = esAdmin ? 'inline-block' : 'none';
+    } else {
+        userLabel.style.display = 'none';
+        btnSalir.style.display = 'none';
+        btnAdmin.style.display = 'none';
+    }
+}
+
+function abrirPanelAdministracion() {
+    if (!MODO_WEB) return;
+    if (!esAdmin) {
+        mostrarNotificacion('No tienes permisos de administrador', 'error');
+        return;
+    }
+
+    let modal = document.getElementById('modalPanelAdmin');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalPanelAdmin';
+        modal.className = 'modal panel-admin-modal';
+        modal.innerHTML = `
+            <div class="modal-content panel-admin-content">
+                <div class="panel-admin-header">
+                    <h3>⚙️ Administración del calendario</h3>
+                    <button type="button" class="panel-admin-close" id="btnCerrarPanelAdmin">✕</button>
+                </div>
+                <div class="panel-admin-tabs">
+                    <button type="button" class="panel-admin-tab activo" data-tab="usuarios">👥 Usuarios</button>
+                    <button type="button" class="panel-admin-tab" data-tab="logs">📜 Historial de cambios</button>
+                </div>
+
+                <div class="panel-admin-tab-content" id="panelAdminTabUsuarios">
+                    <h4>Crear nueva cuenta</h4>
+                    <form id="formCrearUsuario" class="panel-admin-form">
+                        <div class="panel-admin-form-row">
+                            <label>Usuario</label>
+                            <input type="text" id="nuevoUsername" required minlength="3" maxlength="64"
+                                   pattern="[a-zA-Z0-9._-]{3,64}"
+                                   placeholder="ej. profe.lupin">
+                        </div>
+                        <div class="panel-admin-form-row">
+                            <label>Contraseña</label>
+                            <input type="password" id="nuevoPassword" required minlength="6"
+                                   placeholder="mínimo 6 caracteres">
+                        </div>
+                        <div class="panel-admin-form-row">
+                            <label>Rol</label>
+                            <select id="nuevoRol" required>
+                                <option value="profesor" selected>Profesor (sólo clases / eventos / notas)</option>
+                                <option value="admin">Administrador (control total + gestionar cuentas)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-guardar">Crear cuenta</button>
+                    </form>
+
+                    <h4 style="margin-top:24px;">Cuentas existentes</h4>
+                    <div class="panel-admin-tabla-wrapper">
+                        <table class="panel-admin-tabla" id="tablaUsuariosAdmin">
+                            <thead>
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Rol</th>
+                                    <th>Creado por</th>
+                                    <th>Creado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="5">Cargando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="panel-admin-tab-content" id="panelAdminTabLogs" style="display:none;">
+                    <div class="panel-admin-filtros">
+                        <input type="text" id="filtroLogQ" placeholder="Buscar (usuario, acción, detalle)" maxlength="64">
+                        <input type="date" id="filtroLogDesde">
+                        <input type="date" id="filtroLogHasta">
+                        <button type="button" class="btn-guardar" id="btnAplicarFiltroLogs">Filtrar</button>
+                        <button type="button" class="btn-cerrar" id="btnLimpiarFiltroLogs">Limpiar</button>
+                    </div>
+                    <div class="panel-admin-tabla-wrapper">
+                        <table class="panel-admin-tabla" id="tablaLogsAdmin">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Usuario</th>
+                                    <th>Rol</th>
+                                    <th>Acción</th>
+                                    <th>Detalles</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="5">Cargando...</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div class="panel-admin-paginacion" id="paginacionLogs"></div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        document.getElementById('btnCerrarPanelAdmin').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.style.display = 'none';
+        });
+        modal.querySelectorAll('.panel-admin-tab').forEach(btn => {
+            btn.addEventListener('click', () => panelAdminCambiarTab(btn.dataset.tab));
+        });
+        document.getElementById('formCrearUsuario').addEventListener('submit', panelAdminCrearUsuario);
+        document.getElementById('btnAplicarFiltroLogs').addEventListener('click', () => panelAdminCargarLogs(0));
+        document.getElementById('btnLimpiarFiltroLogs').addEventListener('click', () => {
+            document.getElementById('filtroLogQ').value = '';
+            document.getElementById('filtroLogDesde').value = '';
+            document.getElementById('filtroLogHasta').value = '';
+            panelAdminCargarLogs(0);
+        });
+    }
+
+    modal.style.display = 'block';
+    panelAdminCambiarTab('usuarios');
+    panelAdminCargarUsuarios();
+}
+
+function panelAdminCambiarTab(tab) {
+    const modal = document.getElementById('modalPanelAdmin');
+    if (!modal) return;
+    modal.querySelectorAll('.panel-admin-tab').forEach(btn => {
+        btn.classList.toggle('activo', btn.dataset.tab === tab);
+    });
+    document.getElementById('panelAdminTabUsuarios').style.display = tab === 'usuarios' ? 'block' : 'none';
+    document.getElementById('panelAdminTabLogs').style.display = tab === 'logs' ? 'block' : 'none';
+    if (tab === 'logs') panelAdminCargarLogs(0);
+}
+
+async function panelAdminCargarUsuarios() {
+    const tbody = document.querySelector('#tablaUsuariosAdmin tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+
+    try {
+        const r = await fetch(`${API_URL}/api/usuarios`, {
+            headers: { 'Authorization': 'Bearer ' + tokenAutenticacion }
+        });
+        const data = await r.json();
+        if (!r.ok || !data.success) {
+            tbody.innerHTML = '<tr><td colspan="5">Error: ' + (data.error || r.status) + '</td></tr>';
+            return;
+        }
+        if (!data.usuarios.length) {
+            tbody.innerHTML = '<tr><td colspan="5">No hay usuarios todavía.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        for (const u of data.usuarios) {
+            const tr = document.createElement('tr');
+            const esYo = usuarioActual && u.username === usuarioActual.username;
+            tr.innerHTML = `
+                <td><strong>${escaparHTML(u.username)}</strong>${esYo ? ' <em style="color:#888;">(tú)</em>' : ''}</td>
+                <td><span class="rol-badge rol-${u.rol}">${u.rol}</span></td>
+                <td>${escaparHTML(u.creado_por || '-')}</td>
+                <td>${escaparFecha(u.creado_en)}</td>
+                <td class="panel-admin-acciones">
+                    <button class="btn-mini" data-act="pass" data-user="${escaparHTML(u.username)}">🔑 Cambiar contraseña</button>
+                    <button class="btn-mini" data-act="rol" data-user="${escaparHTML(u.username)}" data-rol="${u.rol}">🎭 Cambiar rol</button>
+                    <button class="btn-mini btn-mini-rojo" data-act="del" data-user="${escaparHTML(u.username)}" ${esYo ? 'disabled title="No puedes eliminar tu propia cuenta"' : ''}>🗑️ Eliminar</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        tbody.querySelectorAll('button[data-act]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const act = btn.dataset.act;
+                const user = btn.dataset.user;
+                if (act === 'pass') panelAdminCambiarPassword(user);
+                else if (act === 'rol') panelAdminCambiarRol(user, btn.dataset.rol);
+                else if (act === 'del') panelAdminEliminarUsuario(user);
+            });
+        });
+    } catch (e) {
+        console.error('[panel-admin] Error cargando usuarios:', e);
+        tbody.innerHTML = '<tr><td colspan="5">Error de conexión.</td></tr>';
+    }
+}
+
+async function panelAdminCrearUsuario(ev) {
+    ev.preventDefault();
+    const username = document.getElementById('nuevoUsername').value.trim();
+    const password = document.getElementById('nuevoPassword').value;
+    const rol = document.getElementById('nuevoRol').value;
+
+    if (!username || !password || !rol) {
+        mostrarNotificacion('Faltan campos', 'error');
+        return;
+    }
+
+    try {
+        const r = await fetch(`${API_URL}/api/usuarios`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + tokenAutenticacion
+            },
+            body: JSON.stringify({ username, password, rol })
+        });
+        const data = await r.json();
+        if (!r.ok || !data.success) {
+            mostrarNotificacion(data.error || ('Error ' + r.status), 'error');
+            return;
+        }
+        mostrarNotificacion('Cuenta creada: ' + username, 'success');
+        document.getElementById('formCrearUsuario').reset();
+        panelAdminCargarUsuarios();
+    } catch (e) {
+        console.error('[panel-admin] Error creando usuario:', e);
+        mostrarNotificacion('Error de conexión', 'error');
+    }
+}
+
+async function panelAdminCambiarPassword(username) {
+    const nueva = prompt('Nueva contraseña para "' + username + '" (mínimo 6 caracteres):');
+    if (nueva == null) return;
+    if (nueva.length < 6) {
+        mostrarNotificacion('La contraseña debe tener al menos 6 caracteres', 'error');
+        return;
+    }
+    try {
+        const r = await fetch(`${API_URL}/api/usuarios?username=` + encodeURIComponent(username), {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + tokenAutenticacion
+            },
+            body: JSON.stringify({ password: nueva })
+        });
+        const data = await r.json();
+        if (!r.ok || !data.success) {
+            mostrarNotificacion(data.error || ('Error ' + r.status), 'error');
+            return;
+        }
+        mostrarNotificacion('Contraseña actualizada', 'success');
+    } catch (e) {
+        console.error(e);
+        mostrarNotificacion('Error de conexión', 'error');
+    }
+}
+
+async function panelAdminCambiarRol(username, rolActual) {
+    const nuevoRol = rolActual === 'admin' ? 'profesor' : 'admin';
+    if (!confirm('¿Cambiar el rol de "' + username + '" de ' + rolActual + ' a ' + nuevoRol + '?')) return;
+    try {
+        const r = await fetch(`${API_URL}/api/usuarios?username=` + encodeURIComponent(username), {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + tokenAutenticacion
+            },
+            body: JSON.stringify({ rol: nuevoRol })
+        });
+        const data = await r.json();
+        if (!r.ok || !data.success) {
+            mostrarNotificacion(data.error || ('Error ' + r.status), 'error');
+            return;
+        }
+        mostrarNotificacion('Rol actualizado a ' + nuevoRol, 'success');
+        panelAdminCargarUsuarios();
+    } catch (e) {
+        console.error(e);
+        mostrarNotificacion('Error de conexión', 'error');
+    }
+}
+
+async function panelAdminEliminarUsuario(username) {
+    if (!confirm('¿Eliminar la cuenta "' + username + '"? Esta acción no se puede deshacer.')) return;
+    try {
+        const r = await fetch(`${API_URL}/api/usuarios?username=` + encodeURIComponent(username), {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + tokenAutenticacion }
+        });
+        const data = await r.json();
+        if (!r.ok || !data.success) {
+            mostrarNotificacion(data.error || ('Error ' + r.status), 'error');
+            return;
+        }
+        mostrarNotificacion('Cuenta eliminada', 'success');
+        panelAdminCargarUsuarios();
+    } catch (e) {
+        console.error(e);
+        mostrarNotificacion('Error de conexión', 'error');
+    }
+}
+
+async function panelAdminCargarLogs(offsetSolicitado) {
+    const tbody = document.querySelector('#tablaLogsAdmin tbody');
+    const paginacion = document.getElementById('paginacionLogs');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+    if (paginacion) paginacion.innerHTML = '';
+
+    const q = document.getElementById('filtroLogQ').value.trim();
+    const desde = document.getElementById('filtroLogDesde').value.trim();
+    const hasta = document.getElementById('filtroLogHasta').value.trim();
+    const limit = 50;
+    const offset = Math.max(0, parseInt(offsetSolicitado || 0, 10) || 0);
+
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    if (q) params.set('q', q);
+    if (desde) params.set('desde', desde);
+    if (hasta) params.set('hasta', hasta);
+
+    try {
+        const r = await fetch(`${API_URL}/api/logs?` + params.toString(), {
+            headers: { 'Authorization': 'Bearer ' + tokenAutenticacion }
+        });
+        const data = await r.json();
+        if (!r.ok || !data.success) {
+            tbody.innerHTML = '<tr><td colspan="5">Error: ' + (data.error || r.status) + '</td></tr>';
+            return;
+        }
+        if (!data.logs.length) {
+            tbody.innerHTML = '<tr><td colspan="5">No hay registros que coincidan.</td></tr>';
+        } else {
+            tbody.innerHTML = '';
+            for (const log of data.logs) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${escaparFecha(log.fecha)}</td>
+                    <td><strong>${escaparHTML(log.username)}</strong></td>
+                    <td><span class="rol-badge rol-${log.rol || 'profesor'}">${escaparHTML(log.rol || '-')}</span></td>
+                    <td>${escaparHTML(log.accion)}</td>
+                    <td>${escaparHTML(log.detalles || '')}</td>
+                `;
+                tbody.appendChild(tr);
+            }
+        }
+
+        if (paginacion) {
+            const total = Number(data.total) || 0;
+            const desdeIdx = total ? (offset + 1) : 0;
+            const hastaIdx = Math.min(offset + limit, total);
+            paginacion.innerHTML = `
+                <span>Mostrando ${desdeIdx}-${hastaIdx} de ${total}</span>
+                <button type="button" class="btn-mini" id="btnLogsAnterior" ${offset === 0 ? 'disabled' : ''}>← Anterior</button>
+                <button type="button" class="btn-mini" id="btnLogsSiguiente" ${hastaIdx >= total ? 'disabled' : ''}>Siguiente →</button>
+            `;
+            const btnPrev = document.getElementById('btnLogsAnterior');
+            const btnNext = document.getElementById('btnLogsSiguiente');
+            if (btnPrev) btnPrev.addEventListener('click', () => panelAdminCargarLogs(Math.max(0, offset - limit)));
+            if (btnNext) btnNext.addEventListener('click', () => panelAdminCargarLogs(offset + limit));
+        }
+    } catch (e) {
+        console.error('[panel-admin] Error cargando logs:', e);
+        tbody.innerHTML = '<tr><td colspan="5">Error de conexión.</td></tr>';
+    }
+}
+
+function escaparHTML(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function escaparFecha(s) {
+    if (!s) return '-';
+    try {
+        const d = new Date(s);
+        if (isNaN(d.getTime())) return escaparHTML(s);
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mi = String(d.getMinutes()).padStart(2, '0');
+        return dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + mi;
+    } catch (_) {
+        return escaparHTML(s);
     }
 }
 
@@ -2801,7 +3260,8 @@ function generarHTMLSeparador(separador, horario, separadorIndex) {
 // ACTUALIZAR la función mostrarContextMenuSeparador
 function mostrarContextMenuSeparador(event, horario, separadorIndex) {
     if (!esProfesor) return;
-    
+    if (!puedeEditarConfig()) return;
+
     event.preventDefault();
     
     if (contextMenu) {
@@ -2836,6 +3296,10 @@ function mostrarContextMenuSeparador(event, horario, separadorIndex) {
 // ENCONTRAR Y REEMPLAZAR en script.js - Función eliminarSeparador
 function eliminarSeparador(horario, separadorIndex = null) {
     if (!esProfesor || !horario) return;
+    if (!puedeEditarConfig()) {
+        mostrarNotificacion('Sólo los administradores pueden eliminar franjas horarias.', 'error');
+        return;
+    }
     
     // Obtener datos del separador para mostrar en el modal
     const separadoresFranja = calendarioData.separadores && calendarioData.separadores[horario];
@@ -3096,7 +3560,11 @@ function confirmarEliminarClase() {
 
 function abrirModalClima(semana, dia) {
     if (!esProfesor) return;
-    
+    if (!puedeEditarConfig()) {
+        mostrarNotificacion('Sólo los administradores pueden cambiar el clima del día.', 'error');
+        return;
+    }
+
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
     
@@ -3219,7 +3687,11 @@ function inicializarSelectorCursos(cursosSeleccionados) {
 
 function abrirModalMeses(semana) {
     if (!esProfesor) return;
-    
+    if (!puedeEditarConfig()) {
+        mostrarNotificacion('Sólo los administradores pueden modificar los meses.', 'error');
+        return;
+    }
+
     document.getElementById('modalMesesSemana').value = semana;
     
     const semanaIndex = semana - 1;
@@ -3850,7 +4322,11 @@ function abrirModalEventoExistente(semana, dia, horario, eventoIndex) {
 
 function abrirModalSeparador(horario, separadorIndex = null) {
     if (!esProfesor) return;
-    
+    if (!puedeEditarConfig()) {
+        mostrarNotificacion('Sólo los administradores pueden añadir o editar franjas horarias.', 'error');
+        return;
+    }
+
     separadorParaEditar = { horario, index: separadorIndex };
     
     // ✅ FIX: Obtener el separador específico o crear uno nuevo
@@ -4295,7 +4771,11 @@ function cerrarContextMenu() {
 // Función para abrir modal de clima por franja horaria - MEJORADA
 function abrirModalClimaHorario(horario) {
     if (!esProfesor) return;
-    
+    if (!puedeEditarConfig()) {
+        mostrarNotificacion('Sólo los administradores pueden cambiar el clima de las franjas.', 'error');
+        return;
+    }
+
     const climaActual = calendarioData.climasHorario ? calendarioData.climasHorario[horario] : "CLEAR";
     
     document.getElementById('modalClimaHorarioFranja').value = horario;
@@ -4505,7 +4985,11 @@ function guardarCalendario() {
 
 function abrirModalProbarClimas() {
     if (!esProfesor) return;
-    
+    if (!puedeEditarConfig()) {
+        mostrarNotificacion('Sólo los administradores pueden probar configuraciones de clima.', 'error');
+        return;
+    }
+
     document.getElementById('modalProbarClimas').style.display = 'block';
     
     // Establecer hora actual por defecto
@@ -4647,6 +5131,10 @@ function cerrarModalProbarClimas() {
 // ==================== FUNCIONES PARA BARRAS DE ESTACIÓN ====================
 
 function abrirModalBarrasEstacion(semana) {
+    if (!puedeEditarConfig()) {
+        mostrarNotificacion('Sólo los administradores pueden modificar las barras de estación.', 'error');
+        return;
+    }
     document.getElementById('modalBarrasSemana').value = semana;
     renderizarListaBarras();
     document.getElementById('modalBarrasEstacion').style.display = 'block';

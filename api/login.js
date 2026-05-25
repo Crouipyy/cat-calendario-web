@@ -1,51 +1,58 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const fs = require('fs');
-const path = require('path');
+// Endpoint de login del calendario web.
+//
+// Antes este archivo leía web-server/users.json (read-only en Vercel) y sólo
+// existía un único usuario "admin". Ahora los usuarios viven en la tabla
+// MySQL `calendario_usuarios` y cada uno tiene un rol: 'admin' o 'profesor'.
+//
+// Bootstrap: si la tabla está vacía y se han configurado las variables de
+// entorno BOOTSTRAP_ADMIN_USER + BOOTSTRAP_ADMIN_PASS, ese usuario puede
+// iniciar sesión como admin. En ese momento se inserta también en la tabla,
+// y a partir de ahí ya gana el valor almacenado en BD.
 
-function leerUsuarios() {
-    try {
-        // Intentar leer desde el archivo del repositorio
-        const usersPath = path.join(process.cwd(), 'web-server', 'users.json');
-        
-        if (fs.existsSync(usersPath)) {
-            const contenido = fs.readFileSync(usersPath, 'utf8');
-            const usuarios = JSON.parse(contenido);
-            console.log('[Login] Usuarios cargados desde archivo');
-            return usuarios;
-        }
-        
-        // Si no existe el archivo, usar usuario por defecto hardcodeado
-        // NOTA: En Vercel NO se puede escribir archivos (solo lectura)
-        // Usamos un hash pre-generado de 'admin123'
-        // Hash generado con: bcrypt.hashSync('admin123', 10)
-        const defaultPasswordHash = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
-        
-        const usuarios = [{
-            username: 'admin',
-            password: defaultPasswordHash,
-            permisos: ['editar']
-        }];
-        
-        console.log('[Login] Usando usuario por defecto (admin/admin123) - archivo no encontrado');
-        return usuarios;
-    } catch (error) {
-        console.error('Error leyendo usuarios:', error);
-        
-        // Fallback: usuario por defecto hardcodeado con hash pre-generado
-        // Hash de 'admin123' generado con bcrypt
-        const defaultPasswordHash = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
-        console.log('[Login] Usando usuario por defecto (fallback)');
-        return [{
-            username: 'admin',
-            password: defaultPasswordHash,
-            permisos: ['editar']
-        }];
-    }
+const bcrypt = require('bcryptjs');
+const { obtenerConexion, asegurarTablas, registrarLog } = require('../lib/db');
+const { firmarToken } = require('../lib/auth');
+
+async function buscarUsuario(conexion, username) {
+    const [rows] = await conexion.execute(
+        'SELECT id, username, password_hash, rol FROM calendario_usuarios WHERE username = ? LIMIT 1',
+        [username]
+    );
+    return rows && rows.length ? rows[0] : null;
 }
 
-export default async function handler(req, res) {
-    // Configurar CORS
+async function contarUsuarios(conexion) {
+    const [rows] = await conexion.execute('SELECT COUNT(*) AS n FROM calendario_usuarios');
+    return rows && rows.length ? Number(rows[0].n) : 0;
+}
+
+async function intentarBootstrap(conexion, username, password) {
+    const bootUser = (process.env.BOOTSTRAP_ADMIN_USER || '').trim();
+    const bootPass = process.env.BOOTSTRAP_ADMIN_PASS || '';
+    if (!bootUser || !bootPass) return null;
+
+    if (username !== bootUser) return null;
+    if (password !== bootPass) return null;
+
+    const total = await contarUsuarios(conexion);
+    if (total > 0) return null;
+
+    const hash = await bcrypt.hash(password, 10);
+    await conexion.execute(
+        'INSERT INTO calendario_usuarios (username, password_hash, rol, creado_por) VALUES (?, ?, ?, ?)',
+        [bootUser, hash, 'admin', 'bootstrap']
+    );
+    await registrarLog(conexion, {
+        username: bootUser,
+        rol: 'admin',
+        accion: 'Bootstrap admin',
+        detalles: 'Cuenta admin creada automáticamente desde BOOTSTRAP_ADMIN_USER/PASS.'
+    });
+    console.log('[Login] Bootstrap: creada cuenta admin "' + bootUser + '" desde variables de entorno.');
+    return await buscarUsuario(conexion, bootUser);
+}
+
+module.exports = async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -54,75 +61,76 @@ export default async function handler(req, res) {
         return res.status(200).end();
     }
 
-    if (req.method === 'POST') {
-        try {
-            const { username, password } = req.body;
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
 
-            if (!username || !password) {
-                return res.status(400).json({
-                    error: 'Usuario y contraseña requeridos'
-                });
-            }
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
+    }
 
-            const users = leerUsuarios();
-            console.log('[Login] Usuarios disponibles:', users.map(u => u.username));
-            
-            const usuario = users.find(u => u.username === username);
+    let conexion = null;
+    try {
+        conexion = await obtenerConexion();
+        if (!conexion) {
+            return res.status(500).json({ error: 'No se pudo conectar a la base de datos' });
+        }
+        await asegurarTablas(conexion);
 
+        let usuario = await buscarUsuario(conexion, username);
+
+        if (!usuario) {
+            // No existe en BD -> intentar bootstrap (sólo crea la cuenta si la
+            // tabla está vacía y las credenciales casan con BOOTSTRAP_*).
+            usuario = await intentarBootstrap(conexion, username, password);
             if (!usuario) {
-                console.log('[Login] Usuario no encontrado:', username);
-                return res.status(401).json({
-                    error: 'Usuario o contraseña incorrectos'
-                });
+                return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
             }
-
-            console.log('[Login] Usuario encontrado:', usuario.username);
-            console.log('[Login] Comparando contraseña...');
-            
-            const passwordValido = await bcrypt.compare(password, usuario.password);
-            
-            console.log('[Login] Resultado de comparación:', passwordValido);
-            console.log('[Login] Hash almacenado:', usuario.password.substring(0, 20) + '...');
-
-            if (!passwordValido) {
-                console.log('[Login] Contraseña incorrecta para usuario:', username);
-                return res.status(401).json({
-                    error: 'Usuario o contraseña incorrectos'
-                });
-            }
-            
-            console.log('[Login] Autenticación exitosa para:', username);
-
-            // Generar token
-            const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_seguro_cambiar_en_produccion';
-            const token = jwt.sign(
-                {
-                    username: usuario.username,
-                    permisos: usuario.permisos || [],
-                    id: usuario.id || usuario.username
-                },
-                JWT_SECRET,
-                { expiresIn: '24h' }
-            );
-
+            // Login exitoso por bootstrap (la contraseña ya se ha validado
+            // contra BOOTSTRAP_ADMIN_PASS); seguimos al return.
+            const token = firmarToken({
+                username: usuario.username,
+                rol: usuario.rol,
+                permisos: ['editar']
+            });
             return res.status(200).json({
                 success: true,
                 token,
                 usuario: {
                     username: usuario.username,
-                    permisos: usuario.permisos || []
+                    rol: usuario.rol,
+                    permisos: ['editar']
                 }
             });
-        } catch (error) {
-            console.error('Error en login:', error);
-            return res.status(500).json({
-                error: 'Error en el proceso de autenticación'
-            });
+        }
+
+        const passwordValido = await bcrypt.compare(password, usuario.password_hash);
+        if (!passwordValido) {
+            return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+        }
+
+        const token = firmarToken({
+            username: usuario.username,
+            rol: usuario.rol,
+            permisos: ['editar']
+        });
+
+        return res.status(200).json({
+            success: true,
+            token,
+            usuario: {
+                username: usuario.username,
+                rol: usuario.rol,
+                permisos: ['editar']
+            }
+        });
+    } catch (error) {
+        console.error('[Login] Error:', error);
+        return res.status(500).json({ error: 'Error en el proceso de autenticación' });
+    } finally {
+        if (conexion) {
+            try { await conexion.end(); } catch (_) {}
         }
     }
-
-    return res.status(405).json({
-        error: 'Method not allowed'
-    });
-}
-
+};

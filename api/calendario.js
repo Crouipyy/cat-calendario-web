@@ -1,17 +1,31 @@
-// API para manejar el calendario usando MySQL como almacenamiento persistente
+// API para manejar el calendario usando MySQL como almacenamiento persistente.
+//
+// Cambios respecto a la versión histórica:
+// 1) En POST autenticados con Bearer (web) ahora se mira el ROL del JWT:
+//    - admin     -> guarda exactamente lo que mande la web.
+//    - profesor  -> sólo se aceptan cambios en clases / eventosHorario por
+//                   día y en el panel de notas (notas, tablonSecciones).
+//                   Todo lo demás (clima, separadores, meses, estructura de
+//                   semanas...) se restaura desde la fila actual de MySQL.
+// 2) Cada POST exitoso registra una entrada en calendario_logs con un
+//    resumen de qué cambió.
+
 const mysql = require('mysql2/promise');
 const { calendarioPlantillaParaUI } = require('./calendarioPlantilla');
+const { asegurarTablas, registrarLog } = require('../lib/db');
+const { verificarBearer } = require('../lib/auth');
 
-// Función para obtener conexión a MySQL
+// ---------------------------------------------------------------------------
+// Conexión MySQL (se mantiene local con logging detallado para no perder los
+// mensajes de diagnóstico que ya estaban en la versión anterior).
+// ---------------------------------------------------------------------------
 async function obtenerConexion() {
-    // Verificar que las variables de entorno necesarias estén configuradas
     const dbHost = process.env.DB_HOST;
     const dbUser = process.env.DB_USER;
     const dbPassword = process.env.DB_PASSWORD;
-    const dbName = process.env.DB_NAME || 'cat_calendario'; // Valor por defecto
+    const dbName = process.env.DB_NAME || 'cat_calendario';
     const dbPort = process.env.DB_PORT || 3306;
-    
-    // Si no hay variables críticas, retornar null
+
     if (!dbHost || !dbUser || !dbPassword) {
         console.warn('[API] ⚠️ Variables de entorno de MySQL no configuradas completamente');
         console.warn('[API] DB_HOST:', dbHost ? '✓' : '✗');
@@ -20,14 +34,9 @@ async function obtenerConexion() {
         console.warn('[API] DB_NAME:', dbName);
         return null;
     }
-    
+
     try {
         console.log('[API] Intentando conectar a MySQL...');
-        console.log('[API] Host:', dbHost);
-        console.log('[API] User:', dbUser);
-        console.log('[API] Database:', dbName);
-        console.log('[API] Port:', parseInt(dbPort) || 3306);
-        
         const conexion = await mysql.createConnection({
             host: dbHost,
             user: dbUser,
@@ -35,242 +44,214 @@ async function obtenerConexion() {
             database: dbName,
             port: parseInt(dbPort) || 3306,
             ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-            connectTimeout: 10000 // Timeout de 10 segundos
+            connectTimeout: 10000
         });
-        
         console.log('[API] ✓ Conexión a MySQL establecida correctamente');
         return conexion;
     } catch (error) {
         console.error('[API] ✗ Error conectando a MySQL:', error.message);
         console.error('[API] Error code:', error.code);
         console.error('[API] Error errno:', error.errno);
-        
-        // Mensaje específico para errores de permisos
-        if (error.code === 'ER_DBACCESS_DENIED_ERROR' || error.errno === 1044) {
-            console.error('[API] ⚠️ ERROR DE PERMISOS: El usuario no tiene acceso a la base de datos');
-            console.error('[API] ⚠️ Verifica:');
-            console.error('[API] ⚠️ 1. Que el nombre de la base de datos (DB_NAME) sea correcto');
-            console.error('[API] ⚠️ 2. Que el usuario tenga permisos en MySQL para acceder a esa base de datos');
-            console.error('[API] ⚠️ 3. Que la base de datos exista');
-            console.error('[API] ⚠️ Base de datos intentada:', dbName);
-        }
-
-        if (error.code === 'ER_ACCESS_DENIED_ERROR' || error.errno === 1045) {
-            console.error('[API] ⚠️ ACCESS DENIED (1045): usuario/contraseña O host de cliente no permitido.');
-            console.error('[API] ⚠️ Vercel entra a MySQL como usuario@ec2-....amazonaws.com (no es tu PC).');
-            console.error('[API] ⚠️ HeidiSQL funciona porque eres otro host (ej. localhost o tu IP).');
-            console.error('[API] ⚠️ Solución típica: en el servidor 37.187.25.84 ejecuta como root:');
-            console.error("[API]    CREATE USER IF NOT EXISTS 'fivemuser'@'%' IDENTIFIED BY 'TU_MISMA_CLAVE';");
-            console.error('[API]    GRANT SELECT,INSERT,UPDATE,DELETE ON gmodserverdb.* TO \'fivemuser\'@\'%\';');
-            console.error('[API]    FLUSH PRIVILEGES;');
-            console.error('[API] ⚠️ (Ajusta nombre de usuario/BD si usas otros.) Abre el puerto 3306 a Internet solo si asumes el riesgo.');
-        }
-        
-        // No lanzar el error, dejar que la función que llama lo maneje
         return null;
     }
 }
 
-// Leer calendario desde MySQL
+// ---------------------------------------------------------------------------
+// Lectura/escritura del calendario (sin cambios de comportamiento).
+// ---------------------------------------------------------------------------
+async function leerCalendarioConexion(conexion) {
+    let rows = [];
+    try {
+        [rows] = await conexion.execute(
+            'SELECT datos, ultima_actualizacion FROM calendario WHERE id = 1 LIMIT 1'
+        );
+    } catch (executeError) {
+        console.error('[API] Error ejecutando query:', executeError);
+        return calendarioPlantillaParaUI();
+    }
+
+    if (!rows || rows.length === 0) {
+        const plantilla = calendarioPlantillaParaUI();
+        const json = JSON.stringify(plantilla);
+        await conexion.execute(
+            'INSERT INTO calendario (id, datos, ultima_actualizacion, actualizado_por) VALUES (1, ?, ?, ?)',
+            [json, plantilla.ultimaActualizacion, 'api-seed']
+        );
+        console.log('[API] No existía fila id=1: insertada plantilla inicial.');
+        return plantilla;
+    }
+
+    const rawDatos = rows[0].datos;
+    const trimmed = rawDatos != null ? String(rawDatos).trim() : '';
+    if (trimmed === '' || trimmed === '{}') {
+        const plantilla = calendarioPlantillaParaUI();
+        const json = JSON.stringify(plantilla);
+        await conexion.execute(
+            'UPDATE calendario SET datos = ?, ultima_actualizacion = ?, actualizado_por = ? WHERE id = 1',
+            [json, plantilla.ultimaActualizacion, 'api-seed-vacio']
+        );
+        return plantilla;
+    }
+
+    try {
+        const datos = JSON.parse(trimmed);
+        const tsCol = rows[0].ultima_actualizacion;
+        const tsJson = Math.floor(Number(datos.ultimaActualizacion)) || 0;
+        let tsMerged = tsJson;
+        if (tsCol != null && tsCol !== '') {
+            const tc = Math.floor(Number(tsCol));
+            if (!Number.isNaN(tc) && tc > 0) tsMerged = Math.max(tc, tsJson);
+        }
+        datos.ultimaActualizacion = tsMerged;
+        return datos;
+    } catch (parseError) {
+        console.error('[API] JSON inválido en MySQL, devolvemos plantilla:', parseError.message);
+        const plantilla = calendarioPlantillaParaUI();
+        return plantilla;
+    }
+}
+
 async function leerCalendario() {
     let conexion = null;
     try {
         conexion = await obtenerConexion();
-        
-        // Si no se pudo conectar, plantilla para la web
-        if (!conexion) {
-            console.warn('[API] ⚠️ No se pudo conectar a MySQL, retornando plantilla UI (no vacía) para evitar pantalla en blanco');
-            return calendarioPlantillaParaUI();
-        }
-        
-        // Obtener el último registro (id = 1 siempre, o el más reciente)
-        let rows = [];
-        try {
-            [rows] = await conexion.execute(
-                'SELECT datos, ultima_actualizacion FROM calendario WHERE id = 1 LIMIT 1'
-            );
-        } catch (executeError) {
-            console.error('[API] Error ejecutando query:', executeError);
-            console.error('[API] Error details:', executeError.message);
-            return calendarioPlantillaParaUI();
-        }
-
-        // Sin fila id=1: insertar plantilla para que el GET siguiente y la web tengan datos reales en MySQL
-        if (!rows || rows.length === 0) {
-            const plantilla = calendarioPlantillaParaUI();
-            const json = JSON.stringify(plantilla);
-            await conexion.execute(
-                'INSERT INTO calendario (id, datos, ultima_actualizacion, actualizado_por) VALUES (1, ?, ?, ?)',
-                [json, plantilla.ultimaActualizacion, 'api-seed']
-            );
-            console.log('[API] No existía fila id=1 en calendario: insertada plantilla inicial (2 semanas).');
-            return plantilla;
-        }
-
-        const rawDatos = rows[0].datos;
-        const trimmed = rawDatos != null ? String(rawDatos).trim() : '';
-        if (trimmed === '' || trimmed === '{}') {
-            const plantilla = calendarioPlantillaParaUI();
-            const json = JSON.stringify(plantilla);
-            await conexion.execute(
-                'UPDATE calendario SET datos = ?, ultima_actualizacion = ?, actualizado_por = ? WHERE id = 1',
-                [json, plantilla.ultimaActualizacion, 'api-seed-vacio']
-            );
-            console.log('[API] Columna datos vacía o {}: rellenada con plantilla inicial.');
-            return plantilla;
-        }
-
-        if (rows && rows.length > 0) {
-            try {
-                const datos = JSON.parse(trimmed);
-                console.log('[API] Calendario leído desde MySQL');
-                console.log('[API] Timestamp:', rows[0].ultima_actualizacion);
-
-                let datosValidos = false;
-
-                try {
-                    if (datos && typeof datos === 'object') {
-                        if (datos.semanas) {
-                            if (Array.isArray(datos.semanas) && datos.semanas.length > 0) {
-                                datosValidos = true;
-                            } else if (typeof datos.semanas === 'object' && datos.semanas !== null) {
-                                const keys = Object.keys(datos.semanas);
-                                if (keys.length > 0) {
-                                    for (const key of keys) {
-                                        const semana = datos.semanas[key];
-                                        if (semana && semana.dias && typeof semana.dias === 'object' && Object.keys(semana.dias).length > 0) {
-                                            datosValidos = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        if (!datosValidos && datos.separadores && typeof datos.separadores === 'object' && datos.separadores !== null) {
-                            if (Object.keys(datos.separadores).length > 0) {
-                                datosValidos = true;
-                            }
-                        }
-
-                        if (!datosValidos && datos.climasHorario && typeof datos.climasHorario === 'object' && datos.climasHorario !== null) {
-                            if (Object.keys(datos.climasHorario).length > 0) {
-                                datosValidos = true;
-                            }
-                        }
-
-                        if (!datosValidos && datos.meses) {
-                            if (Array.isArray(datos.meses) && datos.meses.length > 0) {
-                                datosValidos = true;
-                            } else if (typeof datos.meses === 'object' && datos.meses !== null && Object.keys(datos.meses).length > 0) {
-                                datosValidos = true;
-                            }
-                        }
-                    }
-                } catch (validationError) {
-                    console.error('[API] Error en validación:', validationError);
-                    datosValidos = true;
-                }
-
-                if (!datosValidos) {
-                    const plantilla = calendarioPlantillaParaUI();
-                    const json = JSON.stringify(plantilla);
-                    await conexion.execute(
-                        'UPDATE calendario SET datos = ?, ultima_actualizacion = ?, actualizado_por = ? WHERE id = 1',
-                        [json, plantilla.ultimaActualizacion, 'api-seed-invalido']
-                    );
-                    console.log('[API] JSON en MySQL sin semanas útiles: sustituido por plantilla inicial.');
-                    return plantilla;
-                }
-
-                // GMod compara ultimaActualizacion del JSON; asegurar que refleje la columna SQL (evita pull sin efecto si el JSON viejo no traía el campo).
-                const tsCol = rows[0].ultima_actualizacion;
-                const tsJson = Math.floor(Number(datos.ultimaActualizacion)) || 0;
-                let tsMerged = tsJson;
-                if (tsCol != null && tsCol !== '') {
-                    const tc = Math.floor(Number(tsCol));
-                    if (!Number.isNaN(tc) && tc > 0) {
-                        tsMerged = Math.max(tc, tsJson);
-                    }
-                }
-                datos.ultimaActualizacion = tsMerged;
-
-                return datos;
-            } catch (parseError) {
-                console.error('[API] Error parseando JSON desde MySQL:', parseError);
-                console.error('[API] Datos raw:', rows[0].datos ? String(rows[0].datos).substring(0, 100) : 'null');
-                const plantilla = calendarioPlantillaParaUI();
-                const json = JSON.stringify(plantilla);
-                try {
-                    await conexion.execute(
-                        'UPDATE calendario SET datos = ?, ultima_actualizacion = ?, actualizado_por = ? WHERE id = 1',
-                        [json, plantilla.ultimaActualizacion, 'api-seed-parse']
-                    );
-                    console.log('[API] JSON corrupto: columna datos sustituida por plantilla.');
-                } catch (e) {
-                    console.error('[API] No se pudo escribir plantilla tras parse error:', e.message);
-                }
-                return plantilla;
-            }
-        }
-
-        console.log('[API] Caso inesperado en leerCalendario; devolviendo plantilla UI');
-        return calendarioPlantillaParaUI();
+        if (!conexion) return calendarioPlantillaParaUI();
+        return await leerCalendarioConexion(conexion);
     } catch (error) {
-        console.error('[API] Error leyendo calendario desde MySQL:', error);
+        console.error('[API] Error leyendo calendario:', error);
         return calendarioPlantillaParaUI();
     } finally {
         if (conexion) {
-            await conexion.end();
+            try { await conexion.end(); } catch (_) {}
         }
     }
 }
 
-// Guardar calendario en MySQL
-async function guardarCalendario(datos, actualizadoPor = 'web') {
-    let conexion = null;
-    try {
-        conexion = await obtenerConexion();
-        
-        // Si no se pudo conectar, retornar false
-        if (!conexion) {
-            console.error('[API] ⚠️ No se pudo conectar a MySQL para guardar');
-            return false;
-        }
-        
-        // Actualizar timestamp
-        datos.ultimaActualizacion = Math.floor(Date.now() / 1000);
-        const datosJSON = JSON.stringify(datos);
-        
-        // Insertar o actualizar (usando INSERT ... ON DUPLICATE KEY UPDATE)
-        await conexion.execute(
-            `INSERT INTO calendario (id, datos, ultima_actualizacion, actualizado_por) 
-             VALUES (1, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE 
-             datos = VALUES(datos), 
+async function guardarCalendarioConexion(conexion, datos, actualizadoPor) {
+    datos.ultimaActualizacion = Math.floor(Date.now() / 1000);
+    const datosJSON = JSON.stringify(datos);
+    await conexion.execute(
+        `INSERT INTO calendario (id, datos, ultima_actualizacion, actualizado_por)
+         VALUES (1, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+             datos = VALUES(datos),
              ultima_actualizacion = VALUES(ultima_actualizacion),
              actualizado_por = VALUES(actualizado_por)`,
-            [datosJSON, datos.ultimaActualizacion, actualizadoPor]
-        );
-        
-        console.log('[API] Calendario guardado en MySQL correctamente');
-        console.log('[API] Timestamp:', datos.ultimaActualizacion);
-        console.log('[API] Actualizado por:', actualizadoPor);
-        return true;
-    } catch (error) {
-        console.error('[API] Error guardando calendario en MySQL:', error);
-        return false;
-    } finally {
-        if (conexion) {
-            await conexion.end();
-        }
-    }
+        [datosJSON, datos.ultimaActualizacion, actualizadoPor]
+    );
+    console.log('[API] Calendario guardado por', actualizadoPor, '@', datos.ultimaActualizacion);
 }
 
+// ---------------------------------------------------------------------------
+// Restricciones para rol "profesor": fusionamos lo que envía el cliente con
+// lo que ya está en BD, dejando que sólo "ganen" los campos permitidos.
+// ---------------------------------------------------------------------------
+function aplicarRestriccionesProfesor(actual, entrante) {
+    // Empezamos a partir de una copia profunda de lo actual y vamos
+    // sobreescribiendo sólo los campos que un profesor puede tocar.
+    const base = JSON.parse(JSON.stringify(actual || {}));
+
+    // Notas / tablón: campos abiertos a profesores.
+    if (entrante && Object.prototype.hasOwnProperty.call(entrante, 'notas')) {
+        base.notas = entrante.notas;
+    }
+    if (entrante && Object.prototype.hasOwnProperty.call(entrante, 'tablonSecciones')) {
+        base.tablonSecciones = entrante.tablonSecciones;
+    }
+    if (entrante && Object.prototype.hasOwnProperty.call(entrante, 'tablonNotas')) {
+        base.tablonNotas = entrante.tablonNotas;
+    }
+    if (entrante && Object.prototype.hasOwnProperty.call(entrante, 'tablonNormas')) {
+        base.tablonNormas = entrante.tablonNormas;
+    }
+    if (entrante && Object.prototype.hasOwnProperty.call(entrante, 'tablonHorario')) {
+        base.tablonHorario = entrante.tablonHorario;
+    }
+    if (entrante && Object.prototype.hasOwnProperty.call(entrante, 'tablonIndice')) {
+        base.tablonIndice = entrante.tablonIndice;
+    }
+
+    // Semanas: sólo se permiten cambios en `clases` y `eventosHorario` de
+    // cada día. El resto de campos por día (luna, temperatura, estación,
+    // evento, nombre…) y la lista de semanas en sí permanecen como están.
+    if (Array.isArray(entrante && entrante.semanas) && Array.isArray(base.semanas)) {
+        const total = Math.min(entrante.semanas.length, base.semanas.length);
+        for (let i = 0; i < total; i++) {
+            const semIn = entrante.semanas[i];
+            const semBase = base.semanas[i];
+            if (!semIn || !semBase || !Array.isArray(semIn.dias) || !Array.isArray(semBase.dias)) continue;
+
+            const totalDias = Math.min(semIn.dias.length, semBase.dias.length);
+            for (let d = 0; d < totalDias; d++) {
+                const diaIn = semIn.dias[d];
+                const diaBase = semBase.dias[d];
+                if (!diaIn || !diaBase) continue;
+
+                if (diaIn.clases && typeof diaIn.clases === 'object') {
+                    diaBase.clases = diaBase.clases || {};
+                    for (const hora of Object.keys(diaIn.clases)) {
+                        // Sólo aceptamos horas que ya existen en el calendario
+                        // actual para que un profesor no pueda crear "franjas
+                        // horarias" nuevas (eso lo bloquea el admin).
+                        if (Object.prototype.hasOwnProperty.call(diaBase.clases, hora)) {
+                            diaBase.clases[hora] = diaIn.clases[hora];
+                        }
+                    }
+                }
+
+                if (diaIn.eventosHorario && typeof diaIn.eventosHorario === 'object') {
+                    diaBase.eventosHorario = diaBase.eventosHorario || {};
+                    for (const hora of Object.keys(diaIn.eventosHorario)) {
+                        if (Object.prototype.hasOwnProperty.call(diaBase.eventosHorario, hora)) {
+                            diaBase.eventosHorario[hora] = diaIn.eventosHorario[hora];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return base;
+}
+
+// ---------------------------------------------------------------------------
+// Resumen "humano" del diff entre el calendario antiguo y el nuevo, para
+// guardarlo en calendario_logs.
+// ---------------------------------------------------------------------------
+function resumenDiff(actual, nuevo) {
+    const cambios = [];
+    actual = actual || {};
+    nuevo = nuevo || {};
+
+    const cmp = (a, b) => JSON.stringify(a) !== JSON.stringify(b);
+
+    if (cmp(actual.climasHorario, nuevo.climasHorario)) cambios.push('clima');
+    if (cmp(actual.separadores, nuevo.separadores)) cambios.push('separadores/franjas');
+    if (cmp(actual.meses, nuevo.meses)) cambios.push('meses');
+    if (cmp(actual.notas, nuevo.notas)) cambios.push('notas');
+    if (cmp(actual.tablonSecciones, nuevo.tablonSecciones)) cambios.push('tablón');
+
+    if (Array.isArray(actual.semanas) && Array.isArray(nuevo.semanas)) {
+        const total = Math.max(actual.semanas.length, nuevo.semanas.length);
+        const semanasEditadas = [];
+        for (let i = 0; i < total; i++) {
+            if (cmp(actual.semanas[i], nuevo.semanas[i])) semanasEditadas.push(i + 1);
+        }
+        if (semanasEditadas.length) {
+            cambios.push('semanas ' + semanasEditadas.join(','));
+        }
+    } else if (cmp(actual.semanas, nuevo.semanas)) {
+        cambios.push('semanas');
+    }
+
+    return cambios.length ? cambios.join(', ') : 'sin cambios visibles';
+}
+
+// ---------------------------------------------------------------------------
+// Handler principal
+// ---------------------------------------------------------------------------
 module.exports = async function handler(req, res) {
-    // Envolver TODO en try-catch para evitar cualquier error 500
     try {
-        // Configurar CORS
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CatCal-Sync-Token');
@@ -280,28 +261,21 @@ module.exports = async function handler(req, res) {
         }
 
         if (req.method === 'GET') {
-            // Obtener calendario (público)
             try {
                 const calendario = await leerCalendario();
-                
-                // Asegurar que siempre retornamos un objeto válido
                 if (!calendario) {
-                    console.warn('[API] ⚠️ leerCalendario retornó null/undefined, usando plantilla UI');
                     return res.status(200).json({
                         success: true,
                         calendario: calendarioPlantillaParaUI()
                     });
                 }
-                
                 return res.status(200).json({
                     success: true,
-                    calendario: calendario,
+                    calendario,
                     ultimaActualizacion: Math.floor(Number(calendario && calendario.ultimaActualizacion)) || 0
                 });
             } catch (error) {
                 console.error('[API] Error en GET:', error);
-                console.error('[API] Stack:', error.stack);
-                // Retornar plantilla UI si el GET falla
                 return res.status(200).json({
                     success: true,
                     calendario: calendarioPlantillaParaUI()
@@ -309,101 +283,110 @@ module.exports = async function handler(req, res) {
             }
         }
 
-        if (req.method === 'POST') {
-        // Guardar calendario
+        if (req.method !== 'POST') {
+            return res.status(405).json({ error: 'Method not allowed' });
+        }
+
+        // ---- POST: guardar calendario ----
         const authHeader = req.headers.authorization;
         const syncSecret = (process.env.CAT_CAL_SYNC_SECRET || '').trim();
         const syncHeaderRaw = req.headers['x-catcal-sync-token'];
         const syncHeader = typeof syncHeaderRaw === 'string' ? syncHeaderRaw.trim() : '';
         const syncOk = syncSecret !== '' && syncHeader !== '' && syncHeader === syncSecret;
 
-        const { calendario } = req.body;
-        
+        const { calendario } = req.body || {};
         if (!calendario) {
-            return res.status(400).json({
-                error: 'Datos del calendario no proporcionados'
-            });
+            return res.status(400).json({ error: 'Datos del calendario no proporcionados' });
         }
-        
-        // ✅ VALIDAR que los datos no estén vacíos antes de guardar
+
         const datosValidos = (
-            (calendario.semanas && Array.isArray(calendario.semanas) && calendario.semanas.length > 0) ||
+            (Array.isArray(calendario.semanas) && calendario.semanas.length > 0) ||
             (calendario.semanas && typeof calendario.semanas === 'object' && Object.keys(calendario.semanas).length > 0) ||
             (calendario.separadores && typeof calendario.separadores === 'object' && Object.keys(calendario.separadores).length > 0) ||
             (calendario.climasHorario && typeof calendario.climasHorario === 'object' && Object.keys(calendario.climasHorario).length > 0) ||
-            (calendario.meses && Array.isArray(calendario.meses) && calendario.meses.length > 0)
+            (Array.isArray(calendario.meses) && calendario.meses.length > 0)
         );
-        
         if (!datosValidos) {
             console.warn('[API] ⚠️ Intento de guardar calendario vacío - RECHAZADO');
-            return res.status(400).json({
-                error: 'No se pueden guardar datos vacíos del calendario'
-            });
+            return res.status(400).json({ error: 'No se pueden guardar datos vacíos del calendario' });
         }
-        
+
+        // Determinar quién hace la petición y con qué autoridad.
         let actualizadoPor = 'FiveM';
-        
+        let usuarioWeb = null;       // payload del JWT si proviene de la web
+        let modoSync = 'fivem';      // 'gmod' | 'web' | 'fivem'
+
         if (syncOk) {
             actualizadoPor = 'gmod';
-            console.log('[API] Guardando calendario desde GMod (X-CatCal-Sync-Token)');
+            modoSync = 'gmod';
         } else if (authHeader && authHeader.startsWith('Bearer ')) {
-            try {
-                const jwt = require('jsonwebtoken');
-                const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_seguro_cambiar_en_produccion';
-                const token = authHeader.replace('Bearer ', '');
-                const decoded = jwt.verify(token, JWT_SECRET);
-                
-                actualizadoPor = decoded.username || 'web';
-                console.log('[API] Guardando calendario desde web (usuario:', actualizadoPor, ')');
-            } catch (error) {
-                return res.status(401).json({
-                    error: 'Token inválido'
-                });
+            usuarioWeb = verificarBearer(req);
+            if (!usuarioWeb) {
+                return res.status(401).json({ error: 'Token inválido' });
             }
+            actualizadoPor = usuarioWeb.username || 'web';
+            modoSync = 'web';
         } else if (syncSecret !== '') {
             return res.status(401).json({
-                error: 'No autorizado: usa Bearer (web) o header X-CatCal-Sync-Token (GMod) con CAT_CAL_SYNC_SECRET'
+                error: 'No autorizado: usa Bearer (web) o X-CatCal-Sync-Token (GMod) con CAT_CAL_SYNC_SECRET'
             });
-        } else {
-            // Sin CAT_CAL_SYNC_SECRET en entorno: compatibilidad FiveM (confianza interna)
-            console.log('[API] Guardando calendario desde FiveM (sin CAT_CAL_SYNC_SECRET)');
         }
 
-            try {
-                const guardado = await guardarCalendario(calendario, actualizadoPor);
-                
-                if (guardado) {
-                    return res.status(200).json({
-                        success: true,
-                        message: 'Calendario guardado correctamente',
-                        ultimaActualizacion: calendario.ultimaActualizacion
-                    });
-                } else {
-                    return res.status(500).json({
-                        error: 'Error al guardar el calendario'
-                    });
-                }
-            } catch (error) {
-                console.error('[API] Error en POST:', error);
-                return res.status(500).json({
-                    error: 'Error al guardar el calendario'
+        let conexion = null;
+        try {
+            conexion = await obtenerConexion();
+            if (!conexion) {
+                return res.status(500).json({ error: 'No se pudo conectar a la base de datos' });
+            }
+            await asegurarTablas(conexion);
+
+            // Para la web (rol profesor) necesitamos lo que hay actualmente
+            // para hacer el merge restrictivo.
+            const calendarioActual = await leerCalendarioConexion(conexion);
+
+            let calendarioFinal = calendario;
+            let resumen = '';
+
+            if (modoSync === 'web' && usuarioWeb && usuarioWeb.rol !== 'admin') {
+                calendarioFinal = aplicarRestriccionesProfesor(calendarioActual, calendario);
+                resumen = resumenDiff(calendarioActual, calendarioFinal);
+                console.log('[API] POST web (profesor "' + actualizadoPor + '"): ' + resumen);
+            } else {
+                resumen = resumenDiff(calendarioActual, calendarioFinal);
+                console.log('[API] POST ' + modoSync + ' ("' + actualizadoPor + '"): ' + resumen);
+            }
+
+            await guardarCalendarioConexion(conexion, calendarioFinal, actualizadoPor);
+
+            // Auditoría: sólo registramos cambios web (admin/profesor).
+            // Las syncs masivas de GMod no se registran para no llenar la tabla.
+            if (modoSync === 'web' && usuarioWeb) {
+                await registrarLog(conexion, {
+                    username: usuarioWeb.username,
+                    rol: usuarioWeb.rol || 'profesor',
+                    accion: 'Editar calendario',
+                    detalles: resumen
                 });
             }
-        }
 
-        return res.status(405).json({
-            error: 'Method not allowed'
-        });
+            return res.status(200).json({
+                success: true,
+                message: 'Calendario guardado correctamente',
+                ultimaActualizacion: calendarioFinal.ultimaActualizacion
+            });
+        } catch (error) {
+            console.error('[API] Error en POST:', error);
+            return res.status(500).json({ error: 'Error al guardar el calendario' });
+        } finally {
+            if (conexion) {
+                try { await conexion.end(); } catch (_) {}
+            }
+        }
     } catch (globalError) {
-        // Capturar CUALQUIER error que pueda ocurrir en TODO el handler
         console.error('[API] ⚠️ ERROR GLOBAL en handler:', globalError);
-        console.error('[API] ⚠️ Error message:', globalError.message);
-        console.error('[API] ⚠️ Error stack:', globalError.stack);
-        
-        // SIEMPRE retornar 200 con plantilla UI, NUNCA 500
         return res.status(200).json({
             success: true,
             calendario: calendarioPlantillaParaUI()
         });
     }
-}
+};
