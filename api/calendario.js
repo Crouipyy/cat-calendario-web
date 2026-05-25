@@ -216,35 +216,255 @@ function aplicarRestriccionesProfesor(actual, entrante) {
 
 // ---------------------------------------------------------------------------
 // Resumen "humano" del diff entre el calendario antiguo y el nuevo, para
-// guardarlo en calendario_logs.
+// guardarlo en calendario_logs. El cliente envía SIEMPRE el calendario
+// completo aunque el usuario sólo haya tocado una cosa, así que aquí
+// hacemos un diff fino y reportamos únicamente las cosas que cambiaron
+// de verdad (insensible al orden de propiedades dentro de los objetos).
 // ---------------------------------------------------------------------------
-function resumenDiff(actual, nuevo) {
-    const cambios = [];
-    actual = actual || {};
-    nuevo = nuevo || {};
 
-    const cmp = (a, b) => JSON.stringify(a) !== JSON.stringify(b);
+function igualValor(a, b) {
+    if (a === b) return true;
+    if (a == null || b == null) return a === b;
+    const ta = typeof a;
+    if (ta !== typeof b) return false;
+    if (ta !== 'object') return a === b;
 
-    if (cmp(actual.climasHorario, nuevo.climasHorario)) cambios.push('clima');
-    if (cmp(actual.separadores, nuevo.separadores)) cambios.push('separadores/franjas');
-    if (cmp(actual.meses, nuevo.meses)) cambios.push('meses');
-    if (cmp(actual.notas, nuevo.notas)) cambios.push('notas');
-    if (cmp(actual.tablonSecciones, nuevo.tablonSecciones)) cambios.push('tablón');
-
-    if (Array.isArray(actual.semanas) && Array.isArray(nuevo.semanas)) {
-        const total = Math.max(actual.semanas.length, nuevo.semanas.length);
-        const semanasEditadas = [];
-        for (let i = 0; i < total; i++) {
-            if (cmp(actual.semanas[i], nuevo.semanas[i])) semanasEditadas.push(i + 1);
+    const aIsArr = Array.isArray(a), bIsArr = Array.isArray(b);
+    if (aIsArr !== bIsArr) return false;
+    if (aIsArr) {
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) {
+            if (!igualValor(a[i], b[i])) return false;
         }
-        if (semanasEditadas.length) {
-            cambios.push('semanas ' + semanasEditadas.join(','));
+        return true;
+    }
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    for (const k of keysA) {
+        if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
+        if (!igualValor(a[k], b[k])) return false;
+    }
+    return true;
+}
+
+function huellaClase(c) {
+    if (!c || typeof c !== 'object') return '∅';
+    const cursos = Array.isArray(c.cursos) ? c.cursos.slice().sort() : [];
+    return JSON.stringify({
+        t: String(c.titulo || '').trim(),
+        d: String(c.descripcion || '').trim(),
+        p: String(c.profesor || '').trim(),
+        h: String(c.horaExacta || ''),
+        cs: cursos
+    });
+}
+
+function describirClase(c) {
+    if (!c) return '(vacía)';
+    const titulo = String(c.titulo || '').trim() || '(sin título)';
+    const partes = [titulo];
+    if (c.horaExacta) partes.push(c.horaExacta);
+    if (Array.isArray(c.cursos) && c.cursos.length) {
+        partes.push('cursos ' + c.cursos.join(', '));
+    }
+    return partes.join(' · ');
+}
+
+function describirEvento(e) {
+    if (!e || typeof e !== 'object') return '(vacío)';
+    const t = String(e.texto || '').trim();
+    return t || '(evento sin texto)';
+}
+
+function arrayEnHora(v) {
+    if (v == null) return [];
+    return Array.isArray(v) ? v.filter(Boolean) : (v ? [v] : []);
+}
+
+// Diff de clases para una franja horaria. Devuelve frases legibles tipo
+// "Añadida clase 'Pociones' (cursos 2º, 3º)" o "Modificada clase de S1 D2".
+function diffClasesEnHora(prefijo, hora, A, B) {
+    const out = [];
+    const huellasA = A.map(huellaClase);
+    const huellasB = B.map(huellaClase);
+    const setA = new Set(huellasA);
+    const setB = new Set(huellasB);
+    const añadidas = B.filter((_, i) => !setA.has(huellasB[i]));
+    const eliminadas = A.filter((_, i) => !setB.has(huellasA[i]));
+
+    // Si en la misma franja se elimina N y se añade N, lo mostramos como
+    // "Modificada" para que no parezca el doble de actividad.
+    if (añadidas.length && añadidas.length === eliminadas.length) {
+        for (let i = 0; i < añadidas.length; i++) {
+            out.push(
+                'Modificada clase en ' + prefijo + ' ' + hora + ': ' +
+                describirClase(eliminadas[i]) + ' → ' + describirClase(añadidas[i])
+            );
         }
-    } else if (cmp(actual.semanas, nuevo.semanas)) {
-        cambios.push('semanas');
+        return out;
     }
 
-    return cambios.length ? cambios.join(', ') : 'sin cambios visibles';
+    for (const c of añadidas) {
+        out.push('Añadida clase en ' + prefijo + ' ' + hora + ': ' + describirClase(c));
+    }
+    for (const c of eliminadas) {
+        out.push('Eliminada clase en ' + prefijo + ' ' + hora + ': ' + describirClase(c));
+    }
+    return out;
+}
+
+// Igual, para eventos por franja.
+function diffEventosEnHora(prefijo, hora, A, B) {
+    const out = [];
+    const huellasA = A.map(e => JSON.stringify(e || {}));
+    const huellasB = B.map(e => JSON.stringify(e || {}));
+    const setA = new Set(huellasA);
+    const setB = new Set(huellasB);
+    const añadidos = B.filter((_, i) => !setA.has(huellasB[i]));
+    const eliminados = A.filter((_, i) => !setB.has(huellasA[i]));
+
+    if (añadidos.length && añadidos.length === eliminados.length) {
+        for (let i = 0; i < añadidos.length; i++) {
+            out.push(
+                'Modificado evento en ' + prefijo + ' ' + hora + ': ' +
+                describirEvento(eliminados[i]) + ' → ' + describirEvento(añadidos[i])
+            );
+        }
+        return out;
+    }
+    for (const e of añadidos) {
+        out.push('Añadido evento en ' + prefijo + ' ' + hora + ': ' + describirEvento(e));
+    }
+    for (const e of eliminados) {
+        out.push('Eliminado evento en ' + prefijo + ' ' + hora + ': ' + describirEvento(e));
+    }
+    return out;
+}
+
+function resumenDiff(actual, nuevo) {
+    actual = actual || {};
+    nuevo = nuevo || {};
+    const cambios = [];
+
+    // ---- Semanas: clases, eventos por franja y atributos del día ----
+    const semA = Array.isArray(actual.semanas) ? actual.semanas : [];
+    const semB = Array.isArray(nuevo.semanas) ? nuevo.semanas : [];
+    const totalSem = Math.max(semA.length, semB.length);
+    const DIAS_NOM = ['Sáb', 'Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
+
+    for (let s = 0; s < totalSem; s++) {
+        const semanaA = semA[s] || {};
+        const semanaB = semB[s] || {};
+        const diasA = Array.isArray(semanaA.dias) ? semanaA.dias : [];
+        const diasB = Array.isArray(semanaB.dias) ? semanaB.dias : [];
+        const totalDias = Math.max(diasA.length, diasB.length);
+
+        for (let d = 0; d < totalDias; d++) {
+            const diaA = diasA[d] || {};
+            const diaB = diasB[d] || {};
+            const nomDia = (diaB.nombre || diaA.nombre || DIAS_NOM[d] || ('Día ' + (d + 1)));
+            const prefijo = 'S' + (s + 1) + ' ' + nomDia;
+
+            // Clima del día (evento/luna/temperatura/estación)
+            const atribs = [
+                ['evento', 'evento'],
+                ['luna', 'luna'],
+                ['temperatura', 'temperatura'],
+                ['estacion', 'estación']
+            ];
+            for (const [k, label] of atribs) {
+                if (!igualValor(diaA[k], diaB[k])) {
+                    cambios.push(
+                        'Cambiado ' + label + ' de ' + prefijo + ': ' +
+                        JSON.stringify(diaA[k]) + ' → ' + JSON.stringify(diaB[k])
+                    );
+                }
+            }
+
+            // Clases por hora
+            const clasesA = diaA.clases || {};
+            const clasesB = diaB.clases || {};
+            const horas = new Set([...Object.keys(clasesA), ...Object.keys(clasesB)]);
+            for (const hora of horas) {
+                const A = arrayEnHora(clasesA[hora]);
+                const B = arrayEnHora(clasesB[hora]);
+                if (!igualValor(A, B)) {
+                    cambios.push.apply(cambios, diffClasesEnHora(prefijo, hora, A, B));
+                }
+            }
+
+            // Eventos por hora
+            const evA = diaA.eventosHorario || {};
+            const evB = diaB.eventosHorario || {};
+            const horasEv = new Set([...Object.keys(evA), ...Object.keys(evB)]);
+            for (const hora of horasEv) {
+                const A = arrayEnHora(evA[hora]);
+                const B = arrayEnHora(evB[hora]);
+                if (!igualValor(A, B)) {
+                    cambios.push.apply(cambios, diffEventosEnHora(prefijo, hora, A, B));
+                }
+            }
+        }
+    }
+
+    // ---- Clima por franja (climasHorario) ----
+    const climaA = actual.climasHorario || {};
+    const climaB = nuevo.climasHorario || {};
+    const horasClima = new Set([...Object.keys(climaA), ...Object.keys(climaB)]);
+    for (const hora of horasClima) {
+        if (!igualValor(climaA[hora], climaB[hora])) {
+            cambios.push('Cambiado clima de la franja ' + hora + ': ' + (climaA[hora] || '∅') + ' → ' + (climaB[hora] || '∅'));
+        }
+    }
+
+    // ---- Separadores / franjas horarias ----
+    const sepA = actual.separadores || {};
+    const sepB = nuevo.separadores || {};
+    const horasSep = new Set([...Object.keys(sepA), ...Object.keys(sepB)]);
+    for (const hora of horasSep) {
+        if (!igualValor(sepA[hora], sepB[hora])) {
+            const sb = sepB[hora] || {};
+            const texto = String(sb.texto || '').trim();
+            cambios.push(
+                'Editada franja ' + hora + (texto ? ' ("' + texto + '")' : '')
+            );
+        }
+    }
+
+    // ---- Meses por semana ----
+    const mesA = actual.meses || [];
+    const mesB = nuevo.meses || [];
+    const totalMes = Math.max(
+        Array.isArray(mesA) ? mesA.length : 0,
+        Array.isArray(mesB) ? mesB.length : 0
+    );
+    for (let i = 0; i < totalMes; i++) {
+        if (!igualValor(mesA[i], mesB[i])) {
+            cambios.push('Cambiados meses de S' + (i + 1));
+        }
+    }
+
+    // ---- Tablón / notas ----
+    const seccionesTablon = [
+        ['tablonIndice', 'tablón (índice)'],
+        ['tablonHorario', 'tablón (horario)'],
+        ['tablonNormas', 'tablón (normas)'],
+        ['tablonNotas', 'tablón (notas)'],
+        ['tablonSecciones', 'tablón (estructura)'],
+        ['notas', 'boletín de notas']
+    ];
+    for (const [k, label] of seccionesTablon) {
+        if (!igualValor(actual[k], nuevo[k])) {
+            cambios.push('Editado ' + label);
+        }
+    }
+
+    if (!cambios.length) return 'sin cambios visibles';
+    // Limitar a un tamaño razonable para la columna `detalles` (TEXT).
+    const MAX = 12;
+    if (cambios.length <= MAX) return cambios.join('; ');
+    return cambios.slice(0, MAX).join('; ') + ' …(+' + (cambios.length - MAX) + ' cambios más)';
 }
 
 // ---------------------------------------------------------------------------
