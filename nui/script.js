@@ -1,11 +1,5 @@
 let calendarioData = {};
 let esProfesor = false;
-// Sólo aplica al modo web (Vercel). En GMod/FiveM se ignora.
-//   true  -> usuario con rol 'admin' (puede tocar clima, separadores,
-//            meses, gestionar cuentas y ver logs).
-//   false -> profesor o no autenticado: en web NO puede tocar la
-//            configuración del calendario, sólo clases / eventos / notas.
-let esAdmin = false;
 let config = {};
 let semanaActual = 1;
 let tooltipElement = null;
@@ -1362,14 +1356,6 @@ const MODO_WEB = detectarModoWeb();
 const API_URL = obtenerAPIURL();
 let tokenAutenticacion = localStorage.getItem('calendario_token') || null;
 let usuarioActual = null;
-
-// En la web (Vercel) sólo los admins pueden tocar la configuración global
-// del calendario (clima, separadores/franjas horarias, meses, barras de
-// estación, etc.). En GMod/FiveM no aplica esa restricción y devolvemos
-// true siempre.
-function puedeEditarConfig() {
-    return !MODO_WEB || esAdmin;
-}
 let ultimoTimestamp = null; // Para detectar cambios en modo web
 let pollingInterval = null; // Referencia al intervalo de polling
 
@@ -1708,11 +1694,9 @@ async function cargarDatosDesdeAPI() {
                 if (verifyData.success) {
                     usuarioActual = verifyData.usuario;
                     esProfesor = verifyData.usuario.permisos && verifyData.usuario.permisos.includes('editar');
-                    esAdmin = verifyData.usuario.rol === 'admin';
                 } else {
                     tokenAutenticacion = null;
                     localStorage.removeItem('calendario_token');
-                    esAdmin = false;
                 }
             } catch (e) {
                 console.error('Error verificando token:', e);
@@ -1734,9 +1718,6 @@ async function cargarDatosDesdeAPI() {
         asegurarTablonSecciones();
         aplicarTablonSeccionesAlDOM();
         cambiarPestanaTablon('indice');
-
-        // Botón de Administración (sólo web + admin) y de cerrar sesión.
-        actualizarBotonesSesionWeb();
 
         // Mostrar botón de login si no está autenticado
         mostrarLoginSiNecesario();
@@ -1848,24 +1829,10 @@ function detenerPollingPeriodico() {
     }
 }
 
-// Función para mostrar login si es necesario.
-// Si el modal ya existe (porque el usuario lo cerró antes con "Cerrar" o
-// ya pasó por aquí en una sesión previa), lo volvemos a hacer visible sin
-// crearlo de nuevo. Eso permite re-abrirlo desde el botón "Iniciar sesión"
-// que aparece tras cerrar sesión, sin recargar la página.
+// Función para mostrar login si es necesario
 function mostrarLoginSiNecesario() {
     if (!MODO_WEB || tokenAutenticacion) return;
-
-    const yaExistente = document.getElementById('modalLogin');
-    if (yaExistente) {
-        yaExistente.style.display = 'block';
-        const inputUser = document.getElementById('loginUsername');
-        if (inputUser) {
-            try { inputUser.focus(); } catch (_) {}
-        }
-        return;
-    }
-
+    
     // Crear modal de login si no existe
     if (!document.getElementById('modalLogin')) {
         const modalLogin = document.createElement('div');
@@ -1929,15 +1896,12 @@ async function hacerLogin() {
             localStorage.setItem('calendario_token', tokenAutenticacion);
             usuarioActual = data.usuario;
             esProfesor = data.usuario.permisos && data.usuario.permisos.includes('editar');
-            esAdmin = data.usuario.rol === 'admin';
-
+            
             const btnGuardar = document.getElementById('btnGuardar');
             if (btnGuardar) {
                 btnGuardar.style.display = esProfesor ? 'block' : 'none';
             }
-
-            actualizarBotonesSesionWeb();
-
+            
             document.getElementById('modalLogin').style.display = 'none';
             mostrarNotificacion('Sesión iniciada correctamente', 'success');
         } else {
@@ -1946,452 +1910,6 @@ async function hacerLogin() {
     } catch (error) {
         console.error('Error en login:', error);
         mostrarNotificacion('Error de conexión', 'error');
-    }
-}
-
-// =====================================================================
-// PANEL DE ADMINISTRACIÓN (sólo en MODO_WEB y para usuarios con rol
-// admin). Permite crear/editar/eliminar usuarios y ver el log de
-// cambios del calendario.
-// =====================================================================
-
-function cerrarSesionWeb() {
-    tokenAutenticacion = null;
-    localStorage.removeItem('calendario_token');
-    usuarioActual = null;
-    esProfesor = false;
-    esAdmin = false;
-
-    const btnGuardar = document.getElementById('btnGuardar');
-    if (btnGuardar) btnGuardar.style.display = 'none';
-
-    actualizarBotonesSesionWeb();
-    mostrarNotificacion('Sesión cerrada', 'info');
-    mostrarLoginSiNecesario();
-}
-
-// Crea (si no existe) y actualiza la visibilidad de los botones flotantes
-// "Administración" y "Cerrar sesión". Sólo se montan en MODO_WEB.
-function actualizarBotonesSesionWeb() {
-    if (!MODO_WEB) return;
-
-    let barra = document.getElementById('barraSesionAdmin');
-    if (!barra) {
-        barra = document.createElement('div');
-        barra.id = 'barraSesionAdmin';
-        barra.className = 'barra-sesion-admin';
-        barra.innerHTML = `
-            <span id="barraSesionAdminUser" class="barra-sesion-admin__user"></span>
-            <button type="button" id="btnIniciarSesionWeb" class="btn-panel-admin" style="display:none;">
-                🔐 Iniciar sesión
-            </button>
-            <button type="button" id="btnPanelAdmin" class="btn-panel-admin" style="display:none;">
-                ⚙️ Administración
-            </button>
-            <button type="button" id="btnCerrarSesionWeb" class="btn-cerrar-sesion" style="display:none;">
-                Cerrar sesión
-            </button>
-        `;
-        document.body.appendChild(barra);
-        document.getElementById('btnPanelAdmin').addEventListener('click', abrirPanelAdministracion);
-        document.getElementById('btnCerrarSesionWeb').addEventListener('click', cerrarSesionWeb);
-        document.getElementById('btnIniciarSesionWeb').addEventListener('click', () => {
-            mostrarLoginSiNecesario();
-        });
-    }
-
-    const userLabel = document.getElementById('barraSesionAdminUser');
-    const btnAdmin = document.getElementById('btnPanelAdmin');
-    const btnSalir = document.getElementById('btnCerrarSesionWeb');
-    const btnEntrar = document.getElementById('btnIniciarSesionWeb');
-
-    if (tokenAutenticacion && usuarioActual) {
-        const rolTxt = esAdmin ? 'admin' : 'profesor';
-        userLabel.textContent = '👤 ' + usuarioActual.username + ' (' + rolTxt + ')';
-        userLabel.style.display = 'inline-block';
-        btnSalir.style.display = 'inline-block';
-        btnAdmin.style.display = esAdmin ? 'inline-block' : 'none';
-        btnEntrar.style.display = 'none';
-    } else {
-        userLabel.style.display = 'none';
-        btnSalir.style.display = 'none';
-        btnAdmin.style.display = 'none';
-        btnEntrar.style.display = 'inline-block';
-    }
-}
-
-function abrirPanelAdministracion() {
-    if (!MODO_WEB) return;
-    if (!esAdmin) {
-        mostrarNotificacion('No tienes permisos de administrador', 'error');
-        return;
-    }
-
-    let modal = document.getElementById('modalPanelAdmin');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'modalPanelAdmin';
-        modal.className = 'modal panel-admin-modal';
-        modal.innerHTML = `
-            <div class="modal-content panel-admin-content">
-                <div class="panel-admin-header">
-                    <h3>⚙️ Administración del calendario</h3>
-                    <button type="button" class="panel-admin-close" id="btnCerrarPanelAdmin">✕</button>
-                </div>
-                <div class="panel-admin-tabs">
-                    <button type="button" class="panel-admin-tab activo" data-tab="usuarios">👥 Usuarios</button>
-                    <button type="button" class="panel-admin-tab" data-tab="logs">📜 Historial de cambios</button>
-                </div>
-
-                <div class="panel-admin-tab-content" id="panelAdminTabUsuarios">
-                    <h4>Crear nueva cuenta</h4>
-                    <form id="formCrearUsuario" class="panel-admin-form">
-                        <div class="panel-admin-form-row">
-                            <label>Usuario</label>
-                            <input type="text" id="nuevoUsername" required minlength="3" maxlength="64"
-                                   pattern="[a-zA-Z0-9._-]{3,64}"
-                                   placeholder="ej. profe.lupin">
-                        </div>
-                        <div class="panel-admin-form-row">
-                            <label>Contraseña</label>
-                            <input type="password" id="nuevoPassword" required minlength="6"
-                                   placeholder="mínimo 6 caracteres">
-                        </div>
-                        <div class="panel-admin-form-row">
-                            <label>Rol</label>
-                            <select id="nuevoRol" required>
-                                <option value="profesor" selected>Profesor (sólo clases / eventos / notas)</option>
-                                <option value="admin">Administrador (control total + gestionar cuentas)</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn-guardar">Crear cuenta</button>
-                    </form>
-
-                    <h4 style="margin-top:24px;">Cuentas existentes</h4>
-                    <div class="panel-admin-tabla-wrapper">
-                        <table class="panel-admin-tabla" id="tablaUsuariosAdmin">
-                            <thead>
-                                <tr>
-                                    <th>Usuario</th>
-                                    <th>Rol</th>
-                                    <th>Creado por</th>
-                                    <th>Creado</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody><tr><td colspan="5">Cargando...</td></tr></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="panel-admin-tab-content" id="panelAdminTabLogs" style="display:none;">
-                    <div class="panel-admin-filtros">
-                        <input type="text" id="filtroLogQ" placeholder="Buscar (usuario, acción, detalle)" maxlength="64">
-                        <input type="date" id="filtroLogDesde">
-                        <input type="date" id="filtroLogHasta">
-                        <button type="button" class="btn-guardar" id="btnAplicarFiltroLogs">Filtrar</button>
-                        <button type="button" class="btn-cerrar" id="btnLimpiarFiltroLogs">Limpiar</button>
-                    </div>
-                    <div class="panel-admin-tabla-wrapper">
-                        <table class="panel-admin-tabla" id="tablaLogsAdmin">
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Usuario</th>
-                                    <th>Rol</th>
-                                    <th>Acción</th>
-                                    <th>Detalles</th>
-                                </tr>
-                            </thead>
-                            <tbody><tr><td colspan="5">Cargando...</td></tr></tbody>
-                        </table>
-                    </div>
-                    <div class="panel-admin-paginacion" id="paginacionLogs"></div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-
-        document.getElementById('btnCerrarPanelAdmin').addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) modal.style.display = 'none';
-        });
-        modal.querySelectorAll('.panel-admin-tab').forEach(btn => {
-            btn.addEventListener('click', () => panelAdminCambiarTab(btn.dataset.tab));
-        });
-        document.getElementById('formCrearUsuario').addEventListener('submit', panelAdminCrearUsuario);
-        document.getElementById('btnAplicarFiltroLogs').addEventListener('click', () => panelAdminCargarLogs(0));
-        document.getElementById('btnLimpiarFiltroLogs').addEventListener('click', () => {
-            document.getElementById('filtroLogQ').value = '';
-            document.getElementById('filtroLogDesde').value = '';
-            document.getElementById('filtroLogHasta').value = '';
-            panelAdminCargarLogs(0);
-        });
-    }
-
-    modal.style.display = 'block';
-    panelAdminCambiarTab('usuarios');
-    panelAdminCargarUsuarios();
-}
-
-function panelAdminCambiarTab(tab) {
-    const modal = document.getElementById('modalPanelAdmin');
-    if (!modal) return;
-    modal.querySelectorAll('.panel-admin-tab').forEach(btn => {
-        btn.classList.toggle('activo', btn.dataset.tab === tab);
-    });
-    document.getElementById('panelAdminTabUsuarios').style.display = tab === 'usuarios' ? 'block' : 'none';
-    document.getElementById('panelAdminTabLogs').style.display = tab === 'logs' ? 'block' : 'none';
-    if (tab === 'logs') panelAdminCargarLogs(0);
-}
-
-async function panelAdminCargarUsuarios() {
-    const tbody = document.querySelector('#tablaUsuariosAdmin tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
-
-    try {
-        const r = await fetch(`${API_URL}/api/usuarios`, {
-            headers: { 'Authorization': 'Bearer ' + tokenAutenticacion }
-        });
-        const data = await r.json();
-        if (!r.ok || !data.success) {
-            tbody.innerHTML = '<tr><td colspan="5">Error: ' + (data.error || r.status) + '</td></tr>';
-            return;
-        }
-        if (!data.usuarios.length) {
-            tbody.innerHTML = '<tr><td colspan="5">No hay usuarios todavía.</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = '';
-        for (const u of data.usuarios) {
-            const tr = document.createElement('tr');
-            const esYo = usuarioActual && u.username === usuarioActual.username;
-            tr.innerHTML = `
-                <td><strong>${escaparHTML(u.username)}</strong>${esYo ? ' <em style="color:#888;">(tú)</em>' : ''}</td>
-                <td><span class="rol-badge rol-${u.rol}">${u.rol}</span></td>
-                <td>${escaparHTML(u.creado_por || '-')}</td>
-                <td>${escaparFecha(u.creado_en)}</td>
-                <td class="panel-admin-acciones">
-                    <button class="btn-mini" data-act="pass" data-user="${escaparHTML(u.username)}">🔑 Cambiar contraseña</button>
-                    <button class="btn-mini" data-act="rol" data-user="${escaparHTML(u.username)}" data-rol="${u.rol}">🎭 Cambiar rol</button>
-                    <button class="btn-mini btn-mini-rojo" data-act="del" data-user="${escaparHTML(u.username)}" ${esYo ? 'disabled title="No puedes eliminar tu propia cuenta"' : ''}>🗑️ Eliminar</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        }
-
-        tbody.querySelectorAll('button[data-act]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const act = btn.dataset.act;
-                const user = btn.dataset.user;
-                if (act === 'pass') panelAdminCambiarPassword(user);
-                else if (act === 'rol') panelAdminCambiarRol(user, btn.dataset.rol);
-                else if (act === 'del') panelAdminEliminarUsuario(user);
-            });
-        });
-    } catch (e) {
-        console.error('[panel-admin] Error cargando usuarios:', e);
-        tbody.innerHTML = '<tr><td colspan="5">Error de conexión.</td></tr>';
-    }
-}
-
-async function panelAdminCrearUsuario(ev) {
-    ev.preventDefault();
-    const username = document.getElementById('nuevoUsername').value.trim();
-    const password = document.getElementById('nuevoPassword').value;
-    const rol = document.getElementById('nuevoRol').value;
-
-    if (!username || !password || !rol) {
-        mostrarNotificacion('Faltan campos', 'error');
-        return;
-    }
-
-    try {
-        const r = await fetch(`${API_URL}/api/usuarios`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + tokenAutenticacion
-            },
-            body: JSON.stringify({ username, password, rol })
-        });
-        const data = await r.json();
-        if (!r.ok || !data.success) {
-            mostrarNotificacion(data.error || ('Error ' + r.status), 'error');
-            return;
-        }
-        mostrarNotificacion('Cuenta creada: ' + username, 'success');
-        document.getElementById('formCrearUsuario').reset();
-        panelAdminCargarUsuarios();
-    } catch (e) {
-        console.error('[panel-admin] Error creando usuario:', e);
-        mostrarNotificacion('Error de conexión', 'error');
-    }
-}
-
-async function panelAdminCambiarPassword(username) {
-    const nueva = prompt('Nueva contraseña para "' + username + '" (mínimo 6 caracteres):');
-    if (nueva == null) return;
-    if (nueva.length < 6) {
-        mostrarNotificacion('La contraseña debe tener al menos 6 caracteres', 'error');
-        return;
-    }
-    try {
-        const r = await fetch(`${API_URL}/api/usuarios?username=` + encodeURIComponent(username), {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + tokenAutenticacion
-            },
-            body: JSON.stringify({ password: nueva })
-        });
-        const data = await r.json();
-        if (!r.ok || !data.success) {
-            mostrarNotificacion(data.error || ('Error ' + r.status), 'error');
-            return;
-        }
-        mostrarNotificacion('Contraseña actualizada', 'success');
-    } catch (e) {
-        console.error(e);
-        mostrarNotificacion('Error de conexión', 'error');
-    }
-}
-
-async function panelAdminCambiarRol(username, rolActual) {
-    const nuevoRol = rolActual === 'admin' ? 'profesor' : 'admin';
-    if (!confirm('¿Cambiar el rol de "' + username + '" de ' + rolActual + ' a ' + nuevoRol + '?')) return;
-    try {
-        const r = await fetch(`${API_URL}/api/usuarios?username=` + encodeURIComponent(username), {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + tokenAutenticacion
-            },
-            body: JSON.stringify({ rol: nuevoRol })
-        });
-        const data = await r.json();
-        if (!r.ok || !data.success) {
-            mostrarNotificacion(data.error || ('Error ' + r.status), 'error');
-            return;
-        }
-        mostrarNotificacion('Rol actualizado a ' + nuevoRol, 'success');
-        panelAdminCargarUsuarios();
-    } catch (e) {
-        console.error(e);
-        mostrarNotificacion('Error de conexión', 'error');
-    }
-}
-
-async function panelAdminEliminarUsuario(username) {
-    if (!confirm('¿Eliminar la cuenta "' + username + '"? Esta acción no se puede deshacer.')) return;
-    try {
-        const r = await fetch(`${API_URL}/api/usuarios?username=` + encodeURIComponent(username), {
-            method: 'DELETE',
-            headers: { 'Authorization': 'Bearer ' + tokenAutenticacion }
-        });
-        const data = await r.json();
-        if (!r.ok || !data.success) {
-            mostrarNotificacion(data.error || ('Error ' + r.status), 'error');
-            return;
-        }
-        mostrarNotificacion('Cuenta eliminada', 'success');
-        panelAdminCargarUsuarios();
-    } catch (e) {
-        console.error(e);
-        mostrarNotificacion('Error de conexión', 'error');
-    }
-}
-
-async function panelAdminCargarLogs(offsetSolicitado) {
-    const tbody = document.querySelector('#tablaLogsAdmin tbody');
-    const paginacion = document.getElementById('paginacionLogs');
-    if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
-    if (paginacion) paginacion.innerHTML = '';
-
-    const q = document.getElementById('filtroLogQ').value.trim();
-    const desde = document.getElementById('filtroLogDesde').value.trim();
-    const hasta = document.getElementById('filtroLogHasta').value.trim();
-    const limit = 50;
-    const offset = Math.max(0, parseInt(offsetSolicitado || 0, 10) || 0);
-
-    const params = new URLSearchParams();
-    params.set('limit', String(limit));
-    params.set('offset', String(offset));
-    if (q) params.set('q', q);
-    if (desde) params.set('desde', desde);
-    if (hasta) params.set('hasta', hasta);
-
-    try {
-        const r = await fetch(`${API_URL}/api/logs?` + params.toString(), {
-            headers: { 'Authorization': 'Bearer ' + tokenAutenticacion }
-        });
-        const data = await r.json();
-        if (!r.ok || !data.success) {
-            tbody.innerHTML = '<tr><td colspan="5">Error: ' + (data.error || r.status) + '</td></tr>';
-            return;
-        }
-        if (!data.logs.length) {
-            tbody.innerHTML = '<tr><td colspan="5">No hay registros que coincidan.</td></tr>';
-        } else {
-            tbody.innerHTML = '';
-            for (const log of data.logs) {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${escaparFecha(log.fecha)}</td>
-                    <td><strong>${escaparHTML(log.username)}</strong></td>
-                    <td><span class="rol-badge rol-${log.rol || 'profesor'}">${escaparHTML(log.rol || '-')}</span></td>
-                    <td>${escaparHTML(log.accion)}</td>
-                    <td>${escaparHTML(log.detalles || '')}</td>
-                `;
-                tbody.appendChild(tr);
-            }
-        }
-
-        if (paginacion) {
-            const total = Number(data.total) || 0;
-            const desdeIdx = total ? (offset + 1) : 0;
-            const hastaIdx = Math.min(offset + limit, total);
-            paginacion.innerHTML = `
-                <span>Mostrando ${desdeIdx}-${hastaIdx} de ${total}</span>
-                <button type="button" class="btn-mini" id="btnLogsAnterior" ${offset === 0 ? 'disabled' : ''}>← Anterior</button>
-                <button type="button" class="btn-mini" id="btnLogsSiguiente" ${hastaIdx >= total ? 'disabled' : ''}>Siguiente →</button>
-            `;
-            const btnPrev = document.getElementById('btnLogsAnterior');
-            const btnNext = document.getElementById('btnLogsSiguiente');
-            if (btnPrev) btnPrev.addEventListener('click', () => panelAdminCargarLogs(Math.max(0, offset - limit)));
-            if (btnNext) btnNext.addEventListener('click', () => panelAdminCargarLogs(offset + limit));
-        }
-    } catch (e) {
-        console.error('[panel-admin] Error cargando logs:', e);
-        tbody.innerHTML = '<tr><td colspan="5">Error de conexión.</td></tr>';
-    }
-}
-
-function escaparHTML(s) {
-    if (s == null) return '';
-    return String(s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function escaparFecha(s) {
-    if (!s) return '-';
-    try {
-        const d = new Date(s);
-        if (isNaN(d.getTime())) return escaparHTML(s);
-        const dd = String(d.getDate()).padStart(2, '0');
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const yyyy = d.getFullYear();
-        const hh = String(d.getHours()).padStart(2, '0');
-        const mi = String(d.getMinutes()).padStart(2, '0');
-        return dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + mi;
-    } catch (_) {
-        return escaparHTML(s);
     }
 }
 
@@ -2803,21 +2321,20 @@ function mostrarCalendario() {
                 // Botones para agregar
                 if (esProfesor) {
                     const clasesArray = diaData.clases[horario.hora] || [];
-                    const eventosArray = diaData.eventosHorario && diaData.eventosHorario[horario.hora] ?
+                    const eventosArray = diaData.eventosHorario && diaData.eventosHorario[horario.hora] ? 
                         (Array.isArray(diaData.eventosHorario[horario.hora]) ? diaData.eventosHorario[horario.hora] : [diaData.eventosHorario[horario.hora]]) : [];
-
+                    
                     const eventosActivos = eventosArray.filter(evento => evento && evento.texto).length;
-
+                    
                     const espaciosOcupados = clasesArray.length + eventosActivos;
-
-                    // El límite "duro" por franja ya no aplica: en cada media
-                    // hora caben varias clases siempre que no compartan curso
-                    // con otra clase ya creada en esa misma media hora.
-                    // Mantenemos un tope visual generoso (8) para que las celdas
-                    // no crezcan de forma incontrolable.
-                    console.log(`📊 Franja ${horario.hora}: ${clasesArray.length} clases, ${eventosActivos} eventos`);
-
-                    if (espaciosOcupados < 8) {
+                    
+                    // ✅ FIX: Determinar límite de clases basado en la duración real de la franja
+                    const maxClasesPermitidas = obtenerLimiteClasesPorFranja(horario.hora);
+                    
+                    console.log(`📊 Franja ${horario.hora}: ${clasesArray.length}/${maxClasesPermitidas} clases, ${eventosActivos}/2 eventos`);
+                    
+                    // Mostrar botón de agregar clase solo si no se ha alcanzado el límite específico de la franja
+                    if (clasesArray.length < maxClasesPermitidas && espaciosOcupados < 4) {
                         html += `
                             <div class="clase-vacia agregar-mas"
                                 data-semana="${semanaActual}"
@@ -2828,11 +2345,11 @@ function mostrarCalendario() {
                             </div>
                         `;
                     } else {
-                        console.log(`🚫 Botón clase oculto: ${espaciosOcupados}/8 espacios ocupados`);
+                        console.log(`🚫 Botón clase oculto: ${clasesArray.length} clases >= ${maxClasesPermitidas} límite o ${espaciosOcupados}/4 espacios ocupados`);
                     }
-
-                    // Eventos: mantenemos el tope original (máximo 2 por franja).
-                    if (eventosActivos < 2 && espaciosOcupados < 8) {
+                    
+                    // ✅ FIX: Mostrar botón de evento solo si no se ha alcanzado el límite de 2 eventos
+                    if (eventosActivos < 2 && espaciosOcupados < 4) {
                         html += `
                             <div class="clase-vacia agregar-evento"
                                 data-semana="${semanaActual}"
@@ -3066,58 +2583,28 @@ function obtenerOpcionesHorario(semana, dia, horario, claseIndex) {
         }
     }
     
-    // Nueva regla: NO filtramos por medias horas ocupadas. En una misma
-    // media hora pueden convivir varias clases siempre que no compartan
-    // curso (esa restricción la aplica cursosBloqueadosEnHora a nivel de
-    // selector de cursos y la valida guardarClase).
-    console.log('📋 Todas las opciones (sin filtrar por ocupación):', opciones.map(o => o.value));
-    return opciones;
-}
-
-// Devuelve un Set con los cursos que NO pueden volver a usarse en la
-// media hora (horaExacta, HH:MM) indicada, porque ya hay otra clase en
-// esa misma media hora con esos cursos. Comodín "Todos":
-//   * Si una clase existente usa "Todos" en esa media hora, se bloquean
-//     TODOS los cursos disponibles + "Todos".
-//   * Si una clase existente usa cualquier curso específico en esa media
-//     hora, también se bloquea "Todos" (no podemos meter un comodín que
-//     pisaría a una clase específica ya creada).
-function cursosBloqueadosEnHora(semana, dia, horario, horaExacta, claseIndexExclude) {
-    const bloqueados = new Set();
-    if (!horaExacta) return bloqueados;
-
-    const semanaIndex = semana - 1;
-    const diaIndex = dia - 1;
-    const clases = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
-
-    const horaExactaNorm = String(horaExacta).split(':').slice(0, 2).join(':');
-    const cursosDisponibles = (config && Array.isArray(config.cursos) && config.cursos.length)
-        ? config.cursos
-        : ['1º', '2º', '3º', '4º', '5º', '6º', '7º', 'Todos'];
-
-    let algunaUsaTodos = false;
-    let algunaUsaEspecifico = false;
-
-    clases.forEach((c, idx) => {
-        if (idx === claseIndexExclude) return;
-        if (!c || !c.horaExacta) return;
-        const hNorm = String(c.horaExacta).split(':').slice(0, 2).join(':');
-        if (hNorm !== horaExactaNorm) return;
-        const cs = Array.isArray(c.cursos) ? c.cursos : [];
-        cs.forEach(curso => {
-            if (curso === 'Todos') algunaUsaTodos = true;
-            else algunaUsaEspecifico = true;
-            bloqueados.add(curso);
-        });
-    });
-
-    if (algunaUsaTodos) {
-        cursosDisponibles.forEach(c => bloqueados.add(c));
-    }
-    if (algunaUsaEspecifico) {
-        bloqueados.add('Todos');
-    }
-    return bloqueados;
+    // Si ya hay clases, determinar qué opciones están ocupadas
+    const horasOcupadas = clasesExistentes
+        .filter((clase, index) => index !== claseIndex)
+        .map(clase => {
+            if (clase.horaExacta) {
+                return clase.horaExacta.split(':').slice(0, 2).join(':');
+            }
+            return null;
+        })
+        .filter(hora => hora);
+    
+    console.log('⛔ Horas ocupadas:', horasOcupadas);
+    console.log('📋 Todas las opciones:', opciones.map(o => o.value));
+    
+    // Filtrar opciones disponibles
+    const opcionesDisponibles = opciones.filter(opcion => 
+        !horasOcupadas.includes(opcion.value)
+    );
+    
+    console.log('✅ Opciones disponibles:', opcionesDisponibles.map(o => o.value));
+    
+    return opcionesDisponibles;
 }
 
 // Función auxiliar para convertir hora a minutos
@@ -3172,45 +2659,56 @@ function extraerHorasDelHorario(horarioStr) {
 
 function abrirModalClaseNueva(elemento) {
     if (!esProfesor) return;
-
+    
     const semana = elemento.dataset.semana;
     const dia = elemento.dataset.dia;
     const horario = elemento.dataset.horario;
-
+    
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
-
+    
+    // Obtener el array de clases existentes
     const clasesArray = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
-    console.log('🔍 Abriendo modal de clase nueva. Franja:', horario, '| ya existen', clasesArray.length, 'clases');
-
-    // Ya no aplicamos el tope duro por franja: pueden coexistir varias
-    // clases en cada media hora siempre que no compartan curso.
-
-    // Obtener TODAS las medias horas candidatas (ya no se filtran las
-    // ocupadas: cada media hora puede tener varias clases con cursos
-    // distintos).
+    
+    console.log('🔍 Verificando límites para franja:', horario);
+    
+    // ✅ FIX: Usar la función auxiliar para determinar límites
+    const maxClasesPermitidas = obtenerLimiteClasesPorFranja(horario);
+    
+    console.log('📚 Máximo de clases permitidas:', maxClasesPermitidas);
+    console.log('📊 Clases existentes:', clasesArray.length);
+    
+    // Verificar límite de clases según duración
+    if (clasesArray.length >= maxClasesPermitidas) {
+        mostrarNotificacion(`❌ Límite alcanzado: Máximo ${maxClasesPermitidas} clase(s) permitida(s) en esta franja`, 'error');
+        return;
+    }
+    
+    // Obtener opciones de horario disponibles
     const opcionesHorario = obtenerOpcionesHorario(semana, dia, horario, -1);
-
+    
     if (opcionesHorario.length === 0) {
         mostrarNotificacion('❌ No hay horarios disponibles en esta franja', 'error');
         return;
     }
-
+    
     document.getElementById('modalSemana').value = semana;
     document.getElementById('modalDia').value = dia;
     document.getElementById('modalHorario').value = horario;
     document.getElementById('modalClaseIndex').value = clasesArray.length;
-
+    
+    // Limpiar formulario
     document.getElementById('tituloClase').value = "";
     document.getElementById('descripcionClase').value = "";
     document.getElementById('profesorClase').value = "";
-
-    const contexto = { semana, dia, horario, claseIndex: -1 };
-    inicializarSelectorHora(opcionesHorario, "", contexto);
-    inicializarSelectorCursos([], contexto);
-
+    
+    // Configurar selector de hora automático
+    inicializarSelectorHora(opcionesHorario, "");
+    
+    inicializarSelectorCursos([]);
+    
     document.getElementById('modalClase').style.display = 'block';
-
+    
     console.log('✅ Modal abierto correctamente para nueva clase');
 }
 
@@ -3303,8 +2801,7 @@ function generarHTMLSeparador(separador, horario, separadorIndex) {
 // ACTUALIZAR la función mostrarContextMenuSeparador
 function mostrarContextMenuSeparador(event, horario, separadorIndex) {
     if (!esProfesor) return;
-    if (!puedeEditarConfig()) return;
-
+    
     event.preventDefault();
     
     if (contextMenu) {
@@ -3339,10 +2836,6 @@ function mostrarContextMenuSeparador(event, horario, separadorIndex) {
 // ENCONTRAR Y REEMPLAZAR en script.js - Función eliminarSeparador
 function eliminarSeparador(horario, separadorIndex = null) {
     if (!esProfesor || !horario) return;
-    if (!puedeEditarConfig()) {
-        mostrarNotificacion('Sólo los administradores pueden eliminar franjas horarias.', 'error');
-        return;
-    }
     
     // Obtener datos del separador para mostrar en el modal
     const separadoresFranja = calendarioData.separadores && calendarioData.separadores[horario];
@@ -3438,21 +2931,18 @@ function abrirModalClaseExistente(elemento) {
     document.getElementById('tituloClase').value = claseData.titulo || "";
     document.getElementById('descripcionClase').value = claseData.descripcion || "";
     document.getElementById('profesorClase').value = claseData.profesor || "";
-
+    
     // Configurar selector de hora con hora normalizada
-    const contexto = { semana, dia, horario, claseIndex: parseInt(claseIndex) };
-    inicializarSelectorHora(opcionesHorario, horaSeleccionadaNormalizada, contexto);
-    inicializarSelectorCursos(Array.isArray(claseData.cursos) ? claseData.cursos : [], contexto);
-
+    inicializarSelectorHora(opcionesHorario, horaSeleccionadaNormalizada);
+    
+    inicializarSelectorCursos(Array.isArray(claseData.cursos) ? claseData.cursos : []);
+    
     document.getElementById('modalClase').style.display = 'block';
 }
 
 
 // FUNCIÓN COMPLETAMENTE CORREGIDA para inicializar selector de hora (NO DESHABILITAR)
-// `contexto` (opcional) = { semana, dia, horario, claseIndex }; cuando se
-// pasa, al cambiar la media hora elegida se repinta el selector de cursos
-// para reflejar los cursos ya cogidos por otras clases en esa media hora.
-function inicializarSelectorHora(opcionesDisponibles, horaSeleccionada, contexto) {
+function inicializarSelectorHora(opcionesDisponibles, horaSeleccionada) {
     console.log('🕐 Inicializando selector de hora...');
     console.log('📋 Opciones disponibles:', opcionesDisponibles);
     console.log('🎯 Hora seleccionada:', horaSeleccionada);
@@ -3535,29 +3025,7 @@ function inicializarSelectorHora(opcionesDisponibles, horaSeleccionada, contexto
         helpText.textContent = 'Hora específica dentro de la franja horaria';
     }
     container.appendChild(helpText);
-
-    // Al cambiar la media hora seleccionada, repintar el selector de
-    // cursos: los cursos ya cogidos por otra clase en esa media hora
-    // tienen que aparecer bloqueados, y los cursos previamente
-    // seleccionados que ahora chocan se de-seleccionan.
-    if (contexto) {
-        select.addEventListener('change', () => {
-            const seleccionadosAhora = Array.from(
-                document.querySelectorAll('#cursosSelector .curso-option.selected')
-            ).map(opt => {
-                const inp = opt.querySelector('input');
-                return inp ? inp.value : null;
-            }).filter(v => v);
-
-            const bloqueados = cursosBloqueadosEnHora(
-                contexto.semana, contexto.dia, contexto.horario,
-                select.value, contexto.claseIndex
-            );
-            const cursosFiltrados = seleccionadosAhora.filter(c => !bloqueados.has(c));
-            inicializarSelectorCursos(cursosFiltrados, contexto);
-        });
-    }
-
+    
     console.log('✅ Selector de hora inicializado correctamente (SIEMPRE HABILITADO)');
 }
 
@@ -3628,11 +3096,7 @@ function confirmarEliminarClase() {
 
 function abrirModalClima(semana, dia) {
     if (!esProfesor) return;
-    if (!puedeEditarConfig()) {
-        mostrarNotificacion('Sólo los administradores pueden cambiar el clima del día.', 'error');
-        return;
-    }
-
+    
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
     
@@ -3703,44 +3167,23 @@ function traducirClima(clima) {
     return traducciones[clima] || clima;
 }
 
-// `contexto` (opcional): { semana, dia, horario, claseIndex }. Cuando se
-// pasa, los cursos que ya están cogidos por OTRA clase en la misma media
-// hora se pintan deshabilitados ("curso-bloqueado") y no se pueden marcar.
-function inicializarSelectorCursos(cursosSeleccionados, contexto) {
+function inicializarSelectorCursos(cursosSeleccionados) {
     const container = document.getElementById('cursosSelector');
     container.innerHTML = '';
-
+    
     const cursosDisponibles = config.cursos || ['1º', '2º', '3º', '4º', '5º', '6º', '7º', 'Todos'];
-
-    let bloqueados = new Set();
-    if (contexto) {
-        const sel = document.getElementById('horaExactaClaseSelect');
-        const horaExacta = sel ? sel.value : '';
-        if (horaExacta) {
-            bloqueados = cursosBloqueadosEnHora(
-                contexto.semana, contexto.dia, contexto.horario,
-                horaExacta, contexto.claseIndex
-            );
-        }
-    }
-
+    
     cursosDisponibles.forEach(curso => {
-        const isBlocked = bloqueados.has(curso);
-        const isSelected = !isBlocked && cursosSeleccionados.includes(curso);
+        const isSelected = cursosSeleccionados.includes(curso);
         const option = document.createElement('div');
-        option.className = `curso-option ${isSelected ? 'selected' : ''} ${curso === 'Todos' ? 'todos' : ''} ${isBlocked ? 'curso-bloqueado' : ''}`;
+        option.className = `curso-option ${isSelected ? 'selected' : ''} ${curso === 'Todos' ? 'todos' : ''}`;
         option.innerHTML = `
             <input type="checkbox" ${isSelected ? 'checked' : ''} value="${curso}" style="display: none;">
             ${curso}
         `;
-        if (isBlocked) {
-            option.title = 'Otra clase ya ha ocupado este curso en esta media hora';
-            container.appendChild(option);
-            return;
-        }
         option.addEventListener('click', function() {
             const checkbox = this.querySelector('input');
-
+            
             // Si se selecciona "Todos", deseleccionar los demás
             if (curso === 'Todos' && !checkbox.checked) {
                 document.querySelectorAll('#cursosSelector .curso-option').forEach(opt => {
@@ -3776,11 +3219,7 @@ function inicializarSelectorCursos(cursosSeleccionados, contexto) {
 
 function abrirModalMeses(semana) {
     if (!esProfesor) return;
-    if (!puedeEditarConfig()) {
-        mostrarNotificacion('Sólo los administradores pueden modificar los meses.', 'error');
-        return;
-    }
-
+    
     document.getElementById('modalMesesSemana').value = semana;
     
     const semanaIndex = semana - 1;
@@ -3965,32 +3404,9 @@ function guardarClase(event) {
     // Obtener y normalizar la hora exacta (CORREGIDO: usar el select correcto)
     const horaExactaSelect = document.getElementById('horaExactaClaseSelect');
     const horaExacta = horaExactaSelect ? horaExactaSelect.value.split(':').slice(0, 2).join(':') : "";
-
+    
     console.log('💾 Guardando clase con hora:', horaExacta);
-
-    if (!horaExacta) {
-        mostrarNotificacion('❌ Debes seleccionar una hora exacta', 'error');
-        return;
-    }
-    if (!cursosSeleccionados.length) {
-        mostrarNotificacion('❌ Selecciona al menos un curso', 'error');
-        return;
-    }
-
-    // Validación de cursos bloqueados por otra clase en la misma media
-    // hora. Excluimos la propia clase (claseIndex) cuando se está editando.
-    const bloqueados = cursosBloqueadosEnHora(
-        parseInt(semana), parseInt(dia), horario, horaExacta, claseIndex
-    );
-    const conflicto = cursosSeleccionados.filter(c => bloqueados.has(c));
-    if (conflicto.length) {
-        mostrarNotificacion(
-            '❌ Estos cursos ya están ocupados por otra clase en esa media hora: ' + conflicto.join(', '),
-            'error'
-        );
-        return;
-    }
-
+    
     const nuevaClase = {
         titulo: document.getElementById('tituloClase').value,
         descripcion: document.getElementById('descripcionClase').value,
@@ -4434,11 +3850,7 @@ function abrirModalEventoExistente(semana, dia, horario, eventoIndex) {
 
 function abrirModalSeparador(horario, separadorIndex = null) {
     if (!esProfesor) return;
-    if (!puedeEditarConfig()) {
-        mostrarNotificacion('Sólo los administradores pueden añadir o editar franjas horarias.', 'error');
-        return;
-    }
-
+    
     separadorParaEditar = { horario, index: separadorIndex };
     
     // ✅ FIX: Obtener el separador específico o crear uno nuevo
@@ -4883,11 +4295,7 @@ function cerrarContextMenu() {
 // Función para abrir modal de clima por franja horaria - MEJORADA
 function abrirModalClimaHorario(horario) {
     if (!esProfesor) return;
-    if (!puedeEditarConfig()) {
-        mostrarNotificacion('Sólo los administradores pueden cambiar el clima de las franjas.', 'error');
-        return;
-    }
-
+    
     const climaActual = calendarioData.climasHorario ? calendarioData.climasHorario[horario] : "CLEAR";
     
     document.getElementById('modalClimaHorarioFranja').value = horario;
@@ -5097,11 +4505,7 @@ function guardarCalendario() {
 
 function abrirModalProbarClimas() {
     if (!esProfesor) return;
-    if (!puedeEditarConfig()) {
-        mostrarNotificacion('Sólo los administradores pueden probar configuraciones de clima.', 'error');
-        return;
-    }
-
+    
     document.getElementById('modalProbarClimas').style.display = 'block';
     
     // Establecer hora actual por defecto
@@ -5243,10 +4647,6 @@ function cerrarModalProbarClimas() {
 // ==================== FUNCIONES PARA BARRAS DE ESTACIÓN ====================
 
 function abrirModalBarrasEstacion(semana) {
-    if (!puedeEditarConfig()) {
-        mostrarNotificacion('Sólo los administradores pueden modificar las barras de estación.', 'error');
-        return;
-    }
     document.getElementById('modalBarrasSemana').value = semana;
     renderizarListaBarras();
     document.getElementById('modalBarrasEstacion').style.display = 'block';
