@@ -15,7 +15,13 @@
         <!-- Header -->
         <div class="header">
             <h1>📅 Calendario Escolar Hogwarts</h1>
-            <button id="btnCerrar" class="btn-cerrar">✕</button>
+            <div class="header-actions" id="headerAuthBar">
+                <span id="authUserLabel" class="auth-user-label" hidden></span>
+                <button type="button" id="btnLoginHeader" class="btn-auth" hidden>Iniciar sesión</button>
+                <button type="button" id="btnLogoutHeader" class="btn-auth" hidden>Cerrar sesión</button>
+                <button type="button" id="btnAdminPanel" class="btn-auth btn-auth-admin" hidden>⚙️ Administración</button>
+                <button type="button" id="btnCerrar" class="btn-cerrar">✕</button>
+            </div>
         </div>
 
         <div id="tablon-main" class="tablon-main">
@@ -168,7 +174,7 @@
         <div class="acciones">
             <button id="btnGuardar" class="btn-guardar" style="display: none;">💾 Guardar Cambios</button>
             <button id="btnCerrar2" class="btn-cerrar">Cerrar</button>
-            <button id="btnProbarClimas" class="btn-guardar" style="background: #6f42c1;">🧪 Probar Climas</button> 
+            <button id="btnProbarClimas" class="btn-guardar" style="background: #6f42c1; display: none;">🧪 Probar Climas</button>
         </div>
     </div>
 
@@ -270,10 +276,10 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Información del Sistema de Clima Automático:</label>
+                    <label>Clima y temperatura (solo calendario):</label>
                     <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 12px;">
-                        <strong>StormFox 2</strong> aplica el clima del mapa segun las franjas del calendario (servidor).<br>
-                        Profesorado puede usar <strong>Probar climas</strong> para forzar un tipo GTA sobre el tiempo actual.
+                        Los climas por franja y la temperatura son <strong>solo informativos</strong> para el roleo.<br>
+                        <strong>No</strong> se sincronizan con StormFox ni cambian el clima/temperatura del mapa.
                     </div>
                 </div>
 
@@ -559,6 +565,41 @@
                     <button type="button" id="btnCancelarEditarBarra" class="btn-cerrar">❌ Cancelar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Panel de administración (solo rol admin en Vercel) -->
+    <div id="modalAdmin" class="modal">
+        <div class="modal-content" style="max-width: 920px; max-height: 90vh; overflow: auto;">
+            <h3>⚙️ Administración del calendario</h3>
+            <nav class="admin-tabs" aria-label="Secciones de administración">
+                <button type="button" class="admin-tab admin-tab--activa" data-admin-tab="usuarios">Usuarios</button>
+                <button type="button" class="admin-tab" data-admin-tab="logs">Historial</button>
+            </nav>
+            <div id="adminPanelUsuarios" class="admin-panel admin-panel--activa">
+                <div class="admin-form-grid">
+                    <label>Usuario <input type="text" id="adminNewUsername" autocomplete="off" maxlength="64"></label>
+                    <label>Contraseña <input type="password" id="adminNewPassword" autocomplete="new-password"></label>
+                    <label>Rol
+                        <select id="adminNewRol">
+                            <option value="profesor">profesor</option>
+                            <option value="admin">admin</option>
+                        </select>
+                    </label>
+                    <button type="button" id="btnAdminCreateUser" class="btn-guardar">Crear usuario</button>
+                </div>
+                <div id="adminUsersList" class="admin-users-list"></div>
+            </div>
+            <div id="adminPanelLogs" class="admin-panel">
+                <div class="admin-form-grid">
+                    <label>Buscar <input type="text" id="adminLogSearch" placeholder="usuario, acción…"></label>
+                    <button type="button" id="btnAdminReloadLogs" class="btn-guardar">Actualizar historial</button>
+                </div>
+                <div id="adminLogsList" class="admin-logs-list"></div>
+            </div>
+            <div class="modal-botones">
+                <button type="button" id="btnCerrarAdmin" class="btn-cerrar">Cerrar</button>
+            </div>
         </div>
     </div>
 

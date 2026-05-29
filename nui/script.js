@@ -1,5 +1,6 @@
 let calendarioData = {};
 let esProfesor = false;
+let esAdmin = false;
 let config = {};
 let semanaActual = 1;
 let tooltipElement = null;
@@ -1692,15 +1693,17 @@ async function cargarDatosDesdeAPI() {
                 });
                 const verifyData = await verifyResponse.json();
                 if (verifyData.success) {
-                    usuarioActual = verifyData.usuario;
-                    esProfesor = verifyData.usuario.permisos && verifyData.usuario.permisos.includes('editar');
+                    aplicarRolUsuario(verifyData.usuario);
                 } else {
                     tokenAutenticacion = null;
                     localStorage.removeItem('calendario_token');
+                    aplicarRolUsuario(null);
                 }
             } catch (e) {
                 console.error('Error verificando token:', e);
             }
+        } else {
+            aplicarRolUsuario(null);
         }
         
         // Asegurar que el body esté visible
@@ -1708,19 +1711,13 @@ async function cargarDatosDesdeAPI() {
         
         // Mostrar calendario
         mostrarCalendario();
-        
-        // Mostrar botón guardar solo si es profesor
-        const btnGuardar = document.getElementById('btnGuardar');
-        if (btnGuardar) {
-            btnGuardar.style.display = esProfesor ? 'block' : 'none';
-        }
 
         asegurarTablonSecciones();
         aplicarTablonSeccionesAlDOM();
         cambiarPestanaTablon('indice');
 
-        // Mostrar botón de login si no está autenticado
-        mostrarLoginSiNecesario();
+        actualizarBarraAuth();
+        ensureModalLoginExists();
         
         console.log('[Calendario] Calendario cargado correctamente');
         
@@ -1829,50 +1826,346 @@ function detenerPollingPeriodico() {
     }
 }
 
-// Función para mostrar login si es necesario
-function mostrarLoginSiNecesario() {
-    if (!MODO_WEB || tokenAutenticacion) return;
-    
-    // Crear modal de login si no existe
-    if (!document.getElementById('modalLogin')) {
-        const modalLogin = document.createElement('div');
-        modalLogin.id = 'modalLogin';
-        modalLogin.className = 'modal';
-        modalLogin.style.display = 'block';
-        modalLogin.innerHTML = `
-            <div class="modal-content">
-                <h3>🔐 Iniciar Sesión</h3>
-                <p>Necesitas iniciar sesión para editar el calendario</p>
-                <form id="formLogin">
-                    <div class="form-group">
-                        <label>Usuario:</label>
-                        <input type="text" id="loginUsername" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Contraseña:</label>
-                        <input type="password" id="loginPassword" required>
-                    </div>
-                    <div class="modal-botones">
-                        <button type="submit" class="btn-guardar">Iniciar Sesión</button>
-                        <button type="button" id="btnCerrarLogin" class="btn-cerrar">Cerrar</button>
-                    </div>
-                </form>
-                <p style="margin-top: 15px; font-size: 12px; color: #666;">
-                    Puedes ver el calendario sin iniciar sesión, pero necesitas autenticarte para editarlo.
-                </p>
-            </div>
-        `;
-        document.body.appendChild(modalLogin);
-        
-        document.getElementById('formLogin').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            await hacerLogin();
+function aplicarRolUsuario(usuario) {
+    if (!usuario) {
+        usuarioActual = null;
+        esProfesor = false;
+        esAdmin = false;
+        return;
+    }
+    usuarioActual = usuario;
+    const permisos = usuario.permisos || [];
+    esProfesor = permisos.indexOf('editar') !== -1;
+    esAdmin = usuario.rol === 'admin';
+}
+
+function actualizarBarraAuth() {
+    const label = document.getElementById('authUserLabel');
+    const btnLogin = document.getElementById('btnLoginHeader');
+    const btnLogout = document.getElementById('btnLogoutHeader');
+    const btnAdmin = document.getElementById('btnAdminPanel');
+    const btnGuardar = document.getElementById('btnGuardar');
+
+    if (!MODO_WEB) {
+        if (label) label.hidden = true;
+        if (btnLogin) btnLogin.hidden = true;
+        if (btnLogout) btnLogout.hidden = true;
+        if (btnAdmin) btnAdmin.hidden = true;
+        return;
+    }
+
+    const loggedIn = !!(tokenAutenticacion && usuarioActual);
+
+    if (label) {
+        if (loggedIn) {
+            label.textContent = (usuarioActual.username || '') +
+                (usuarioActual.rol ? ' (' + usuarioActual.rol + ')' : '');
+            label.hidden = false;
+        } else {
+            label.hidden = true;
+        }
+    }
+    if (btnLogin) btnLogin.hidden = loggedIn;
+    if (btnLogout) btnLogout.hidden = !loggedIn;
+    if (btnAdmin) btnAdmin.hidden = !(loggedIn && esAdmin);
+    if (btnGuardar) btnGuardar.style.display = esProfesor ? 'block' : 'none';
+}
+
+function ensureModalLoginExists() {
+    if (!MODO_WEB || document.getElementById('modalLogin')) return;
+
+    const modalLogin = document.createElement('div');
+    modalLogin.id = 'modalLogin';
+    modalLogin.className = 'modal';
+    modalLogin.style.display = 'none';
+    modalLogin.innerHTML = `
+        <div class="modal-content">
+            <h3>🔐 Iniciar Sesión</h3>
+            <p>Necesitas iniciar sesión para editar el calendario</p>
+            <form id="formLogin">
+                <div class="form-group">
+                    <label>Usuario:</label>
+                    <input type="text" id="loginUsername" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña:</label>
+                    <input type="password" id="loginPassword" required autocomplete="current-password">
+                </div>
+                <div class="modal-botones">
+                    <button type="submit" class="btn-guardar">Iniciar Sesión</button>
+                    <button type="button" id="btnCerrarLogin" class="btn-cerrar">Cerrar</button>
+                </div>
+            </form>
+            <p style="margin-top: 15px; font-size: 12px; color: #666;">
+                Puedes ver el calendario sin iniciar sesión, pero necesitas autenticarte para editarlo.
+            </p>
+        </div>
+    `;
+    document.body.appendChild(modalLogin);
+
+    document.getElementById('formLogin').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        await hacerLogin();
+    });
+
+    document.getElementById('btnCerrarLogin').addEventListener('click', function () {
+        modalLogin.style.display = 'none';
+    });
+}
+
+function abrirModalLogin() {
+    if (!MODO_WEB) return;
+    ensureModalLoginExists();
+    const modalLogin = document.getElementById('modalLogin');
+    if (modalLogin) modalLogin.style.display = 'block';
+}
+
+function cerrarSesion() {
+    tokenAutenticacion = null;
+    localStorage.removeItem('calendario_token');
+    aplicarRolUsuario(null);
+    const modalLogin = document.getElementById('modalLogin');
+    if (modalLogin) modalLogin.style.display = 'none';
+    actualizarBarraAuth();
+    mostrarNotificacion('Sesión cerrada', 'info');
+}
+
+function authHeadersJson() {
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + tokenAutenticacion
+    };
+}
+
+function abrirPanelAdmin() {
+    if (!esAdmin || !tokenAutenticacion) return;
+    const modal = document.getElementById('modalAdmin');
+    if (!modal) return;
+    modal.style.display = 'block';
+    cargarUsuariosAdmin();
+}
+
+function cerrarPanelAdmin() {
+    const modal = document.getElementById('modalAdmin');
+    if (modal) modal.style.display = 'none';
+}
+
+function cambiarTabAdmin(tabId) {
+    document.querySelectorAll('.admin-tab').forEach(function (btn) {
+        btn.classList.toggle('admin-tab--activa', btn.getAttribute('data-admin-tab') === tabId);
+    });
+    const panelUsuarios = document.getElementById('adminPanelUsuarios');
+    const panelLogs = document.getElementById('adminPanelLogs');
+    if (panelUsuarios) {
+        panelUsuarios.classList.toggle('admin-panel--activa', tabId === 'usuarios');
+    }
+    if (panelLogs) {
+        panelLogs.classList.toggle('admin-panel--activa', tabId === 'logs');
+    }
+    if (tabId === 'logs') {
+        cargarLogsAdmin();
+    }
+}
+
+async function cargarUsuariosAdmin() {
+    const cont = document.getElementById('adminUsersList');
+    if (!cont || !tokenAutenticacion) return;
+    cont.innerHTML = '<p style="padding:12px;">Cargando usuarios…</p>';
+    try {
+        const res = await fetch(API_URL + '/api/usuarios', { headers: { Authorization: 'Bearer ' + tokenAutenticacion } });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            cont.innerHTML = '<p style="padding:12px;color:#c00;">' + (data.error || 'Error al cargar usuarios') + '</p>';
+            return;
+        }
+        const usuarios = data.usuarios || [];
+        if (!usuarios.length) {
+            cont.innerHTML = '<p style="padding:12px;">No hay usuarios registrados.</p>';
+            return;
+        }
+        cont.innerHTML = usuarios.map(function (u) {
+            const esYo = usuarioActual && u.username === usuarioActual.username;
+            return '<div class="admin-user-row">' +
+                '<span><strong>' + escapeHtmlAdmin(u.username) + '</strong> · ' + escapeHtmlAdmin(u.rol || '') +
+                (esYo ? ' <em>(tú)</em>' : '') + '</span>' +
+                '<div class="admin-user-actions">' +
+                '<button type="button" data-admin-action="rol" data-username="' + escapeHtmlAdmin(u.username) + '" data-rol="' + escapeHtmlAdmin(u.rol) + '">Cambiar rol</button>' +
+                '<button type="button" data-admin-action="pass" data-username="' + escapeHtmlAdmin(u.username) + '">Nueva contraseña</button>' +
+                (esYo ? '' : '<button type="button" data-admin-action="del" data-username="' + escapeHtmlAdmin(u.username) + '">Eliminar</button>') +
+                '</div></div>';
+        }).join('');
+    } catch (err) {
+        cont.innerHTML = '<p style="padding:12px;color:#c00;">Error de conexión</p>';
+    }
+}
+
+async function cargarLogsAdmin() {
+    const cont = document.getElementById('adminLogsList');
+    if (!cont || !tokenAutenticacion) return;
+    const q = (document.getElementById('adminLogSearch') && document.getElementById('adminLogSearch').value) || '';
+    cont.innerHTML = '<p style="padding:12px;">Cargando historial…</p>';
+    try {
+        let url = API_URL + '/api/logs?limit=80';
+        if (q.trim()) url += '&q=' + encodeURIComponent(q.trim());
+        const res = await fetch(url, { headers: { Authorization: 'Bearer ' + tokenAutenticacion } });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            cont.innerHTML = '<p style="padding:12px;color:#c00;">' + (data.error || 'Error al cargar historial') + '</p>';
+            return;
+        }
+        const logs = data.logs || [];
+        if (!logs.length) {
+            cont.innerHTML = '<p style="padding:12px;">Sin registros.</p>';
+            return;
+        }
+        cont.innerHTML = logs.map(function (log) {
+            const fecha = log.fecha ? String(log.fecha).replace('T', ' ').slice(0, 19) : '';
+            return '<div class="admin-log-row">' +
+                '<span><strong>' + escapeHtmlAdmin(log.username || '') + '</strong> · ' + escapeHtmlAdmin(log.accion || '') + '</span>' +
+                '<span style="color:#666;font-size:12px;">' + escapeHtmlAdmin(fecha) + '</span>' +
+                (log.detalles ? '<div style="width:100%;font-size:12px;color:#444;">' + escapeHtmlAdmin(log.detalles) + '</div>' : '') +
+                '</div>';
+        }).join('');
+    } catch (err) {
+        cont.innerHTML = '<p style="padding:12px;color:#c00;">Error de conexión</p>';
+    }
+}
+
+function escapeHtmlAdmin(text) {
+    return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+async function crearUsuarioAdmin() {
+    const username = (document.getElementById('adminNewUsername') || {}).value || '';
+    const password = (document.getElementById('adminNewPassword') || {}).value || '';
+    const rol = (document.getElementById('adminNewRol') || {}).value || 'profesor';
+    if (!username.trim() || !password) {
+        mostrarNotificacion('Usuario y contraseña son obligatorios', 'error');
+        return;
+    }
+    try {
+        const res = await fetch(API_URL + '/api/usuarios', {
+            method: 'POST',
+            headers: authHeadersJson(),
+            body: JSON.stringify({ username: username.trim(), password: password, rol: rol })
         });
-        
-        document.getElementById('btnCerrarLogin').addEventListener('click', () => {
-            modalLogin.style.display = 'none';
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            mostrarNotificacion(data.error || 'No se pudo crear el usuario', 'error');
+            return;
+        }
+        mostrarNotificacion('Usuario creado', 'success');
+        document.getElementById('adminNewUsername').value = '';
+        document.getElementById('adminNewPassword').value = '';
+        cargarUsuariosAdmin();
+    } catch (e) {
+        mostrarNotificacion('Error de conexión', 'error');
+    }
+}
+
+async function adminAccionUsuario(action, username, rolActual) {
+    if (action === 'rol') {
+        const nuevoRol = rolActual === 'admin' ? 'profesor' : 'admin';
+        if (!window.confirm('¿Cambiar rol de "' + username + '" a ' + nuevoRol + '?')) return;
+        try {
+            const res = await fetch(API_URL + '/api/usuarios?username=' + encodeURIComponent(username), {
+                method: 'PUT',
+                headers: authHeadersJson(),
+                body: JSON.stringify({ rol: nuevoRol })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                mostrarNotificacion(data.error || 'No se pudo actualizar', 'error');
+                return;
+            }
+            mostrarNotificacion('Rol actualizado', 'success');
+            cargarUsuariosAdmin();
+        } catch (e) {
+            mostrarNotificacion('Error de conexión', 'error');
+        }
+        return;
+    }
+    if (action === 'pass') {
+        const nuevaPass = window.prompt('Nueva contraseña para "' + username + '" (mín. 6 caracteres):');
+        if (!nuevaPass) return;
+        try {
+            const res = await fetch(API_URL + '/api/usuarios?username=' + encodeURIComponent(username), {
+                method: 'PUT',
+                headers: authHeadersJson(),
+                body: JSON.stringify({ password: nuevaPass })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                mostrarNotificacion(data.error || 'No se pudo cambiar la contraseña', 'error');
+                return;
+            }
+            mostrarNotificacion('Contraseña actualizada', 'success');
+        } catch (e) {
+            mostrarNotificacion('Error de conexión', 'error');
+        }
+        return;
+    }
+    if (action === 'del') {
+        if (!window.confirm('¿Eliminar al usuario "' + username + '"?')) return;
+        try {
+            const res = await fetch(API_URL + '/api/usuarios?username=' + encodeURIComponent(username), {
+                method: 'DELETE',
+                headers: { Authorization: 'Bearer ' + tokenAutenticacion }
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                mostrarNotificacion(data.error || 'No se pudo eliminar', 'error');
+                return;
+            }
+            mostrarNotificacion('Usuario eliminado', 'success');
+            cargarUsuariosAdmin();
+        } catch (e) {
+            mostrarNotificacion('Error de conexión', 'error');
+        }
+    }
+}
+
+function inicializarBarraAuthYAdmin() {
+    if (!MODO_WEB) return;
+
+    elOn('btnLoginHeader', 'click', abrirModalLogin);
+    elOn('btnLogoutHeader', 'click', cerrarSesion);
+    elOn('btnAdminPanel', 'click', abrirPanelAdmin);
+    elOn('btnCerrarAdmin', 'click', cerrarPanelAdmin);
+    elOn('btnAdminCreateUser', 'click', crearUsuarioAdmin);
+    elOn('btnAdminReloadLogs', 'click', cargarLogsAdmin);
+
+    document.querySelectorAll('.admin-tab').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            cambiarTabAdmin(btn.getAttribute('data-admin-tab'));
+        });
+    });
+
+    const usersList = document.getElementById('adminUsersList');
+    if (usersList) {
+        usersList.addEventListener('click', function (ev) {
+            const btn = ev.target.closest('[data-admin-action]');
+            if (!btn) return;
+            adminAccionUsuario(
+                btn.getAttribute('data-admin-action'),
+                btn.getAttribute('data-username'),
+                btn.getAttribute('data-rol')
+            );
         });
     }
+
+    actualizarBarraAuth();
+    ensureModalLoginExists();
+}
+
+// Abre el modal de login (p. ej. al intentar guardar sin sesión)
+function mostrarLoginSiNecesario() {
+    if (!MODO_WEB) return;
+    abrirModalLogin();
 }
 
 // Función para hacer login
@@ -1894,15 +2187,11 @@ async function hacerLogin() {
         if (data.success && data.token) {
             tokenAutenticacion = data.token;
             localStorage.setItem('calendario_token', tokenAutenticacion);
-            usuarioActual = data.usuario;
-            esProfesor = data.usuario.permisos && data.usuario.permisos.includes('editar');
-            
-            const btnGuardar = document.getElementById('btnGuardar');
-            if (btnGuardar) {
-                btnGuardar.style.display = esProfesor ? 'block' : 'none';
-            }
-            
-            document.getElementById('modalLogin').style.display = 'none';
+            aplicarRolUsuario(data.usuario);
+            actualizarBarraAuth();
+
+            const modalLogin = document.getElementById('modalLogin');
+            if (modalLogin) modalLogin.style.display = 'none';
             mostrarNotificacion('Sesión iniciada correctamente', 'success');
         } else {
             mostrarNotificacion(data.error || 'Error al iniciar sesión', 'error');
@@ -2013,6 +2302,8 @@ function inicializarEventos() {
     
     if (btnCerrar) btnCerrar.addEventListener('click', cerrarCalendario);
     if (btnCerrar2) btnCerrar2.addEventListener('click', cerrarCalendario);
+
+    inicializarBarraAuthYAdmin();
     
     // Botones de semanas
     document.querySelectorAll('.btn-semana').forEach(btn => {
@@ -4405,9 +4696,10 @@ function guardarCalendario() {
         .then(response => {
             if (!response.ok) {
                 if (response.status === 401) {
-                    // Token inválido, pedir login de nuevo
                     tokenAutenticacion = null;
                     localStorage.removeItem('calendario_token');
+                    aplicarRolUsuario(null);
+                    actualizarBarraAuth();
                     mostrarLoginSiNecesario();
                     throw new Error('Sesión expirada');
                 }
@@ -4596,6 +4888,11 @@ function actualizarListaClimasConfigurados() {
 }
 
 // Función para aplicar clima de prueba
+function catCalStormFoxIntegracionActiva() {
+    const ix = (config && config.integracionStormFox) || {};
+    return ix.enabled === true && (ix.syncWeather === true || ix.syncTemperature === true);
+}
+
 function aplicarClimaPrueba() {
     const resultadoDiv = document.getElementById('resultadoClimaPrueba');
     const clima = resultadoDiv.dataset.climaActual;
@@ -4606,11 +4903,16 @@ function aplicarClimaPrueba() {
         return;
     }
 
+    if (!catCalStormFoxIntegracionActiva()) {
+        mostrarNotificacion('Vista previa: ' + traducirClima(clima) + ' (no se aplica a StormFox)', 'info');
+        return;
+    }
+
     if (typeof window !== 'undefined' && window.MODO_GMOD === true) {
         if (typeof gmod !== 'undefined' && gmod && typeof gmod.CalClimaPrueba === 'function') {
             try {
                 gmod.CalClimaPrueba(JSON.stringify({ clima: clima, hora: hora }));
-                mostrarNotificacion(`Solicitud enviada: ${traducirClima(clima)} (StormFox)`, 'success');
+                mostrarNotificacion(`Solicitud enviada: ${traducirClima(clima)}`, 'success');
             } catch (e) {
                 console.error(e);
                 mostrarNotificacion('Error al enviar clima de prueba', 'error');

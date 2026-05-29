@@ -61,7 +61,7 @@ async function obtenerConexion() {
             console.error('[API] ⚠️ HeidiSQL funciona porque eres otro host (ej. localhost o tu IP).');
             console.error('[API] ⚠️ Solución típica: en el servidor 37.187.25.84 ejecuta como root:');
             console.error("[API]    CREATE USER IF NOT EXISTS 'fivemuser'@'%' IDENTIFIED BY 'TU_MISMA_CLAVE';");
-            console.error('[API]    GRANT SELECT,INSERT,UPDATE,DELETE ON gmodserverdb.* TO \'fivemuser\'@\'%\';');
+            console.error('[API]    GRANT SELECT,INSERT,UPDATE,DELETE ON noroirp.* TO \'fivemuser\'@\'%\';');
             console.error('[API]    FLUSH PRIVILEGES;');
             console.error('[API] ⚠️ (Ajusta nombre de usuario/BD si usas otros.) Abre el puerto 3306 a Internet solo si asumes el riesgo.');
         }
@@ -110,14 +110,8 @@ async function leerCalendario() {
         const rawDatos = rows[0].datos;
         const trimmed = rawDatos != null ? String(rawDatos).trim() : '';
         if (trimmed === '' || trimmed === '{}') {
-            const plantilla = calendarioPlantillaParaUI();
-            const json = JSON.stringify(plantilla);
-            await conexion.execute(
-                'UPDATE calendario SET datos = ?, ultima_actualizacion = ?, actualizado_por = ? WHERE id = 1',
-                [json, plantilla.ultimaActualizacion, 'api-seed-vacio']
-            );
-            console.log('[API] Columna datos vacía o {}: rellenada con plantilla inicial.');
-            return plantilla;
+            console.warn('[API] Columna datos vacía o {}: devolviendo plantilla UI SIN sobrescribir DB.');
+            return calendarioPlantillaParaUI();
         }
 
         if (rows && rows.length > 0) {
@@ -173,14 +167,8 @@ async function leerCalendario() {
                 }
 
                 if (!datosValidos) {
-                    const plantilla = calendarioPlantillaParaUI();
-                    const json = JSON.stringify(plantilla);
-                    await conexion.execute(
-                        'UPDATE calendario SET datos = ?, ultima_actualizacion = ?, actualizado_por = ? WHERE id = 1',
-                        [json, plantilla.ultimaActualizacion, 'api-seed-invalido']
-                    );
-                    console.log('[API] JSON en MySQL sin semanas útiles: sustituido por plantilla inicial.');
-                    return plantilla;
+                    console.warn('[API] JSON en MySQL sin semanas útiles: devolviendo plantilla UI SIN sobrescribir DB.');
+                    return calendarioPlantillaParaUI();
                 }
 
                 // GMod compara ultimaActualizacion del JSON; asegurar que refleje la columna SQL (evita pull sin efecto si el JSON viejo no traía el campo).
@@ -199,18 +187,8 @@ async function leerCalendario() {
             } catch (parseError) {
                 console.error('[API] Error parseando JSON desde MySQL:', parseError);
                 console.error('[API] Datos raw:', rows[0].datos ? String(rows[0].datos).substring(0, 100) : 'null');
-                const plantilla = calendarioPlantillaParaUI();
-                const json = JSON.stringify(plantilla);
-                try {
-                    await conexion.execute(
-                        'UPDATE calendario SET datos = ?, ultima_actualizacion = ?, actualizado_por = ? WHERE id = 1',
-                        [json, plantilla.ultimaActualizacion, 'api-seed-parse']
-                    );
-                    console.log('[API] JSON corrupto: columna datos sustituida por plantilla.');
-                } catch (e) {
-                    console.error('[API] No se pudo escribir plantilla tras parse error:', e.message);
-                }
-                return plantilla;
+                console.warn('[API] JSON corrupto: devolviendo plantilla UI SIN sobrescribir DB.');
+                return calendarioPlantillaParaUI();
             }
         }
 
@@ -238,6 +216,41 @@ async function guardarCalendario(datos, actualizadoPor = 'web') {
             return false;
         }
         
+        // Tabla de historial para auditoría / recuperación rápida
+        try {
+            await conexion.execute(
+                `CREATE TABLE IF NOT EXISTS calendario_historial (
+                    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                    calendario_id INT NOT NULL,
+                    datos LONGTEXT NOT NULL,
+                    ultima_actualizacion INT UNSIGNED NOT NULL DEFAULT 0,
+                    actualizado_por VARCHAR(64) DEFAULT NULL,
+                    snapshot_ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    motivo VARCHAR(64) DEFAULT NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_calendario_id (calendario_id),
+                    KEY idx_snapshot_ts (snapshot_ts)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+            );
+        } catch (historyTableError) {
+            console.warn('[API] No se pudo asegurar tabla calendario_historial:', historyTableError.message);
+        }
+
+        try {
+            const [prevRows] = await conexion.execute(
+                'SELECT id, datos, ultima_actualizacion, actualizado_por FROM calendario WHERE id = 1 LIMIT 1'
+            );
+            if (prevRows && prevRows.length > 0) {
+                const prev = prevRows[0];
+                await conexion.execute(
+                    'INSERT INTO calendario_historial (calendario_id, datos, ultima_actualizacion, actualizado_por, motivo) VALUES (?, ?, ?, ?, ?)',
+                    [1, String(prev.datos || ''), Number(prev.ultima_actualizacion) || 0, prev.actualizado_por || 'unknown', 'before_overwrite']
+                );
+            }
+        } catch (historyPrevError) {
+            console.warn('[API] No se pudo guardar snapshot previo:', historyPrevError.message);
+        }
+
         // Actualizar timestamp
         datos.ultimaActualizacion = Math.floor(Date.now() / 1000);
         const datosJSON = JSON.stringify(datos);
@@ -252,6 +265,15 @@ async function guardarCalendario(datos, actualizadoPor = 'web') {
              actualizado_por = VALUES(actualizado_por)`,
             [datosJSON, datos.ultimaActualizacion, actualizadoPor]
         );
+
+        try {
+            await conexion.execute(
+                'INSERT INTO calendario_historial (calendario_id, datos, ultima_actualizacion, actualizado_por, motivo) VALUES (?, ?, ?, ?, ?)',
+                [1, datosJSON, datos.ultimaActualizacion, actualizadoPor, 'after_write']
+            );
+        } catch (historyPostError) {
+            console.warn('[API] No se pudo guardar snapshot posterior:', historyPostError.message);
+        }
         
         console.log('[API] Calendario guardado en MySQL correctamente');
         console.log('[API] Timestamp:', datos.ultimaActualizacion);
@@ -312,7 +334,7 @@ module.exports = async function handler(req, res) {
         if (req.method === 'POST') {
         // Guardar calendario
         const authHeader = req.headers.authorization;
-        const syncSecret = (process.env.CAT_CAL_SYNC_SECRET || '').trim();
+        const syncSecret = (process.env.CAT_CAL_SYNC_SECRET || process.env.CAT_CAL_SYNC || '').trim();
         const syncHeaderRaw = req.headers['x-catcal-sync-token'];
         const syncHeader = typeof syncHeaderRaw === 'string' ? syncHeaderRaw.trim() : '';
         const syncOk = syncSecret !== '' && syncHeader !== '' && syncHeader === syncSecret;
@@ -365,8 +387,10 @@ module.exports = async function handler(req, res) {
                 error: 'No autorizado: usa Bearer (web) o header X-CatCal-Sync-Token (GMod) con CAT_CAL_SYNC_SECRET'
             });
         } else {
-            // Sin CAT_CAL_SYNC_SECRET en entorno: compatibilidad FiveM (confianza interna)
-            console.log('[API] Guardando calendario desde FiveM (sin CAT_CAL_SYNC_SECRET)');
+            // Endurecido: evitar escrituras anónimas sin secreto.
+            return res.status(401).json({
+                error: 'No autorizado: configura CAT_CAL_SYNC o CAT_CAL_SYNC_SECRET y usa X-CatCal-Sync-Token (GMod), o Bearer (web).'
+            });
         }
 
             try {

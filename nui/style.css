@@ -37,6 +37,141 @@ body {
 .header h1 {
     font-size: 24px;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+}
+
+.header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.auth-user-label {
+    font-size: 13px;
+    opacity: 0.95;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-auth {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    padding: 7px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.btn-auth:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.btn-auth-admin {
+    background: #d3a625;
+    color: #2c2c2c;
+    border-color: #b38f20;
+}
+
+.btn-auth-admin:hover {
+    background: #e8bc3a;
+}
+
+.admin-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0 16px;
+}
+
+.admin-tab {
+    padding: 8px 14px;
+    border: 1px solid #ccc;
+    background: #f8f9fa;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.admin-tab--activa {
+    background: #740001;
+    color: #fff;
+    border-color: #740001;
+}
+
+.admin-panel {
+    display: none;
+}
+
+.admin-panel--activa {
+    display: block;
+}
+
+.admin-form-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+    margin-bottom: 14px;
+}
+
+.admin-form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.admin-form-grid input,
+.admin-form-grid select {
+    padding: 8px;
+    min-width: 140px;
+}
+
+.admin-users-list,
+.admin-logs-list {
+    max-height: 340px;
+    overflow: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background: #f8f9fa;
+}
+
+.admin-user-row,
+.admin-log-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e9ecef;
+    font-size: 13px;
+}
+
+.admin-user-row:last-child,
+.admin-log-row:last-child {
+    border-bottom: none;
+}
+
+.admin-user-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.admin-user-actions button {
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
 }
 
 .btn-cerrar {
