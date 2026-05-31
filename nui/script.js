@@ -22,6 +22,175 @@ let contextoVisor = {};
 /** Recorte servidor para alumnos (sin filas ajenas). */
 let notasVistaAlumno = null;
 
+/** Horario canónico del servidor (España peninsular). Los datos se guardan con estas horas. */
+const HORARIO_ZONA_ORIGEN = 'Europe/Madrid';
+
+function obtenerFechaReferenciaMadrid() {
+    const partes = new Intl.DateTimeFormat('en-US', {
+        timeZone: HORARIO_ZONA_ORIGEN,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+    }).formatToParts(new Date());
+
+    const out = {};
+    partes.forEach(function (p) {
+        if (p.type !== 'literal') {
+            out[p.type] = parseInt(p.value, 10);
+        }
+    });
+
+    return { y: out.year, mo: out.month, d: out.day };
+}
+
+function getPartsInTimeZone(epochMs, timeZone) {
+    const partes = new Intl.DateTimeFormat('en-US', {
+        timeZone: timeZone,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false
+    }).formatToParts(new Date(epochMs));
+
+    const out = {};
+    partes.forEach(function (p) {
+        if (p.type !== 'literal') {
+            out[p.type] = parseInt(p.value, 10);
+        }
+    });
+
+    return out;
+}
+
+function madridWallClockToUtc(y, mo, d, h, mi) {
+    let utc = Date.UTC(y, mo - 1, d, h, mi);
+
+    for (let i = 0; i < 8; i++) {
+        const p = getPartsInTimeZone(utc, HORARIO_ZONA_ORIGEN);
+        const want = Date.UTC(y, mo - 1, d, h, mi);
+        const got = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
+        const diff = want - got;
+
+        if (diff === 0) {
+            break;
+        }
+
+        utc += diff;
+    }
+
+    return utc;
+}
+
+function formatearUtcEnZonaLocal(utcMs) {
+    return new Intl.DateTimeFormat(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).format(new Date(utcMs));
+}
+
+function minutosMadridWallALocalHHMM(ref, totalMin, extraDayOffset) {
+    let mins = totalMin;
+    let dayOff = extraDayOffset || 0;
+
+    while (mins < 0) {
+        mins += 1440;
+        dayOff -= 1;
+    }
+
+    while (mins >= 1440) {
+        mins -= 1440;
+        dayOff += 1;
+    }
+
+    const h = Math.floor(mins / 60);
+    const mi = mins % 60;
+    const utc = madridWallClockToUtc(ref.y, ref.mo, ref.d + dayOff, h, mi);
+
+    return formatearUtcEnZonaLocal(utc);
+}
+
+function formatearRangoMinutosMadridALocal(iniMin, finMin, cruzaMedianoche) {
+    const ref = obtenerFechaReferenciaMadrid();
+    const inicio = minutosMadridWallALocalHHMM(ref, iniMin, 0);
+    const fin = minutosMadridWallALocalHHMM(ref, finMin, cruzaMedianoche ? 1 : 0);
+
+    return inicio + ' - ' + fin;
+}
+
+function debeMostrarHorarioEnZonaLocal() {
+    try {
+        const visor = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        return visor && visor !== HORARIO_ZONA_ORIGEN;
+    } catch (e) {
+        return false;
+    }
+}
+
+function obtenerEtiquetaZonaHorariaVisor() {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    } catch (e) {
+        return '';
+    }
+}
+
+function formatearFranjaHorariaVisor(franjaMadrid, horarioConfigOpt) {
+    if (!franjaMadrid) {
+        return '';
+    }
+
+    if (!debeMostrarHorarioEnZonaLocal()) {
+        return franjaMadrid;
+    }
+
+    const cfg = horarioConfigOpt || (config.horarios && config.horarios.find(function (h) {
+        return h.hora === franjaMadrid;
+    }));
+
+    let iniMin;
+    let finMin;
+
+    if (cfg && cfg.inicio != null && cfg.fin != null) {
+        iniMin = convertirHoraDecimalAMinutos(cfg.inicio);
+        finMin = convertirHoraDecimalAMinutos(cfg.fin);
+    } else {
+        const partes = extraerHorasDelHorario(franjaMadrid);
+        iniMin = convertirHoraDecimalAMinutos(partes.inicio);
+        finMin = convertirHoraDecimalAMinutos(partes.fin);
+    }
+
+    return formatearRangoMinutosMadridALocal(iniMin, finMin, finMin <= iniMin);
+}
+
+function convertirHoraMadridALocal(horaHHMM) {
+    const norm = formatearHoraConMinutos(horaHHMM);
+
+    if (!norm || !debeMostrarHorarioEnZonaLocal()) {
+        return norm;
+    }
+
+    const partes = norm.split(':').map(Number);
+    const ref = obtenerFechaReferenciaMadrid();
+    const utc = madridWallClockToUtc(ref.y, ref.mo, ref.d, partes[0], partes[1] || 0);
+
+    return formatearUtcEnZonaLocal(utc);
+}
+
+function formatearHoraParaVisor(horaString) {
+    if (!horaString) {
+        return '';
+    }
+
+    const base = horaString.split(':').slice(0, 2).join(':');
+
+    return convertirHoraMadridALocal(base);
+}
+
 function arrayDesdeObjetoNormasApartados(arrOrObj) {
     if (arrOrObj == null) {
         return [];
@@ -2461,7 +2630,15 @@ function mostrarCalendario() {
         `;
     }
     
-    let html = htmlBarrasEstacion + `
+    let htmlZona = '';
+    if (debeMostrarHorarioEnZonaLocal()) {
+        const tzVisor = obtenerEtiquetaZonaHorariaVisor();
+        htmlZona = '<div class="calendario-zona-aviso" role="status">🕐 Horarios en tu zona horaria'
+            + (tzVisor ? ' (' + tzVisor + ')' : '')
+            + '. Los datos del servidor están en horario de España (peninsular).</div>';
+    }
+
+    let html = htmlZona + htmlBarrasEstacion + `
         <table class="tabla-calendario">
             <thead>
                 <tr>
@@ -2542,7 +2719,7 @@ function mostrarCalendario() {
         html += `<tr>
             <td style="background: #f8f9fa; font-weight: bold; vertical-align: top; position: relative;">
                 <div style="padding: 8px;">
-                    ${horario.hora}
+                    ${formatearFranjaHorariaVisor(horario.hora, horarioConfig)}
                     <div style="font-size: 11px; color: #666; margin-top: 3px;">
                         🌤️ ${traducirClima(climaHorario)}
                     </div>
@@ -2754,9 +2931,7 @@ function crearHTMLClase(clase, semana, dia, horario, claseIndex) {
           ).join('')}</div>`
         : '';
     
-    // Mostrar hora sin segundos
-    const horaMostrar = clase.horaExacta ? 
-        clase.horaExacta.split(':').slice(0, 2).join(':') : '';
+    const horaMostrar = clase.horaExacta ? formatearHoraParaVisor(clase.horaExacta) : '';
     
     const horaHTML = horaMostrar 
         ? `<div class="clase-hora">🕐 ${horaMostrar}</div>`
@@ -2866,7 +3041,7 @@ function obtenerOpcionesHorario(semana, dia, horario, claseIndex) {
             
             opciones.push({
                 value: horaInicio,
-                label: `${horaInicio} - ${horaFin} (${duracionClase} min)`,
+                label: `${formatearHoraParaVisor(horaInicio)} - ${formatearHoraParaVisor(horaFin)} (${duracionClase} min)`,
                 duracion: duracionClase
             });
             
@@ -3046,8 +3221,8 @@ function generarHTMLSeparador(separador, horario, separadorIndex) {
     
     // Si tiene hora personalizada, mostrarla
     if (separador.mostrarHora) {
-        const horaInicioFormateada = formatearHoraConMinutos(separador.horaInicio);
-        const horaFinFormateada = formatearHoraConMinutos(separador.horaFin);
+        const horaInicioFormateada = formatearHoraParaVisor(separador.horaInicio);
+        const horaFinFormateada = formatearHoraParaVisor(separador.horaFin);
         
         let horaMostrar;
         if (horaInicioFormateada && horaFinFormateada) {
@@ -3055,8 +3230,8 @@ function generarHTMLSeparador(separador, horario, separadorIndex) {
         } else {
             // ✅ FIX: Si no hay hora personalizada, formatear el horario del config también
             const { inicio, fin } = extraerHorasDelHorario(horario);
-            const inicioFormateado = formatearHoraConMinutos(inicio);
-            const finFormateado = formatearHoraConMinutos(fin);
+            const inicioFormateado = formatearHoraParaVisor(inicio);
+            const finFormateado = formatearHoraParaVisor(fin);
             horaMostrar = `${inicioFormateado} - ${finFormateado}`;
         }
         

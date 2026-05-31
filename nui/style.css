@@ -1913,6 +1913,17 @@ select.tablon-notas-in-casa {
     max-width: 11rem;
 }
 
+.calendario-zona-aviso {
+    margin: 0 0 12px 0;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(212, 175, 55, 0.15);
+    border: 1px solid rgba(212, 175, 55, 0.45);
+    color: #f5e6c8;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
 #panel-horario.tablon-panel {
     align-items: stretch;
     align-content: stretch;
