@@ -1915,75 +1915,7 @@ async function cargarDatosDesdeAPI() {
 
 // Función para iniciar polling periódico (solo en modo web)
 function iniciarPollingPeriodico() {
-    if (typeof window !== 'undefined' && window.MODO_GMOD === true) {
-        return;
-    }
-    // Solo en modo web y si no hay un intervalo ya activo
-    if (!MODO_WEB || !API_URL || API_URL === '' || API_URL.includes('cfx-nui')) {
-        return;
-    }
-    
-    // Si ya hay un intervalo activo, no crear otro
-    if (pollingInterval !== null) {
-        console.log('[Calendario] Polling ya está activo');
-        return;
-    }
-    
-    console.log('[Calendario] 🔄 Iniciando polling periódico (cada 30 segundos)');
-    
-    // Intervalo de 30 segundos (30000 ms)
-    pollingInterval = setInterval(async () => {
-        try {
-            // Verificar si la página está visible (no hacer polling si está en segundo plano)
-            if (document.hidden) {
-                console.log('[Calendario] Página en segundo plano, omitiendo polling');
-                return;
-            }
-            
-            console.log('[Calendario] 🔍 Verificando cambios...');
-            
-            const response = await fetch(`${API_URL}/api/calendario`);
-            
-            if (!response.ok) {
-                console.warn('[Calendario] Error en polling:', response.status);
-                return;
-            }
-            
-            const data = await response.json();
-            
-            if (data.success && data.calendario) {
-                const nuevoTimestamp = data.calendario.ultimaActualizacion || 0;
-                
-                // Comparar timestamps
-                if (ultimoTimestamp !== null && nuevoTimestamp > ultimoTimestamp) {
-                    console.log('[Calendario] 🔄 Cambios detectados! Actualizando calendario...');
-                    console.log('[Calendario] Timestamp anterior:', ultimoTimestamp, 'Nuevo:', nuevoTimestamp);
-                    
-                    // Actualizar datos
-                    ultimoTimestamp = nuevoTimestamp;
-                    calendarioData = normalizarCalendarioRecibido(data.calendario);
-                    
-                    // Actualizar la vista si el calendario está visible
-                    if (document.body.style.display !== 'none') {
-                        mostrarCalendario();
-                        asegurarTablonSecciones();
-                        aplicarTablonSeccionesAlDOM();
-                        mostrarNotificacion('🔄 Calendario actualizado automáticamente', 'info');
-                    }
-                } else if (ultimoTimestamp === null) {
-                    // Primera vez, solo guardar el timestamp
-                    ultimoTimestamp = nuevoTimestamp;
-                } else {
-                    console.log('[Calendario] ✅ Sin cambios (timestamp:', nuevoTimestamp, ')');
-                }
-            }
-        } catch (error) {
-            console.error('[Calendario] Error en polling:', error);
-            // No mostrar notificación de error en polling para no molestar al usuario
-        }
-    }, 30000); // 30 segundos
-    
-    console.log('[Calendario] ✅ Polling iniciado correctamente');
+    console.log('[Calendario] Polling automático desactivado: el calendario solo se refresca al guardar o recargar.');
 }
 
 // Función para detener polling (útil si se necesita)
@@ -3049,28 +2981,24 @@ function obtenerOpcionesHorario(semana, dia, horario, claseIndex) {
         }
     }
     
-    // Si ya hay clases, determinar qué opciones están ocupadas
+    // No bloquear aquí por "hora ocupada": al guardar validamos conflicto real
+    // por solape de cursos (misma hora con cursos distintos sí se permite).
     const horasOcupadas = clasesExistentes
         .filter((clase, index) => index !== claseIndex)
         .map(clase => {
-            if (clase.horaExacta) {
+            if (clase && clase.horaExacta) {
                 return clase.horaExacta.split(':').slice(0, 2).join(':');
             }
             return null;
         })
         .filter(hora => hora);
     
-    console.log('⛔ Horas ocupadas:', horasOcupadas);
+    console.log('ℹ️ Horas usadas (informativo):', horasOcupadas);
     console.log('📋 Todas las opciones:', opciones.map(o => o.value));
+
+    console.log('✅ Opciones disponibles:', opciones.map(o => o.value));
     
-    // Filtrar opciones disponibles
-    const opcionesDisponibles = opciones.filter(opcion => 
-        !horasOcupadas.includes(opcion.value)
-    );
-    
-    console.log('✅ Opciones disponibles:', opcionesDisponibles.map(o => o.value));
-    
-    return opcionesDisponibles;
+    return opciones;
 }
 
 // Función auxiliar para convertir hora a minutos
@@ -3840,6 +3768,25 @@ function obtenerLimiteClasesPorFranja(horario) {
     }
 }
 
+function normalizarCursosParaConflicto(cursos) {
+    if (!Array.isArray(cursos) || cursos.length === 0) {
+        return ['Todos'];
+    }
+
+    return cursos.map(curso => String(curso || '').trim()).filter(Boolean);
+}
+
+function clasesSeSolapanPorCurso(cursosA, cursosB) {
+    const a = normalizarCursosParaConflicto(cursosA);
+    const b = normalizarCursosParaConflicto(cursosB);
+
+    if (a.includes('Todos') || b.includes('Todos')) {
+        return true;
+    }
+
+    return a.some(curso => b.includes(curso));
+}
+
 function guardarClase(event) {
     event.preventDefault();
     
@@ -3880,16 +3827,38 @@ function guardarClase(event) {
         cursos: cursosSeleccionados,
         horaExacta: horaExacta
     };
+
+    const clasesFranja = calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario];
+    const hayConflicto = clasesFranja.some((claseExistente, idx) => {
+        if (!claseExistente || idx === claseIndex) {
+            return false;
+        }
+
+        const horaExistente = claseExistente.horaExacta
+            ? claseExistente.horaExacta.split(':').slice(0, 2).join(':')
+            : "";
+
+        if (!horaExistente || !horaExacta || horaExistente !== horaExacta) {
+            return false;
+        }
+
+        return clasesSeSolapanPorCurso(claseExistente.cursos, nuevaClase.cursos);
+    });
+
+    if (hayConflicto) {
+        mostrarNotificacion('❌ Ya existe una clase en esa hora para el mismo curso. Puedes repetir hora solo con cursos distintos.', 'error');
+        return;
+    }
     
     // Si es una clase existente, reemplazarla, sino agregar nueva
-    if (claseIndex < calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario].length) {
-        calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario][claseIndex] = nuevaClase;
+    if (claseIndex < clasesFranja.length) {
+        clasesFranja[claseIndex] = nuevaClase;
     } else {
-        calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario].push(nuevaClase);
+        clasesFranja.push(nuevaClase);
     }
     
     // Ordenar las clases por hora exacta después de guardar
-    calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario].sort((a, b) => {
+    clasesFranja.sort((a, b) => {
         const horaA = a.horaExacta || '00:00';
         const horaB = b.horaExacta || '00:00';
         return horaA.localeCompare(horaB);
