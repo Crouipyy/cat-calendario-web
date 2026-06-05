@@ -536,6 +536,49 @@ function notasAppendTablasLecturaPorCurso(wrap, nb) {
     }
 }
 
+function buildNotasVistaAlumnoDesdeBoletin(nb) {
+    const def = obtenerDefNotas();
+
+    if (!nb || typeof nb !== 'object') {
+        return null;
+    }
+
+    if (!nb.publicado) {
+        return {
+            publicado: false,
+            mensaje: def.msgNoPublicado || 'Las notas aún no están publicadas.'
+        };
+    }
+
+    const filas = Array.isArray(nb.filas) ? nb.filas : [];
+
+    return {
+        publicado: true,
+        tituloListado: nb.tituloListado || def.tituloListadoDefault || 'Notas',
+        anioEscolarLabel: nb.anioEscolarLabel || '',
+        leyenda: nb.leyenda || '',
+        asignaturasPorCurso: deepMergeAsignaturasPorCurso(
+            def.asignaturasPorCursoDefault,
+            nb.asignaturasPorCurso || null
+        ),
+        filas: filas
+    };
+}
+
+function syncNotasVistaAlumnoDesdeCalendario() {
+    if (esProfesor) {
+        return;
+    }
+
+    asegurarTablonSecciones();
+    const nb = calendarioData.tablonSecciones.notasBoletin;
+    const built = buildNotasVistaAlumnoDesdeBoletin(nb);
+
+    if (built) {
+        notasVistaAlumno = built;
+    }
+}
+
 function renderVistaNotasAlumno() {
     const wrap = document.getElementById('tablon-notas-alumno');
     if (!wrap) {
@@ -543,6 +586,11 @@ function renderVistaNotasAlumno() {
     }
     wrap.innerHTML = '';
     const def = obtenerDefNotas();
+
+    if (!notasVistaAlumno) {
+        syncNotasVistaAlumnoDesdeCalendario();
+    }
+
     const nv = notasVistaAlumno;
 
     if (nv && nv.publicado === false) {
@@ -1908,6 +1956,7 @@ async function cargarDatosDesdeAPI() {
         mostrarCalendario();
 
         asegurarTablonSecciones();
+        syncNotasVistaAlumnoDesdeCalendario();
         aplicarTablonSeccionesAlDOM();
         cambiarPestanaTablon('indice');
 
@@ -1993,6 +2042,7 @@ function iniciarPollingPeriodico() {
                     if (document.body.style.display !== 'none') {
                         mostrarCalendario();
                         asegurarTablonSecciones();
+                        syncNotasVistaAlumnoDesdeCalendario();
                         aplicarTablonSeccionesAlDOM();
                         mostrarNotificacion('🔄 Calendario actualizado automáticamente', 'info');
                     }
@@ -2026,12 +2076,19 @@ function aplicarRolUsuario(usuario) {
         usuarioActual = null;
         esProfesor = false;
         esAdmin = false;
+        syncNotasVistaAlumnoDesdeCalendario();
         return;
     }
     usuarioActual = usuario;
     const permisos = usuario.permisos || [];
     esProfesor = permisos.indexOf('editar') !== -1;
     esAdmin = usuario.rol === 'admin';
+
+    if (!esProfesor) {
+        syncNotasVistaAlumnoDesdeCalendario();
+    } else {
+        notasVistaAlumno = null;
+    }
 }
 
 function actualizarBarraAuth() {
