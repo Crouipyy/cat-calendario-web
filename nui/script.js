@@ -244,8 +244,25 @@ function deepMergeAsignaturasPorCurso(def, cur) {
     for (i = 1; i <= 7; i++) {
         const k = String(i);
         const base = def && def[k] && Array.isArray(def[k]) ? def[k].slice() : [];
-        const ext = cur && cur[k] && Array.isArray(cur[k]) ? cur[k] : null;
-        out[k] = ext && ext.length ? ext.slice() : base;
+        const ext = cur && cur[k] && Array.isArray(cur[k]) ? cur[k] : [];
+        const seen = {};
+        const merged = [];
+
+        base.forEach(function (subject) {
+            if (subject && !seen[subject]) {
+                seen[subject] = true;
+                merged.push(subject);
+            }
+        });
+
+        ext.forEach(function (subject) {
+            if (subject && !seen[subject]) {
+                seen[subject] = true;
+                merged.push(subject);
+            }
+        });
+
+        out[k] = merged.length > 0 ? merged : base;
     }
     return out;
 }
@@ -1690,13 +1707,13 @@ const configPorDefecto = {
         anioEscolarLabelDefault: 'Año escolar IC',
         leyendaDefault: '',
         asignaturasPorCursoDefault: {
-            '1': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Vuelo'],
-            '2': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Vuelo'],
-            '3': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Vuelo'],
-            '4': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Cuidado Criaturas'],
-            '5': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Aritmancia'],
-            '6': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Runas Antiguas'],
-            '7': ['Encantamientos', 'Transformaciones', 'Herbología', 'Historia', 'Pociones', 'Defensa', 'Estudios Muggle']
+            '1': ['Encantamientos', 'Transformaciones', 'Herbología', 'HDM', 'Pociones', 'DCAO', 'Vuelo', 'Teoría Mágica'],
+            '2': ['Encantamientos', 'Transformaciones', 'Herbología', 'HDM', 'Pociones', 'DCAO'],
+            '3': ['Encantamientos', 'Transformaciones', 'Herbología', 'HDM', 'Pociones', 'DCAO', 'CCM', 'Astronomía', 'Adivinación', 'Runas Antiguas', 'Estudios Muggle'],
+            '4': ['Encantamientos', 'Transformaciones', 'Herbología', 'HDM', 'Pociones', 'DCAO', 'CCM', 'Astronomía', 'Adivinación', 'Runas Antiguas', 'Estudios Muggle'],
+            '5': ['Encantamientos', 'Transformaciones', 'Herbología', 'HDM', 'Pociones', 'DCAO', 'CCM', 'Astronomía', 'Adivinación', 'Runas Antiguas', 'Estudios Muggle'],
+            '6': ['Encantamientos', 'Transformaciones', 'Herbología', 'HDM', 'Pociones', 'DCAO', 'CCM', 'Astronomía', 'Adivinación', 'Runas Antiguas', 'Estudios Muggle'],
+            '7': ['Encantamientos', 'Transformaciones', 'Herbología', 'HDM', 'Pociones', 'DCAO', 'CCM', 'Astronomía', 'Adivinación', 'Runas Antiguas', 'Estudios Muggle']
         },
         coloresCasa: {
             Gryffindor: '#740001',
