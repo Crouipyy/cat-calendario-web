@@ -255,13 +255,6 @@ function deepMergeAsignaturasPorCurso(def, cur) {
             }
         });
 
-        ext.forEach(function (subject) {
-            if (subject && !seen[subject]) {
-                seen[subject] = true;
-                merged.push(subject);
-            }
-        });
-
         out[k] = merged.length > 0 ? merged : base;
     }
     return out;
