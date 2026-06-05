@@ -250,6 +250,26 @@ function deepMergeAsignaturasPorCurso(def, cur) {
     return out;
 }
 
+function normalizePromocion(value) {
+    if (value == null) {
+        return '';
+    }
+    const raw = String(value).trim();
+    if (raw === '' || raw === '-' || raw === '—') {
+        return '';
+    }
+    const lower = raw
+        .toLowerCase()
+        .replace(/í/g, 'i');
+    if (lower === 'si' || lower === 's' || lower === 'yes') {
+        return 'Si';
+    }
+    if (lower === 'no' || lower === 'n') {
+        return 'No';
+    }
+    return '';
+}
+
 function asegurarNotasBoletin(d) {
     const def = obtenerDefNotas();
     const legacy = typeof d.notas === 'string' ? d.notas.trim() : '';
@@ -297,9 +317,7 @@ function asegurarNotasBoletin(d) {
         if (!row.notas || typeof row.notas !== 'object') {
             row.notas = {};
         }
-        if (typeof row.promocion !== 'string') {
-            row.promocion = '';
-        }
+        row.promocion = normalizePromocion(row.promocion);
     });
     if (typeof d.notas !== 'string') {
         d.notas = '';
@@ -478,7 +496,7 @@ function notasAppendTablasLecturaPorCurso(wrap, nb) {
         thead.appendChild(trTot);
         const hr = document.createElement('tr');
         hr.className = 'tablon-notas-head-cols';
-        ['Nombre', 'Casa', 'Curso', 'Promoción'].concat(cols).forEach(function (lab) {
+        ['Nombre', 'Casa', 'Curso', '¿PROMOCIONA?'].concat(cols).forEach(function (lab) {
             const th = document.createElement('th');
             th.textContent = lab;
             hr.appendChild(th);
@@ -574,7 +592,7 @@ function renderVistaNotasAlumno() {
             const thead = document.createElement('thead');
             const hr = document.createElement('tr');
             hr.className = 'tablon-notas-head-cols';
-            ['Nombre', 'Casa', 'Curso', 'Promoción'].concat(cols).forEach(function (lab) {
+            ['Nombre', 'Casa', 'Curso', '¿PROMOCIONA?'].concat(cols).forEach(function (lab) {
                 const th = document.createElement('th');
                 th.textContent = lab;
                 hr.appendChild(th);
@@ -724,7 +742,7 @@ function renderEditorNotasProfe(nb) {
         thead.appendChild(trTot);
         const hr = document.createElement('tr');
         hr.className = 'tablon-notas-fila-head tablon-notas-head-cols';
-        ['Nombre IC', 'Casa', 'Curso', 'Promoción', 'ID'].concat(cols).forEach(function (lab) {
+        ['Nombre IC', 'Casa', 'Curso', '¿PROMOCIONA?', 'ID'].concat(cols).forEach(function (lab) {
             const th = document.createElement('th');
             th.textContent = lab;
             hr.appendChild(th);
@@ -791,11 +809,19 @@ function renderEditorNotasProfe(nb) {
             tdAnyo.appendChild(sel);
             tr.appendChild(tdAnyo);
             const tdProm = document.createElement('td');
-            const inProm = document.createElement('input');
-            inProm.className = 'tablon-notas-meta-in tablon-notas-in-prom';
-            inProm.setAttribute('maxlength', '40');
-            inProm.value = f.promocion != null ? String(f.promocion) : '';
-            tdProm.appendChild(inProm);
+            const selProm = document.createElement('select');
+            selProm.className = 'tablon-notas-meta-in tablon-notas-in-prom';
+            const promoVal = normalizePromocion(f.promocion);
+            ['', 'Si', 'No'].forEach(function (optVal) {
+                const opt = document.createElement('option');
+                opt.value = optVal;
+                opt.textContent = optVal === '' ? '—' : optVal;
+                if (promoVal === optVal) {
+                    opt.selected = true;
+                }
+                selProm.appendChild(opt);
+            });
+            tdProm.appendChild(selProm);
             tr.appendChild(tdProm);
             const tdId = document.createElement('td');
             tdId.textContent = String(f.characterId || '');
@@ -954,7 +980,7 @@ function leerNotasBoletinDelDOM() {
         }
         const pi = tr.querySelector('.tablon-notas-in-prom');
         if (pi) {
-            row.promocion = pi.value;
+            row.promocion = normalizePromocion(pi.value);
         }
         if (!row.notas) {
             row.notas = {};
@@ -1915,7 +1941,75 @@ async function cargarDatosDesdeAPI() {
 
 // Función para iniciar polling periódico (solo en modo web)
 function iniciarPollingPeriodico() {
-    console.log('[Calendario] Polling automático desactivado: el calendario solo se refresca al guardar o recargar.');
+    if (typeof window !== 'undefined' && window.MODO_GMOD === true) {
+        return;
+    }
+    // Solo en modo web y si no hay un intervalo ya activo
+    if (!MODO_WEB || !API_URL || API_URL === '' || API_URL.includes('cfx-nui')) {
+        return;
+    }
+    
+    // Si ya hay un intervalo activo, no crear otro
+    if (pollingInterval !== null) {
+        console.log('[Calendario] Polling ya está activo');
+        return;
+    }
+    
+    console.log('[Calendario] 🔄 Iniciando polling periódico (cada 30 segundos)');
+    
+    // Intervalo de 30 segundos (30000 ms)
+    pollingInterval = setInterval(async () => {
+        try {
+            // Verificar si la página está visible (no hacer polling si está en segundo plano)
+            if (document.hidden) {
+                console.log('[Calendario] Página en segundo plano, omitiendo polling');
+                return;
+            }
+            
+            console.log('[Calendario] 🔍 Verificando cambios...');
+            
+            const response = await fetch(`${API_URL}/api/calendario`);
+            
+            if (!response.ok) {
+                console.warn('[Calendario] Error en polling:', response.status);
+                return;
+            }
+            
+            const data = await response.json();
+            
+            if (data.success && data.calendario) {
+                const nuevoTimestamp = data.calendario.ultimaActualizacion || 0;
+                
+                // Comparar timestamps
+                if (ultimoTimestamp !== null && nuevoTimestamp > ultimoTimestamp) {
+                    console.log('[Calendario] 🔄 Cambios detectados! Actualizando calendario...');
+                    console.log('[Calendario] Timestamp anterior:', ultimoTimestamp, 'Nuevo:', nuevoTimestamp);
+                    
+                    // Actualizar datos
+                    ultimoTimestamp = nuevoTimestamp;
+                    calendarioData = normalizarCalendarioRecibido(data.calendario);
+                    
+                    // Actualizar la vista si el calendario está visible
+                    if (document.body.style.display !== 'none') {
+                        mostrarCalendario();
+                        asegurarTablonSecciones();
+                        aplicarTablonSeccionesAlDOM();
+                        mostrarNotificacion('🔄 Calendario actualizado automáticamente', 'info');
+                    }
+                } else if (ultimoTimestamp === null) {
+                    // Primera vez, solo guardar el timestamp
+                    ultimoTimestamp = nuevoTimestamp;
+                } else {
+                    console.log('[Calendario] ✅ Sin cambios (timestamp:', nuevoTimestamp, ')');
+                }
+            }
+        } catch (error) {
+            console.error('[Calendario] Error en polling:', error);
+            // No mostrar notificación de error en polling para no molestar al usuario
+        }
+    }, 30000); // 30 segundos
+    
+    console.log('[Calendario] ✅ Polling iniciado correctamente');
 }
 
 // Función para detener polling (útil si se necesita)
@@ -2981,24 +3075,28 @@ function obtenerOpcionesHorario(semana, dia, horario, claseIndex) {
         }
     }
     
-    // No bloquear aquí por "hora ocupada": al guardar validamos conflicto real
-    // por solape de cursos (misma hora con cursos distintos sí se permite).
+    // Si ya hay clases, determinar qué opciones están ocupadas
     const horasOcupadas = clasesExistentes
         .filter((clase, index) => index !== claseIndex)
         .map(clase => {
-            if (clase && clase.horaExacta) {
+            if (clase.horaExacta) {
                 return clase.horaExacta.split(':').slice(0, 2).join(':');
             }
             return null;
         })
         .filter(hora => hora);
     
-    console.log('ℹ️ Horas usadas (informativo):', horasOcupadas);
+    console.log('⛔ Horas ocupadas:', horasOcupadas);
     console.log('📋 Todas las opciones:', opciones.map(o => o.value));
-
-    console.log('✅ Opciones disponibles:', opciones.map(o => o.value));
     
-    return opciones;
+    // Filtrar opciones disponibles
+    const opcionesDisponibles = opciones.filter(opcion => 
+        !horasOcupadas.includes(opcion.value)
+    );
+    
+    console.log('✅ Opciones disponibles:', opcionesDisponibles.map(o => o.value));
+    
+    return opcionesDisponibles;
 }
 
 // Función auxiliar para convertir hora a minutos
@@ -3768,25 +3866,6 @@ function obtenerLimiteClasesPorFranja(horario) {
     }
 }
 
-function normalizarCursosParaConflicto(cursos) {
-    if (!Array.isArray(cursos) || cursos.length === 0) {
-        return ['Todos'];
-    }
-
-    return cursos.map(curso => String(curso || '').trim()).filter(Boolean);
-}
-
-function clasesSeSolapanPorCurso(cursosA, cursosB) {
-    const a = normalizarCursosParaConflicto(cursosA);
-    const b = normalizarCursosParaConflicto(cursosB);
-
-    if (a.includes('Todos') || b.includes('Todos')) {
-        return true;
-    }
-
-    return a.some(curso => b.includes(curso));
-}
-
 function guardarClase(event) {
     event.preventDefault();
     
@@ -3827,38 +3906,16 @@ function guardarClase(event) {
         cursos: cursosSeleccionados,
         horaExacta: horaExacta
     };
-
-    const clasesFranja = calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario];
-    const hayConflicto = clasesFranja.some((claseExistente, idx) => {
-        if (!claseExistente || idx === claseIndex) {
-            return false;
-        }
-
-        const horaExistente = claseExistente.horaExacta
-            ? claseExistente.horaExacta.split(':').slice(0, 2).join(':')
-            : "";
-
-        if (!horaExistente || !horaExacta || horaExistente !== horaExacta) {
-            return false;
-        }
-
-        return clasesSeSolapanPorCurso(claseExistente.cursos, nuevaClase.cursos);
-    });
-
-    if (hayConflicto) {
-        mostrarNotificacion('❌ Ya existe una clase en esa hora para el mismo curso. Puedes repetir hora solo con cursos distintos.', 'error');
-        return;
-    }
     
     // Si es una clase existente, reemplazarla, sino agregar nueva
-    if (claseIndex < clasesFranja.length) {
-        clasesFranja[claseIndex] = nuevaClase;
+    if (claseIndex < calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario].length) {
+        calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario][claseIndex] = nuevaClase;
     } else {
-        clasesFranja.push(nuevaClase);
+        calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario].push(nuevaClase);
     }
     
     // Ordenar las clases por hora exacta después de guardar
-    clasesFranja.sort((a, b) => {
+    calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario].sort((a, b) => {
         const horaA = a.horaExacta || '00:00';
         const horaB = b.horaExacta || '00:00';
         return horaA.localeCompare(horaB);
