@@ -381,23 +381,42 @@ function notasCasasEdicionLista() {
     return base.slice();
 }
 
-function notasCalificacionesSelectLista() {
+function notasCalificacionesSelectLista(curso) {
     const def = obtenerDefNotas();
-    const arr = def.calificacionesBoletin;
-    if (Array.isArray(arr) && arr.length) {
-        return arr
-            .map(function (x) {
-                return String(x).trim();
-            })
-            .filter(function (x) {
-                return x.length > 0;
-            });
+    const letterYears = def.cursosCalificacionLetras || [5, 7];
+    const yearNum = Number(curso) || 0;
+
+    if (letterYears.indexOf(yearNum) !== -1) {
+        const arr = def.calificacionesBoletin;
+        if (Array.isArray(arr) && arr.length) {
+            return arr
+                .map(function (x) {
+                    return String(x).trim();
+                })
+                .filter(function (x) {
+                    return x.length > 0;
+                });
+        }
+        return ['E', 'S', 'A', 'I', 'D', 'T'];
     }
-    return ['E', 'S', 'A', 'I', 'D', 'T'];
+
+    const maxNum = Number(def.calificacionesNumericasMax) || 10;
+    const out = [];
+    let i;
+    for (i = 0; i <= maxNum; i++) {
+        out.push(String(i));
+    }
+    return out;
 }
 
-/** Rango visual tipo hoja IC (E/S/A/I/D/T). '' = sin clase; 'vac' = guion; 'texto' = APTO etc. */
-function notasRangoCalificacion(val) {
+function notasCursoUsaLetras(anyo) {
+    const def = obtenerDefNotas();
+    const letterYears = def.cursosCalificacionLetras || [5, 7];
+    return letterYears.indexOf(Number(anyo) || 0) !== -1;
+}
+
+/** Rango visual tipo hoja IC (E/S/A/I/D/T). '' = sin clase; 'vac' = guion; 'num' = 0–10; 'texto' = APTO etc. */
+function notasRangoCalificacion(val, anyo) {
     if (val == null || val === '') {
         return '';
     }
@@ -407,6 +426,9 @@ function notasRangoCalificacion(val) {
     }
     const n = parseFloat(s.replace(',', '.'));
     if (!isNaN(n)) {
+        if (!notasCursoUsaLetras(anyo) && n >= 0 && n <= 10 && /^-?\d+([.,]\d+)?$/.test(s)) {
+            return 'num';
+        }
         if (n >= 100) {
             return 'e';
         }
@@ -444,7 +466,7 @@ function notasRangoCalificacion(val) {
     return 'texto';
 }
 
-function notasAplicarClaseACelda(td, rawVal) {
+function notasAplicarClaseACelda(td, rawVal, anyo) {
     if (!td) {
         return;
     }
@@ -452,7 +474,7 @@ function notasAplicarClaseACelda(td, rawVal) {
         .replace(/\btablon-notas-val--\w+/g, '')
         .replace(/\s+/g, ' ')
         .trim();
-    const r = notasRangoCalificacion(rawVal);
+    const r = notasRangoCalificacion(rawVal, anyo);
     const base = 'tablon-notas-celda-nota';
     if (r) {
         td.className = (base + ' tablon-notas-val--' + r).trim();
@@ -535,7 +557,7 @@ function notasAppendTablasLecturaPorCurso(wrap, nb) {
                     f.notas && Object.prototype.hasOwnProperty.call(f.notas, col) ? f.notas[col] : '—';
                 const disp = v === '' || v == null ? '—' : String(v);
                 td.textContent = disp;
-                notasAplicarClaseACelda(td, disp === '—' ? '' : disp);
+                notasAplicarClaseACelda(td, disp === '—' ? '' : disp, f.anyo);
                 tr.appendChild(td);
             });
             tbody.appendChild(tr);
@@ -684,7 +706,7 @@ function renderVistaNotasAlumno() {
                           : '—';
                 const disp = v === '' || v == null ? '—' : String(v);
                 td.textContent = disp;
-                notasAplicarClaseACelda(td, disp === '—' ? '' : disp);
+                notasAplicarClaseACelda(td, disp === '—' ? '' : disp, f.anyo);
                 tr.appendChild(td);
             });
             tbody.appendChild(tr);
@@ -742,7 +764,6 @@ function renderEditorNotasProfe(nb) {
     }
     root.innerHTML = '';
     const casasLista = notasCasasEdicionLista();
-    const gradesLista = notasCalificacionesSelectLista();
     const pub = document.getElementById('tablon-notas-publicado');
     if (pub) {
         pub.checked = !!nb.publicado;
@@ -895,6 +916,7 @@ function renderEditorNotasProfe(nb) {
                 const rawStr = val == null ? '' : String(val).trim();
                 const vacio = rawStr === '' || rawStr === '-' || rawStr === '—';
                 const dispVal = vacio ? '' : rawStr;
+                const gradesLista = notasCalificacionesSelectLista(curso);
                 const optVac = document.createElement('option');
                 optVac.value = '';
                 optVac.textContent = '—';
@@ -928,7 +950,7 @@ function renderEditorNotasProfe(nb) {
                 } else {
                     sel.value = '';
                 }
-                notasAplicarClaseACelda(td, vacio ? '' : dispVal);
+                notasAplicarClaseACelda(td, vacio ? '' : dispVal, curso);
                 td.appendChild(sel);
                 tr.appendChild(td);
             });
@@ -1071,7 +1093,15 @@ function inicializarEditorNotasBoletin() {
             ) {
                 return;
             }
-            notasAplicarClaseACelda(t.parentNode, t.value);
+            let anyo = 0;
+            const tr = t.closest ? t.closest('tr') : null;
+            if (tr) {
+                const selAnyo = tr.querySelector('.tablon-notas-in-anyo');
+                if (selAnyo) {
+                    anyo = Number(selAnyo.value) || 0;
+                }
+            }
+            notasAplicarClaseACelda(t.parentNode, t.value, anyo);
         }
         pan.addEventListener('input', catCalActualizarColorCeldaNota);
         pan.addEventListener('change', catCalActualizarColorCeldaNota);
@@ -1716,7 +1746,9 @@ const configPorDefecto = {
             Otra: '#5c4a3a'
         },
         casasBoletinOpciones: ['Gryffindor', 'Hufflepuff', 'Ravenclaw', 'Slytherin'],
-        calificacionesBoletin: ['E', 'S', 'A', 'I', 'D', 'T']
+        calificacionesBoletin: ['E', 'S', 'A', 'I', 'D', 'T'],
+        cursosCalificacionLetras: [5, 7],
+        calificacionesNumericasMax: 10
     }
 };
 
