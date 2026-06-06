@@ -1,6 +1,7 @@
 // API para manejar el calendario usando MySQL como almacenamiento persistente
 const mysql = require('mysql2/promise');
 const { calendarioPlantillaParaUI } = require('./calendarioPlantilla');
+const { verificarBearer, normalizarPermisos } = require('./lib/auth');
 
 // Función para obtener conexión a MySQL
 async function obtenerConexion() {
@@ -369,25 +370,22 @@ module.exports = async function handler(req, res) {
             actualizadoPor = 'gmod';
             console.log('[API] Guardando calendario desde GMod (X-CatCal-Sync-Token)');
         } else if (authHeader && authHeader.startsWith('Bearer ')) {
-            try {
-                const jwt = require('jsonwebtoken');
-                const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_seguro_cambiar_en_produccion';
-                const token = authHeader.replace('Bearer ', '');
-                const decoded = jwt.verify(token, JWT_SECRET);
-                
-                actualizadoPor = decoded.username || 'web';
-                console.log('[API] Guardando calendario desde web (usuario:', actualizadoPor, ')');
-
-                if (decoded.rol !== 'admin') {
-                    return res.status(403).json({
-                        error: 'Solo administradores pueden publicar el tablón OOC'
-                    });
-                }
-            } catch (error) {
+            const decoded = verificarBearer(req);
+            if (!decoded) {
                 return res.status(401).json({
                     error: 'Token inválido'
                 });
             }
+
+            const permisos = normalizarPermisos(decoded);
+            if (permisos.indexOf('editar') === -1) {
+                return res.status(403).json({
+                    error: 'No tienes permiso para editar el calendario'
+                });
+            }
+
+            actualizadoPor = decoded.username || 'web';
+            console.log('[API] Guardando calendario desde web (usuario:', actualizadoPor, 'rol:', decoded.rol || '?', ')');
         } else if (syncSecret !== '') {
             return res.status(401).json({
                 error: 'No autorizado: usa Bearer (web) o header X-CatCal-Sync-Token (GMod) con CAT_CAL_SYNC_SECRET'

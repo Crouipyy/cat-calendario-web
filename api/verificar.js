@@ -2,7 +2,7 @@
 // válido. Devuelve también el rol para que la UI sepa si tiene que pintar
 // el panel de Administración.
 
-const { verificarBearer } = require('../lib/auth');
+const { verificarBearer, normalizarPermisos } = require('../lib/auth');
 
 module.exports = async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,12 +22,14 @@ module.exports = async function handler(req, res) {
         return res.status(401).json({ error: 'Token no proporcionado o inválido' });
     }
 
+    const permisos = normalizarPermisos(payload);
+
     return res.status(200).json({
         success: true,
         usuario: {
             username: payload.username,
             rol: payload.rol || 'profesor',
-            permisos: payload.permisos || ['editar']
+            permisos: permisos
         }
     });
 };

@@ -21,13 +21,17 @@ function actualizarControlesPublicacionNotas() {
 function actualizarBotonesAccionTablon() {
     const btnGuardar = document.getElementById('btnGuardar');
     const btnPublicar = document.getElementById('btnPublicarTablon');
+    const btnBorrar = document.getElementById('btnBorrarHorario');
 
     if (MODO_WEB) {
         if (btnGuardar) {
-            btnGuardar.style.display = 'none';
+            btnGuardar.style.display = esProfesor ? 'block' : 'none';
         }
         if (btnPublicar) {
             btnPublicar.style.display = puedePublicarTablon ? 'block' : 'none';
+        }
+        if (btnBorrar) {
+            btnBorrar.style.display = puedePublicarTablon ? 'block' : 'none';
         }
     } else {
         if (btnGuardar) {
@@ -35,6 +39,9 @@ function actualizarBotonesAccionTablon() {
         }
         if (btnPublicar) {
             btnPublicar.style.display = puedePublicarTablon ? 'block' : 'none';
+        }
+        if (btnBorrar) {
+            btnBorrar.style.display = puedePublicarTablon ? 'block' : 'none';
         }
     }
 
@@ -2009,6 +2016,30 @@ async function cargarDatosDesdeAPI() {
     
     try {
         console.log('[Calendario] Cargando datos desde:', `${API_URL}/api/calendario`);
+
+        // Verificar sesión ANTES de pintar la UI (evita modo solo lectura tras login)
+        if (tokenAutenticacion) {
+            try {
+                const verifyResponse = await fetch(`${API_URL}/api/verificar`, {
+                    headers: {
+                        'Authorization': `Bearer ${tokenAutenticacion}`
+                    }
+                });
+                const verifyData = await verifyResponse.json();
+                if (verifyData.success) {
+                    aplicarRolUsuario(verifyData.usuario);
+                } else {
+                    tokenAutenticacion = null;
+                    localStorage.removeItem('calendario_token');
+                    aplicarRolUsuario(null);
+                }
+            } catch (e) {
+                console.error('Error verificando token:', e);
+                aplicarRolUsuario(null);
+            }
+        } else {
+            aplicarRolUsuario(null);
+        }
         
         const response = await fetch(`${API_URL}/api/calendario`);
         
@@ -2030,10 +2061,6 @@ async function cargarDatosDesdeAPI() {
             ultimoTimestamp = nuevoTimestamp;
             config = configPorDefecto;
             calendarioData = normalizarCalendarioRecibido(data.calendario);
-
-            if (document.body.style.display !== 'none') {
-                mostrarCalendario();
-            }
         } else {
             console.warn('[Calendario] No hay datos del calendario, usando estructura vacía');
             calendarioData = { semanas: [], meses: [], separadores: {}, climasHorario: {} };
@@ -2044,33 +2071,10 @@ async function cargarDatosDesdeAPI() {
             config = configPorDefecto;
         }
         
-        // Verificar autenticación si hay token
-        if (tokenAutenticacion) {
-            try {
-                const verifyResponse = await fetch(`${API_URL}/api/verificar`, {
-                    headers: {
-                        'Authorization': `Bearer ${tokenAutenticacion}`
-                    }
-                });
-                const verifyData = await verifyResponse.json();
-                if (verifyData.success) {
-                    aplicarRolUsuario(verifyData.usuario);
-                } else {
-                    tokenAutenticacion = null;
-                    localStorage.removeItem('calendario_token');
-                    aplicarRolUsuario(null);
-                }
-            } catch (e) {
-                console.error('Error verificando token:', e);
-            }
-        } else {
-            aplicarRolUsuario(null);
-        }
-        
         // Asegurar que el body esté visible
         document.body.style.display = 'block';
         
-        // Mostrar calendario
+        // Pintar una sola vez, ya con permisos de edición aplicados
         mostrarCalendario();
 
         asegurarTablonSecciones();
@@ -2189,6 +2193,40 @@ function detenerPollingPeriodico() {
     }
 }
 
+function permisosDesdeUsuario(usuario) {
+    if (!usuario) {
+        return [];
+    }
+
+    if (Array.isArray(usuario.permisos) && usuario.permisos.length > 0) {
+        return usuario.permisos;
+    }
+
+    if (usuario.rol === 'admin') {
+        return ['editar', 'publicar'];
+    }
+
+    return ['editar'];
+}
+
+function refrescarUIEdicionCalendario() {
+    if (!calendarioData || typeof calendarioData !== 'object') {
+        return;
+    }
+
+    const tieneDatos = (
+        (calendarioData.semanas && (Array.isArray(calendarioData.semanas) ? calendarioData.semanas.length > 0 : Object.keys(calendarioData.semanas).length > 0)) ||
+        (calendarioData.tablonSecciones && typeof calendarioData.tablonSecciones === 'object')
+    );
+
+    if (!tieneDatos) {
+        return;
+    }
+
+    mostrarCalendario();
+    refrescarTablonTrasAbrir();
+}
+
 function aplicarRolUsuario(usuario) {
     if (!usuario) {
         usuarioActual = null;
@@ -2197,10 +2235,11 @@ function aplicarRolUsuario(usuario) {
         esAdmin = false;
         syncNotasVistaAlumnoDesdeCalendario();
         actualizarBotonesAccionTablon();
+        refrescarUIEdicionCalendario();
         return;
     }
     usuarioActual = usuario;
-    const permisos = usuario.permisos || [];
+    const permisos = permisosDesdeUsuario(usuario);
     esProfesor = permisos.indexOf('editar') !== -1;
     puedePublicarTablon = permisos.indexOf('publicar') !== -1;
     esAdmin = usuario.rol === 'admin';
@@ -2212,6 +2251,7 @@ function aplicarRolUsuario(usuario) {
     }
 
     actualizarBotonesAccionTablon();
+    refrescarUIEdicionCalendario();
 }
 
 function actualizarBarraAuth() {
@@ -2763,6 +2803,16 @@ function inicializarEventos() {
             e.preventDefault();
             e.stopPropagation();
             publicarTablon();
+            return false;
+        });
+    }
+
+    const btnBorrarHorario = document.getElementById('btnBorrarHorario');
+    if (btnBorrarHorario) {
+        btnBorrarHorario.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            borrarHorarioCompleto();
             return false;
         });
     }
@@ -5051,6 +5101,170 @@ function cerrarModalClimaHorario() {
     document.getElementById('modalClimaHorario').style.display = 'none';
 }
 
+function generarHorarioVacioDesdeConfig() {
+    const horariosCfg = (config && config.horarios && config.horarios.length) ? config.horarios : configPorDefecto.horarios;
+    const diasSemana = (config && config.diasSemana && config.diasSemana.length) ? config.diasSemana : configPorDefecto.diasSemana;
+    const mesesCfg = (config && config.meses && config.meses.length) ? config.meses : configPorDefecto.meses;
+    const lunasCfg = (config && config.lunas && config.lunas.length) ? config.lunas : configPorDefecto.lunas;
+    const tempsCfg = (config && config.temperaturas) ? config.temperaturas : (configPorDefecto.temperaturas || {});
+
+    const out = {
+        semanas: {},
+        meses: {},
+        separadores: {},
+        climasHorario: {},
+        ultimaActualizacion: Math.floor(Date.now() / 1000)
+    };
+
+    for (let semana = 1; semana <= 2; semana++) {
+        out.meses[semana] = [];
+        for (let dia = 1; dia <= 7; dia++) {
+            const mesIndex = ((semana - 1) * 7 + dia - 1) % 12;
+            out.meses[semana][dia] = mesesCfg[mesIndex] || 'Enero';
+        }
+    }
+
+    for (let semana = 1; semana <= 2; semana++) {
+        out.semanas[semana] = { estacion: 'Mixta', dias: {} };
+
+        for (let dia = 1; dia <= 7; dia++) {
+            const tempConfig = tempsCfg.Primavera || { min: 15, max: 25 };
+            const temperatura = Math.floor(Math.random() * (tempConfig.max - tempConfig.min + 1)) + tempConfig.min;
+
+            out.semanas[semana].dias[dia] = {
+                nombre: diasSemana[dia - 1] || ('Día ' + dia),
+                evento: 'Ninguno',
+                luna: lunasCfg[Math.floor(Math.random() * lunasCfg.length)] || 'Luna Nueva',
+                temperatura: temperatura,
+                estacion: 'Primavera',
+                clases: {},
+                eventosHorario: {}
+            };
+
+            horariosCfg.forEach(function (horario) {
+                out.semanas[semana].dias[dia].clases[horario.hora] = [];
+                out.semanas[semana].dias[dia].eventosHorario[horario.hora] = {
+                    texto: '',
+                    colorFondo: '#fff3cd',
+                    colorTexto: '#000000',
+                    cursiva: false
+                };
+            });
+        }
+    }
+
+    horariosCfg.forEach(function (horario) {
+        out.separadores[horario.hora] = {
+            texto: '',
+            colorFondo: '#740001',
+            colorTexto: '#ffffff',
+            cursiva: false,
+            mostrarHora: false,
+            horaInicio: '',
+            horaFin: ''
+        };
+        out.climasHorario[horario.hora] = horario.clima || 'CLEAR';
+    });
+
+    return out;
+}
+
+function aplicarCalendarioTrasBorrarHorario(payload) {
+    if (!payload || !payload.calendario) {
+        return;
+    }
+
+    const preservedTablon = calendarioData && calendarioData.tablonSecciones;
+    calendarioData = payload.calendario;
+
+    if (preservedTablon && (!calendarioData.tablonSecciones || typeof calendarioData.tablonSecciones !== 'object')) {
+        calendarioData.tablonSecciones = preservedTablon;
+    }
+
+    if (payload.config) {
+        config = payload.config;
+    }
+
+    semanaActual = 1;
+    mostrarCalendario();
+    refrescarTablonTrasAbrir();
+    mostrarNotificacion('Horario borrado por completo.', 'success');
+}
+
+function borrarHorarioCompleto() {
+    if (!puedePublicarTablon) {
+        mostrarNotificacion('No tienes permiso para borrar el horario', 'error');
+        return;
+    }
+
+    const msg = '¿Borrar TODO el horario escolar (clases, eventos y franjas) de las dos semanas?\n\nLas secciones del tablón (normas, optativas, clubes, notas) NO se tocarán.';
+    if (!window.confirm(msg)) {
+        return;
+    }
+
+    const preservedTablon = calendarioData && calendarioData.tablonSecciones;
+    const horarioVacio = generarHorarioVacioDesdeConfig();
+
+    if (preservedTablon) {
+        horarioVacio.tablonSecciones = preservedTablon;
+    }
+
+    if (MODO_WEB) {
+        if (!tokenAutenticacion) {
+            mostrarNotificacion('Debes iniciar sesión para borrar el horario', 'error');
+            mostrarLoginSiNecesario();
+            return;
+        }
+
+        fetch(`${API_URL}/api/calendario`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${tokenAutenticacion}`
+            },
+            body: JSON.stringify({ calendario: horarioVacio })
+        })
+        .then(function (response) {
+            if (!response.ok) {
+                if (response.status === 403) {
+                    throw new Error('Solo staff/administradores pueden borrar el horario OOC');
+                }
+                throw new Error('Error en la respuesta del servidor');
+            }
+            return response.json();
+        })
+        .then(function (data) {
+            if (data.success) {
+                aplicarCalendarioTrasBorrarHorario({ calendario: horarioVacio, config: config });
+                if (data.ultimaActualizacion) {
+                    ultimoTimestamp = data.ultimaActualizacion;
+                    calendarioData.ultimaActualizacion = data.ultimaActualizacion;
+                }
+            } else {
+                mostrarNotificacion('No se pudo borrar el horario en la web', 'error');
+            }
+        })
+        .catch(function (error) {
+            console.error('Error al borrar horario:', error);
+            mostrarNotificacion('Error al borrar: ' + error.message, 'error');
+        });
+        return;
+    }
+
+    if (typeof gmod !== 'undefined' && gmod && typeof gmod.CalBorrarHorario === 'function') {
+        try {
+            gmod.CalBorrarHorario();
+            mostrarNotificacion('Borrado de horario enviado al servidor…', 'info');
+        } catch (e) {
+            console.error(e);
+            mostrarNotificacion('Error al borrar el horario', 'error');
+        }
+        return;
+    }
+
+    mostrarNotificacion('Borrar horario no está disponible en este entorno.', 'error');
+}
+
 // Publicar tablón en la web (staff IC / admin OOC)
 function publicarTablon() {
     if (!puedePublicarTablon) {
@@ -5139,12 +5353,59 @@ function guardarCalendario() {
         return;
     }
 
+    leerTablonSeccionesDelDOM();
+
     if (MODO_WEB) {
-        mostrarNotificacion('En la web solo los administradores pueden publicar el tablón.', 'error');
+        if (!tokenAutenticacion) {
+            mostrarNotificacion('Debes iniciar sesión para guardar cambios', 'error');
+            mostrarLoginSiNecesario();
+            return;
+        }
+
+        fetch(`${API_URL}/api/calendario`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${tokenAutenticacion}`
+            },
+            body: JSON.stringify({
+                calendario: calendarioData
+            })
+        })
+        .then(function (response) {
+            if (!response.ok) {
+                if (response.status === 401) {
+                    tokenAutenticacion = null;
+                    localStorage.removeItem('calendario_token');
+                    aplicarRolUsuario(null);
+                    actualizarBarraAuth();
+                    mostrarLoginSiNecesario();
+                    throw new Error('Sesión expirada');
+                }
+                if (response.status === 403) {
+                    throw new Error('No tienes permiso para guardar el calendario');
+                }
+                throw new Error('Error en la respuesta del servidor');
+            }
+            return response.json();
+        })
+        .then(function (data) {
+            if (data.success) {
+                if (data.ultimaActualizacion) {
+                    ultimoTimestamp = data.ultimaActualizacion;
+                    calendarioData.ultimaActualizacion = data.ultimaActualizacion;
+                }
+                mostrarNotificacion('Calendario guardado correctamente', 'success');
+            } else {
+                mostrarNotificacion('Error al guardar el calendario', 'error');
+            }
+        })
+        .catch(function (error) {
+            console.error('Error al guardar:', error);
+            mostrarNotificacion('Error al guardar: ' + error.message, 'error');
+        });
         return;
     }
-
-    leerTablonSeccionesDelDOM();
 
     console.log('[Calendario] DEBUG: Enviando datos al servidor:', calendarioData);
     
