@@ -10,6 +10,18 @@ let claseParaEliminar = null;
 let separadorParaEditar = null;
 let separadorParaEliminar = null;
 
+function jsArg(val) {
+    return JSON.stringify(val == null ? '' : val);
+}
+
+function escAttr(val) {
+    return String(val == null ? '' : val)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;');
+}
+
 function actualizarControlesPublicacionNotas() {
     const pub = document.getElementById('tablon-notas-publicado');
     const pubLbl = pub && pub.closest ? pub.closest('.tablon-notas-meta-lbl') : null;
@@ -25,13 +37,13 @@ function actualizarBotonesAccionTablon() {
 
     if (MODO_WEB) {
         if (btnGuardar) {
-            btnGuardar.style.display = esProfesor ? 'block' : 'none';
+            btnGuardar.style.display = (esProfesor && !puedePublicarTablon) ? 'block' : 'none';
         }
         if (btnPublicar) {
             btnPublicar.style.display = puedePublicarTablon ? 'block' : 'none';
         }
         if (btnBorrar) {
-            btnBorrar.style.display = puedePublicarTablon ? 'block' : 'none';
+            btnBorrar.style.display = 'none';
         }
     } else {
         if (btnGuardar) {
@@ -41,7 +53,7 @@ function actualizarBotonesAccionTablon() {
             btnPublicar.style.display = puedePublicarTablon ? 'block' : 'none';
         }
         if (btnBorrar) {
-            btnBorrar.style.display = puedePublicarTablon ? 'block' : 'none';
+            btnBorrar.style.display = (!MODO_WEB && puedePublicarTablon) ? 'block' : 'none';
         }
     }
 
@@ -2962,23 +2974,15 @@ function mostrarCalendario() {
         // Añadir separadores para esta franja horaria
         const separadoresFranja = calendarioData.separadores && calendarioData.separadores[horario.hora];
         if (separadoresFranja) {
-            // ✅ FIX: Manejar tanto arrays como objetos individuales para compatibilidad
-            let separadoresArray = [];
-            
             if (Array.isArray(separadoresFranja)) {
-                // Si es un array, usar todos los elementos que tengan texto
-                separadoresArray = separadoresFranja.filter(sep => sep && sep.texto);
+                separadoresFranja.forEach(function (separador, rawIndex) {
+                    if (separador && separador.texto) {
+                        html += generarHTMLSeparador(separador, horario.hora, rawIndex);
+                    }
+                });
             } else if (separadoresFranja.texto) {
-                // Si es un objeto individual con texto, convertirlo a array
-                separadoresArray = [separadoresFranja];
+                html += generarHTMLSeparador(separadoresFranja, horario.hora, 0);
             }
-            
-            // ✅ FIX: Renderizar todos los separadores en orden
-            separadoresArray.forEach((separador, separadorIndex) => {
-                if (separador && separador.texto) {
-                    html += generarHTMLSeparador(separador, horario.hora, separadorIndex);
-                }
-            });
         }
         
         // Fila normal de horario con información de debug
@@ -2994,12 +2998,12 @@ function mostrarCalendario() {
                     </div>
                     ${esProfesor ? `
                         <button class="btn-editar-separador" 
-                                onclick="abrirModalClimaHorario('${horario.hora}')" 
+                                onclick="abrirModalClimaHorario(${jsArg(horario.hora)})" 
                                 style="position: absolute; top: 5px; right: 5px; background: #17a2b8; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">
                             🌤️
                         </button>
                         <button class="btn-editar-separador" 
-                                onclick="abrirModalSeparador('${horario.hora}')" 
+                                onclick="abrirModalSeparador(${jsArg(horario.hora)})" 
                                 style="position: absolute; top: 5px; right: 30px; background: #740001; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">
                             📏
                         </button>
@@ -3042,8 +3046,8 @@ function mostrarCalendario() {
                             html += `
                                 <div class="evento ${evento.cursiva ? 'cursiva' : ''}" 
                                     style="${estiloEvento}"
-                                    oncontextmenu="${esProfesor ? `mostrarContextMenuEvento(event, this, ${semanaActual}, ${diaIndex + 1}, '${horario.hora}', ${eventoIndex}); return false;` : ''}"
-                                    ${esProfesor ? `onclick="abrirModalEventoExistente(${semanaActual}, ${diaIndex + 1}, '${horario.hora}', ${eventoIndex})"` : ''}>
+                                    oncontextmenu="${esProfesor ? `mostrarContextMenuEvento(event, this, ${semanaActual}, ${diaIndex + 1}, ${jsArg(horario.hora)}, ${eventoIndex}); return false;` : ''}"
+                                    ${esProfesor ? `onclick="abrirModalEventoExistente(${semanaActual}, ${diaIndex + 1}, ${jsArg(horario.hora)}, ${eventoIndex})"` : ''}>
                                     ${evento.texto}
                                     ${esProfesor ? '<div style="font-size:9px;color:#666;">✏️ Click editar | 🔘 Click derecho eliminar</div>' : ''}
                                 </div>
@@ -3475,7 +3479,31 @@ function configurarOpcionHoraSeparador() {
     }
 }
 
+function obtenerSeparadorEnFranja(horarioKey, separadorIndex) {
+    const franja = calendarioData.separadores && calendarioData.separadores[horarioKey];
+    if (!franja) {
+        return null;
+    }
+
+    if (Array.isArray(franja)) {
+        if (separadorIndex === null || separadorIndex === undefined) {
+            return null;
+        }
+
+        return franja[separadorIndex] || null;
+    }
+
+    if (separadorIndex === null || separadorIndex === undefined || separadorIndex === 0) {
+        return franja;
+    }
+
+    return null;
+}
+
 function generarHTMLSeparador(separador, horario, separadorIndex) {
+    const horarioJs = jsArg(horario);
+    const horarioAttr = escAttr(horario);
+
     let estilo = 'background: #740001; color: white; padding: 12px; height: 50px;';
     if (separador.colorFondo) estilo += `background: ${separador.colorFondo} !important;`;
     if (separador.colorTexto) estilo += `color: ${separador.colorTexto} !important;`;
@@ -3503,26 +3531,26 @@ function generarHTMLSeparador(separador, horario, separadorIndex) {
         
         contenido = `
             <div style="display: flex; align-items: center; justify-content: space-between; height: 100%; padding: 0 10px;"
-                 oncontextmenu="${esProfesor ? `mostrarContextMenuSeparador(event, '${horario}', ${separadorIndex}); return false;` : ''}">
+                 oncontextmenu="${esProfesor ? `mostrarContextMenuSeparador(event, ${horarioJs}, ${separadorIndex}); return false;` : ''}">
                 <div style="background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 4px; font-size: 14px; min-width: 120px; text-align: center;">
                     ${horaMostrar}
                 </div>
                 <span style="font-weight: bold; flex: 1; text-align: center;">${separador.texto}</span>
-                ${esProfesor ? `<button class="btn-editar-separador" onclick="event.stopPropagation(); abrirModalSeparador('${horario}', ${separadorIndex})" style="margin-left: 10px;">✏️</button>` : ''}
+                ${esProfesor ? `<button class="btn-editar-separador" onclick="event.stopPropagation(); abrirModalSeparador(${horarioJs}, ${separadorIndex})" style="margin-left: 10px;">✏️</button>` : ''}
             </div>
         `;
     } else {
         contenido = `
             <div style="display: flex; align-items: center; justify-content: center; height: 100%; padding: 0 10px;"
-                 oncontextmenu="${esProfesor ? `mostrarContextMenuSeparador(event, '${horario}', ${separadorIndex}); return false;` : ''}">
+                 oncontextmenu="${esProfesor ? `mostrarContextMenuSeparador(event, ${horarioJs}, ${separadorIndex}); return false;` : ''}">
                 <span style="font-weight: bold;">${separador.texto}</span>
-                ${esProfesor ? `<button class="btn-editar-separador" onclick="event.stopPropagation(); abrirModalSeparador('${horario}', ${separadorIndex})" style="margin-left: 10px;">✏️</button>` : ''}
+                ${esProfesor ? `<button class="btn-editar-separador" onclick="event.stopPropagation(); abrirModalSeparador(${horarioJs}, ${separadorIndex})" style="margin-left: 10px;">✏️</button>` : ''}
             </div>
         `;
     }
     
     return `
-        <tr class="separador-fila" data-horario="${horario}" data-separador-index="${separadorIndex}" data-tipo="separador">
+        <tr class="separador-fila" data-horario="${horarioAttr}" data-separador-index="${separadorIndex}" data-tipo="separador">
             <td colspan="${numDias + 1}" style="${estilo}">
                 ${contenido}
             </td>
@@ -3546,11 +3574,14 @@ function mostrarContextMenuSeparador(event, horario, separadorIndex) {
     contextMenu.style.left = event.clientX + 'px';
     contextMenu.style.top = event.clientY + 'px';
     
+    const horarioJs = jsArg(horario);
+    const horarioAttr = escAttr(horario);
+
     contextMenu.innerHTML = `
-        <div class="context-menu-item" onclick="abrirModalSeparador('${horario}', ${separadorIndex})">
+        <div class="context-menu-item" onclick="abrirModalSeparador(${horarioJs}, ${separadorIndex})">
             ✏️ Editar Separador
         </div>
-        <div class="context-menu-item eliminar" onclick="eliminarSeparador('${horario}', ${separadorIndex})">
+        <div class="context-menu-item eliminar" onclick="eliminarSeparador(${horarioJs}, ${separadorIndex})">
             🗑️ Eliminar Separador
         </div>
     `;
@@ -3558,7 +3589,7 @@ function mostrarContextMenuSeparador(event, horario, separadorIndex) {
     document.body.appendChild(contextMenu);
     
     // Resaltar el separador
-    const separadorElement = document.querySelector(`.separador-fila[data-horario="${horario}"][data-separador-index="${separadorIndex}"]`);
+    const separadorElement = document.querySelector(`.separador-fila[data-horario="${horarioAttr}"][data-separador-index="${separadorIndex}"]`);
     if (separadorElement) {
         separadorElement.classList.add('con-menu-contexto');
     }
@@ -3568,63 +3599,38 @@ function mostrarContextMenuSeparador(event, horario, separadorIndex) {
 // ENCONTRAR Y REEMPLAZAR en script.js - Función eliminarSeparador
 function eliminarSeparador(horario, separadorIndex = null) {
     if (!esProfesor || !horario) return;
-    
-    // Obtener datos del separador para mostrar en el modal
-    const separadoresFranja = calendarioData.separadores && calendarioData.separadores[horario];
-    let separadorData = null;
-    
-    if (separadoresFranja) {
-        if (Array.isArray(separadoresFranja)) {
-            if (separadorIndex !== null && separadoresFranja[separadorIndex]) {
-                separadorData = separadoresFranja[separadorIndex];
-            }
-        } else if (separadorIndex === null || separadorIndex === 0) {
-            separadorData = separadoresFranja;
-        }
-    }
-    
-    if (!separadorData || !separadorData.texto) {
+
+    const separadorData = obtenerSeparadorEnFranja(horario, separadorIndex);
+
+    if (!separadorData) {
         mostrarNotificacion('No se encontró el separador para eliminar', 'error');
         return;
     }
-    
-    // Guardar referencia para eliminar
-    separadorParaEliminar = { horario, index: separadorIndex };
-    
-    // Mostrar modal de confirmación personalizado
-    document.getElementById('textoEliminarSeparador').textContent = 
-        `¿Estás seguro de que quieres eliminar el separador "${separadorData.texto}"?`;
-    
+
+    separadorParaEliminar = { horario: horario, index: separadorIndex };
+
+    const etiqueta = separadorData.texto || 'Separador sin título';
+    document.getElementById('textoEliminarSeparador').textContent =
+        '¿Estás seguro de que quieres eliminar el separador "' + etiqueta + '"?';
+
     document.getElementById('modalEliminarSeparador').style.display = 'block';
-    
-    // Cerrar context menu si está abierto
+
     cerrarContextMenu();
 }
 
 // Y actualizar la función de mostrar modal de eliminación
 function mostrarModalEliminarSeparador(horario, separadorIndex = null) {
     if (!esProfesor || !horario) return;
-    
-    const separadoresFranja = calendarioData.separadores && calendarioData.separadores[horario];
-    let separadorData = null;
-    
-    if (separadoresFranja) {
-        if (Array.isArray(separadoresFranja)) {
-            if (separadorIndex !== null && separadoresFranja[separadorIndex]) {
-                separadorData = separadoresFranja[separadorIndex];
-            }
-        } else if (separadorIndex === null || separadorIndex === 0) {
-            separadorData = separadoresFranja;
-        }
-    }
-    
-    if (!separadorData || !separadorData.texto) return;
-    
-    separadorParaEliminar = { horario, index: separadorIndex };
-    
-    document.getElementById('textoEliminarSeparador').textContent = 
-        `¿Estás seguro de que quieres eliminar el separador "${separadorData.texto}"?`;
-    
+
+    const separadorData = obtenerSeparadorEnFranja(horario, separadorIndex);
+    if (!separadorData) return;
+
+    separadorParaEliminar = { horario: horario, index: separadorIndex };
+
+    const etiqueta = separadorData.texto || 'Separador sin título';
+    document.getElementById('textoEliminarSeparador').textContent =
+        '¿Estás seguro de que quieres eliminar el separador "' + etiqueta + '"?';
+
     document.getElementById('modalEliminarSeparador').style.display = 'block';
 }
 
@@ -4884,7 +4890,7 @@ function mostrarContextMenuEvento(event, elemento, semana, dia, horario, eventoI
     contextMenu.style.top = event.clientY + 'px';
     
     contextMenu.innerHTML = `
-        <div class="context-menu-item eliminar" onclick="eliminarEvento(${semana}, ${dia}, '${horario}', ${eventoIndex})">
+        <div class="context-menu-item eliminar" onclick="eliminarEvento(${semana}, ${dia}, ${jsArg(horario)}, ${eventoIndex})">
             🗑️ Eliminar Evento
         </div>
     `;
@@ -4944,52 +4950,44 @@ function cerrarModalSeparador() {
     cerrarContextMenu();
 }
 
-
-// NUEVO: Función para mostrar modal de confirmación de eliminación de separador
-function mostrarModalEliminarSeparador(horario) {
-    if (!esProfesor || !horario) return;
-    
-    const separadorData = calendarioData.separadores && calendarioData.separadores[horario];
-    if (!separadorData || !separadorData.texto) return;
-    
-    separadorParaEliminar = horario;
-    
-    document.getElementById('textoEliminarSeparador').textContent = 
-        `¿Estás seguro de que quieres eliminar el separador "${separadorData.texto}"?`;
-    
-    document.getElementById('modalEliminarSeparador').style.display = 'block';
-}
-
-// REEMPLAZAR la función confirmarEliminarSeparador
 function confirmarEliminarSeparador() {
-    if (!separadorParaEliminar) return;
-    
-    const { horario, index } = separadorParaEliminar;
-    
-    console.log('Eliminando separador:', horario, 'índice:', index);
-    
+    if (!separadorParaEliminar || typeof separadorParaEliminar !== 'object') return;
+
+    const horario = separadorParaEliminar.horario;
+    const index = separadorParaEliminar.index;
+
+    if (!horario) {
+        mostrarNotificacion('Error: No se pudo encontrar el separador', 'error');
+        cerrarModalEliminarSeparador();
+        return;
+    }
+
+    const separadorData = obtenerSeparadorEnFranja(horario, index);
+    if (!separadorData) {
+        mostrarNotificacion('Error: No se pudo encontrar el separador', 'error');
+        cerrarModalEliminarSeparador();
+        return;
+    }
+
     if (calendarioData.separadores && calendarioData.separadores[horario]) {
         if (Array.isArray(calendarioData.separadores[horario])) {
-            // Eliminar el separador específico del array
-            if (index !== null && index < calendarioData.separadores[horario].length) {
+            if (index !== null && index !== undefined && index < calendarioData.separadores[horario].length) {
                 calendarioData.separadores[horario].splice(index, 1);
-                
-                // Si el array queda vacío, eliminarlo completamente
+
                 if (calendarioData.separadores[horario].length === 0) {
                     delete calendarioData.separadores[horario];
                 }
             }
         } else {
-            // Si es un objeto individual, eliminarlo
             delete calendarioData.separadores[horario];
         }
-        
+
         mostrarNotificacion('Separador eliminado correctamente', 'success');
-        guardarCalendario(); // Guardar cambios automáticamente
+        guardarCalendario();
     } else {
         mostrarNotificacion('Error: No se pudo encontrar el separador', 'error');
     }
-    
+
     cerrarModalEliminarSeparador();
     mostrarCalendario();
 }
@@ -5192,6 +5190,10 @@ function aplicarCalendarioTrasBorrarHorario(payload) {
 }
 
 function borrarHorarioCompleto() {
+    if (MODO_WEB) {
+        return;
+    }
+
     if (!puedePublicarTablon) {
         mostrarNotificacion('No tienes permiso para borrar el horario', 'error');
         return;
