@@ -13,6 +13,14 @@ const bcrypt = require('bcryptjs');
 const { obtenerConexion, asegurarTablas, registrarLog } = require('../lib/db');
 const { firmarToken } = require('../lib/auth');
 
+function permisosParaRol(rol) {
+    if (rol === 'admin') {
+        return ['editar', 'publicar'];
+    }
+
+    return ['editar'];
+}
+
 async function buscarUsuario(conexion, username) {
     const [rows] = await conexion.execute(
         'SELECT id, username, password_hash, rol FROM calendario_usuarios WHERE username = ? LIMIT 1',
@@ -92,7 +100,7 @@ module.exports = async function handler(req, res) {
             const token = firmarToken({
                 username: usuario.username,
                 rol: usuario.rol,
-                permisos: ['editar']
+                permisos: permisosParaRol(usuario.rol)
             });
             return res.status(200).json({
                 success: true,
@@ -100,7 +108,7 @@ module.exports = async function handler(req, res) {
                 usuario: {
                     username: usuario.username,
                     rol: usuario.rol,
-                    permisos: ['editar']
+                    permisos: permisosParaRol(usuario.rol)
                 }
             });
         }
@@ -113,7 +121,7 @@ module.exports = async function handler(req, res) {
         const token = firmarToken({
             username: usuario.username,
             rol: usuario.rol,
-            permisos: ['editar']
+            permisos: permisosParaRol(usuario.rol)
         });
 
         return res.status(200).json({
@@ -122,7 +130,7 @@ module.exports = async function handler(req, res) {
             usuario: {
                 username: usuario.username,
                 rol: usuario.rol,
-                permisos: ['editar']
+                permisos: permisosParaRol(usuario.rol)
             }
         });
     } catch (error) {
