@@ -1,5 +1,6 @@
 let calendarioData = {};
 let esProfesor = false;
+let puedePublicarTablon = false;
 let esAdmin = false;
 let config = {};
 let semanaActual = 1;
@@ -8,6 +9,37 @@ let contextMenu = null;
 let claseParaEliminar = null;
 let separadorParaEditar = null;
 let separadorParaEliminar = null;
+
+function actualizarControlesPublicacionNotas() {
+    const pub = document.getElementById('tablon-notas-publicado');
+    const pubLbl = pub && pub.closest ? pub.closest('.tablon-notas-meta-lbl') : null;
+    if (pubLbl) {
+        pubLbl.style.display = puedePublicarTablon ? '' : 'none';
+    }
+}
+
+function actualizarBotonesAccionTablon() {
+    const btnGuardar = document.getElementById('btnGuardar');
+    const btnPublicar = document.getElementById('btnPublicarTablon');
+
+    if (MODO_WEB) {
+        if (btnGuardar) {
+            btnGuardar.style.display = 'none';
+        }
+        if (btnPublicar) {
+            btnPublicar.style.display = puedePublicarTablon ? 'block' : 'none';
+        }
+    } else {
+        if (btnGuardar) {
+            btnGuardar.style.display = esProfesor ? 'block' : 'none';
+        }
+        if (btnPublicar) {
+            btnPublicar.style.display = puedePublicarTablon ? 'block' : 'none';
+        }
+    }
+
+    actualizarControlesPublicacionNotas();
+}
 
 /** Pestañas del tablón (Índice, Horario, textos). Misma UI en GMod y web. */
 const TABLON_TEXTO_PLANO_KEYS = ['optativas', 'clubes'];
@@ -314,6 +346,9 @@ function asegurarNotasBoletin(d) {
     );
     if (!Array.isArray(nb.filas)) {
         nb.filas = [];
+    }
+    if (!nb.exclusiones || typeof nb.exclusiones !== 'object') {
+        nb.exclusiones = {};
     }
     nb.filas.forEach(function (row) {
         if (!row || typeof row !== 'object') {
@@ -814,14 +849,14 @@ function renderEditorNotasProfe(nb) {
         const thead = document.createElement('thead');
         const trTot = document.createElement('tr');
         const thTot = document.createElement('th');
-        thTot.colSpan = 5 + cols.length;
+        thTot.colSpan = 6 + cols.length;
         thTot.className = 'tablon-notas-total-bar';
         thTot.textContent = 'TOTAL ALUMNOS ' + curso + 'º | ' + nEnCurso;
         trTot.appendChild(thTot);
         thead.appendChild(trTot);
         const hr = document.createElement('tr');
         hr.className = 'tablon-notas-fila-head tablon-notas-head-cols';
-        ['Nombre IC', 'Casa', 'Curso', '¿PROMOCIONA?', 'ID'].concat(cols).forEach(function (lab) {
+        ['Nombre IC', 'Casa', 'Curso', '¿PROMOCIONA?', 'ID', 'Quitar'].concat(cols).forEach(function (lab) {
             const th = document.createElement('th');
             th.textContent = lab;
             hr.appendChild(th);
@@ -906,6 +941,18 @@ function renderEditorNotasProfe(nb) {
             tdId.textContent = String(f.characterId || '');
             tdId.className = 'tablon-notas-celda-id';
             tr.appendChild(tdId);
+            const tdDel = document.createElement('td');
+            tdDel.className = 'tablon-notas-celda-quitar';
+            const btnDel = document.createElement('button');
+            btnDel.type = 'button';
+            btnDel.className = 'tablon-notas-btn-quitar';
+            btnDel.textContent = 'Quitar';
+            btnDel.setAttribute('data-orig-idx', String(item.oi));
+            btnDel.addEventListener('click', function () {
+                notasEliminarFilaAlumno(item.oi);
+            });
+            tdDel.appendChild(btnDel);
+            tr.appendChild(tdDel);
             cols.forEach(function (col) {
                 const td = document.createElement('td');
                 const sel = document.createElement('select');
@@ -994,6 +1041,37 @@ function aplicarNotasAlDOM() {
         editP.style.display = 'none';
         renderVistaNotasProfe(nb);
     }
+
+    actualizarControlesPublicacionNotas();
+}
+
+function notasEliminarFilaAlumno(origIdx) {
+    if (!esProfesor) {
+        return;
+    }
+    leerNotasBoletinDelDOM();
+    asegurarTablonSecciones();
+    const nb = calendarioData.tablonSecciones.notasBoletin;
+    const idx = parseInt(origIdx, 10);
+    if (!nb || !Array.isArray(nb.filas) || isNaN(idx) || !nb.filas[idx]) {
+        return;
+    }
+    const row = nb.filas[idx];
+    const label =
+        (row.nombreIc && String(row.nombreIc).trim()) ||
+        (row.characterId ? 'ID ' + row.characterId : 'este alumno');
+    if (!window.confirm('¿Quitar a "' + label + '" del boletín de notas?')) {
+        return;
+    }
+    const cid = Number(row.characterId) || 0;
+    if (cid > 0) {
+        if (!nb.exclusiones) {
+            nb.exclusiones = {};
+        }
+        nb.exclusiones[String(cid)] = true;
+    }
+    nb.filas.splice(idx, 1);
+    aplicarNotasAlDOM();
 }
 
 function leerNotasBoletinDelDOM() {
@@ -1006,7 +1084,7 @@ function leerNotasBoletinDelDOM() {
     }
     const nb = d.notasBoletin;
     const pub = document.getElementById('tablon-notas-publicado');
-    if (pub) {
+    if (pub && puedePublicarTablon) {
         nb.publicado = !!pub.checked;
     }
     const tit = document.getElementById('tablon-notas-titulo');
@@ -1831,6 +1909,7 @@ function handleCalendarioPostMessage(event) {
 
         calendarioData = normalizarCalendarioRecibido(data.calendario || {});
         esProfesor = data.esProfesor || false;
+        puedePublicarTablon = data.puedePublicarTablon || false;
         config = data.config || {};
         contextoVisor = data.contextoVisor && typeof data.contextoVisor === 'object' ? data.contextoVisor : {};
         notasVistaAlumno =
@@ -1894,10 +1973,7 @@ function handleCalendarioPostMessage(event) {
             catCalDebugLog('abrirCal: mostrarCalendario EXC ' + String(eMc));
         }
 
-        var btnGuardar = document.getElementById('btnGuardar');
-        if (btnGuardar) {
-            btnGuardar.style.display = esProfesor ? 'block' : 'none';
-        }
+        actualizarBotonesAccionTablon();
         refrescarTablonTrasAbrir();
     }
 
@@ -2117,13 +2193,16 @@ function aplicarRolUsuario(usuario) {
     if (!usuario) {
         usuarioActual = null;
         esProfesor = false;
+        puedePublicarTablon = false;
         esAdmin = false;
         syncNotasVistaAlumnoDesdeCalendario();
+        actualizarBotonesAccionTablon();
         return;
     }
     usuarioActual = usuario;
     const permisos = usuario.permisos || [];
     esProfesor = permisos.indexOf('editar') !== -1;
+    puedePublicarTablon = permisos.indexOf('publicar') !== -1;
     esAdmin = usuario.rol === 'admin';
 
     if (!esProfesor) {
@@ -2131,6 +2210,8 @@ function aplicarRolUsuario(usuario) {
     } else {
         notasVistaAlumno = null;
     }
+
+    actualizarBotonesAccionTablon();
 }
 
 function actualizarBarraAuth() {
@@ -2162,7 +2243,7 @@ function actualizarBarraAuth() {
     if (btnLogin) btnLogin.hidden = loggedIn;
     if (btnLogout) btnLogout.hidden = !loggedIn;
     if (btnAdmin) btnAdmin.hidden = !(loggedIn && esAdmin);
-    if (btnGuardar) btnGuardar.style.display = esProfesor ? 'block' : 'none';
+    actualizarBotonesAccionTablon();
 }
 
 function ensureModalLoginExists() {
@@ -2664,15 +2745,25 @@ function inicializarEventos() {
         }
     });
     
-    // Botón guardar
+    // Botón guardar (borrador local en GMod)
     const btnGuardar = document.getElementById('btnGuardar');
     if (btnGuardar) {
         btnGuardar.addEventListener('click', function(e) {
-            e.preventDefault(); // Prevenir comportamiento por defecto
-            e.stopPropagation(); // Evitar propagación del evento
+            e.preventDefault();
+            e.stopPropagation();
             console.log('[Calendario] DEBUG: Botón guardar clickeado');
             guardarCalendario();
-            return false; // Asegurar que no se ejecute ningún comportamiento por defecto
+            return false;
+        });
+    }
+
+    const btnPublicarTablon = document.getElementById('btnPublicarTablon');
+    if (btnPublicarTablon) {
+        btnPublicarTablon.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            publicarTablon();
+            return false;
         });
     }
     
@@ -4960,29 +5051,24 @@ function cerrarModalClimaHorario() {
     document.getElementById('modalClimaHorario').style.display = 'none';
 }
 
-// Función separada para guardar
-function guardarCalendario() {
-    console.log('[Calendario] DEBUG: guardarCalendario() llamado');
-    console.log('[Calendario] DEBUG: esProfesor =', esProfesor);
-    console.log('[Calendario] DEBUG: MODO_WEB =', MODO_WEB);
-    
-    if (!esProfesor) {
-        mostrarNotificacion('No tienes permisos para guardar cambios', 'error');
+// Publicar tablón en la web (staff IC / admin OOC)
+function publicarTablon() {
+    if (!puedePublicarTablon) {
+        mostrarNotificacion('No tienes permiso para publicar el tablón', 'error');
         return;
     }
 
-    leerTablonSeccionesDelDOM();
+    if (MODO_WEB || esProfesor) {
+        leerTablonSeccionesDelDOM();
+    }
 
-    console.log('[Calendario] DEBUG: Enviando datos al servidor:', calendarioData);
-    
     if (MODO_WEB) {
-        // Modo web: usar API REST
         if (!tokenAutenticacion) {
-            mostrarNotificacion('Debes iniciar sesión para guardar cambios', 'error');
+            mostrarNotificacion('Debes iniciar sesión para publicar el tablón', 'error');
             mostrarLoginSiNecesario();
             return;
         }
-        
+
         fetch(`${API_URL}/api/calendario`, {
             method: 'POST',
             headers: {
@@ -5003,28 +5089,66 @@ function guardarCalendario() {
                     mostrarLoginSiNecesario();
                     throw new Error('Sesión expirada');
                 }
+                if (response.status === 403) {
+                    throw new Error('Solo administradores pueden publicar el tablón OOC');
+                }
                 throw new Error('Error en la respuesta del servidor');
             }
             return response.json();
         })
         .then(data => {
-            console.log('Respuesta del servidor:', data);
             if (data.success) {
-                // Actualizar timestamp local para evitar notificaciones innecesarias
                 if (data.ultimaActualizacion) {
                     ultimoTimestamp = data.ultimaActualizacion;
                     calendarioData.ultimaActualizacion = data.ultimaActualizacion;
                 }
-                mostrarNotificacion('✅ Cambios guardados correctamente', 'success');
+                mostrarNotificacion('✅ Tablón publicado correctamente', 'success');
             } else {
-                mostrarNotificacion('❌ Error al guardar cambios', 'error');
+                mostrarNotificacion('❌ Error al publicar el tablón', 'error');
             }
         })
         .catch(error => {
-            console.error('Error al guardar:', error);
-            mostrarNotificacion('❌ Error de conexión al guardar: ' + error.message, 'error');
+            console.error('Error al publicar:', error);
+            mostrarNotificacion('❌ Error al publicar: ' + error.message, 'error');
         });
-    } else if (typeof gmod !== 'undefined' && gmod && typeof gmod.CalGuardar === 'function') {
+        return;
+    }
+
+    if (typeof gmod !== 'undefined' && gmod && typeof gmod.CalPublicar === 'function') {
+        try {
+            gmod.CalPublicar();
+            mostrarNotificacion('Publicación del tablón enviada al servidor.', 'info');
+        } catch (e) {
+            console.error(e);
+            mostrarNotificacion('❌ Error al publicar el tablón', 'error');
+        }
+        return;
+    }
+
+    mostrarNotificacion('Publicar tablón no está disponible en este entorno.', 'error');
+}
+
+// Función separada para guardar
+function guardarCalendario() {
+    console.log('[Calendario] DEBUG: guardarCalendario() llamado');
+    console.log('[Calendario] DEBUG: esProfesor =', esProfesor);
+    console.log('[Calendario] DEBUG: MODO_WEB =', MODO_WEB);
+    
+    if (!esProfesor) {
+        mostrarNotificacion('No tienes permisos para guardar cambios', 'error');
+        return;
+    }
+
+    if (MODO_WEB) {
+        mostrarNotificacion('En la web solo los administradores pueden publicar el tablón.', 'error');
+        return;
+    }
+
+    leerTablonSeccionesDelDOM();
+
+    console.log('[Calendario] DEBUG: Enviando datos al servidor:', calendarioData);
+    
+    if (typeof gmod !== 'undefined' && gmod && typeof gmod.CalGuardar === 'function') {
         try {
             gmod.CalGuardar(JSON.stringify({ calendario: calendarioData }));
             mostrarNotificacion('Guardado enviado. El clima automático solo usa datos ya guardados en el servidor; confirma con el aviso en el juego.', 'info');
@@ -5332,7 +5456,7 @@ function confirmarEliminarBarraEstacion() {
     mostrarCalendario();
     mostrarNotificacion('Barra eliminada. Recuerda guardar los cambios.', 'success');
     
-    document.getElementById('btnGuardar').style.display = 'block';
+    actualizarBotonesAccionTablon();
     cerrarModalConfirmarEliminarBarra();
     barraParaEliminar = null;
 }
@@ -5435,7 +5559,7 @@ function guardarBarra() {
     renderizarListaBarras();
     mostrarCalendario();
     
-    document.getElementById('btnGuardar').style.display = 'block';
+    actualizarBotonesAccionTablon();
 }
 
 // GMod DHTML: el postMessage desde Lua puede ejecutarse antes de DOMContentLoaded;

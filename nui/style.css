@@ -1553,6 +1553,26 @@ select.tablon-notas-in-casa {
     vertical-align: middle;
 }
 
+.tablon-notas-celda-quitar {
+    text-align: center;
+    vertical-align: middle;
+    min-width: 72px;
+}
+
+.tablon-notas-btn-quitar {
+    background: #8b2e2e;
+    color: #fff;
+    border: 1px solid #6a2222;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.tablon-notas-btn-quitar:hover {
+    background: #a33636;
+}
+
 .tablon-notas-btn-sec {
     background: linear-gradient(180deg, #e8e0f4 0%, #c9bddc 100%) !important;
     color: #1f1530 !important;

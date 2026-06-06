@@ -377,6 +377,12 @@ module.exports = async function handler(req, res) {
                 
                 actualizadoPor = decoded.username || 'web';
                 console.log('[API] Guardando calendario desde web (usuario:', actualizadoPor, ')');
+
+                if (decoded.rol !== 'admin') {
+                    return res.status(403).json({
+                        error: 'Solo administradores pueden publicar el tablón OOC'
+                    });
+                }
             } catch (error) {
                 return res.status(401).json({
                     error: 'Token inválido'
