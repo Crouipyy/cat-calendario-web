@@ -2113,6 +2113,18 @@ select.tablon-notas-in-casa {
     border-color: #b38f20;
 }
 
+.curso-option.bloqueado {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: #e9ecef;
+    color: #6c757d;
+    text-decoration: line-through;
+}
+
+.curso-option.bloqueado:hover {
+    background: #e9ecef;
+}
+
 /* Selector de meses */
 .meses-selector {
     display: grid;

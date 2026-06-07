@@ -3072,17 +3072,8 @@ function mostrarCalendario() {
                         (Array.isArray(diaData.eventosHorario[horario.hora]) ? diaData.eventosHorario[horario.hora] : [diaData.eventosHorario[horario.hora]]) : [];
                     
                     const eventosActivos = eventosArray.filter(evento => evento && evento.texto).length;
-                    
-                    const espaciosOcupados = clasesArray.length + eventosActivos;
-                    
-                    // ✅ FIX: Determinar límite de clases basado en la duración real de la franja
-                    const maxClasesPermitidas = obtenerLimiteClasesPorFranja(horario.hora);
-                    
-                    console.log(`📊 Franja ${horario.hora}: ${clasesArray.length}/${maxClasesPermitidas} clases, ${eventosActivos}/2 eventos`);
-                    
-                    // Mostrar botón de agregar clase solo si no se ha alcanzado el límite específico de la franja
-                    if (clasesArray.length < maxClasesPermitidas && espaciosOcupados < 4) {
-                        html += `
+
+                    html += `
                             <div class="clase-vacia agregar-mas"
                                 data-semana="${semanaActual}"
                                 data-dia="${diaIndex + 1}"
@@ -3091,12 +3082,8 @@ function mostrarCalendario() {
                                 + Agregar Clase
                             </div>
                         `;
-                    } else {
-                        console.log(`🚫 Botón clase oculto: ${clasesArray.length} clases >= ${maxClasesPermitidas} límite o ${espaciosOcupados}/4 espacios ocupados`);
-                    }
-                    
-                    // ✅ FIX: Mostrar botón de evento solo si no se ha alcanzado el límite de 2 eventos
-                    if (eventosActivos < 2 && espaciosOcupados < 4) {
+
+                    if (eventosActivos < 2) {
                         html += `
                             <div class="clase-vacia agregar-evento"
                                 data-semana="${semanaActual}"
@@ -3107,7 +3094,7 @@ function mostrarCalendario() {
                             </div>
                         `;
                     } else {
-                        console.log(`🚫 Botón evento oculto: ${eventosActivos} eventos >= 2 límite o ${espaciosOcupados}/4 espacios ocupados`);
+                        console.log(`🚫 Botón evento oculto: ${eventosActivos} eventos >= 2 límite`);
                     }
                 }
                 
@@ -3323,6 +3310,100 @@ function refrescarOpcionesHoraModalClase() {
     inicializarSelectorHora(opciones, horaActual);
 }
 
+function obtenerContextoModalClase() {
+    const semanaEl = document.getElementById('modalSemana');
+    const diaEl = document.getElementById('modalDia');
+    const horarioEl = document.getElementById('modalHorario');
+    const claseIndexEl = document.getElementById('modalClaseIndex');
+    const horaSelect = document.getElementById('horaExactaClaseSelect');
+
+    if (!semanaEl || !diaEl || !horarioEl) {
+        return null;
+    }
+
+    const semana = parseInt(semanaEl.value, 10);
+    const dia = parseInt(diaEl.value, 10);
+    const horario = horarioEl.value;
+    const claseIndex = parseInt(claseIndexEl && claseIndexEl.value, 10);
+
+    if (!semana || !dia || !horario) {
+        return null;
+    }
+
+    return {
+        semanaIndex: semana - 1,
+        diaIndex: dia - 1,
+        horario: horario,
+        claseIndex: isNaN(claseIndex) ? -1 : claseIndex,
+        horaNorm: horaSelect ? normalizarHoraClase(horaSelect.value) : ''
+    };
+}
+
+function obtenerCursosOcupadosEnHora(semanaIndex, diaIndex, horario, horaNorm, claseIndexExcluir) {
+    const info = {
+        ocupados: {},
+        todosOcupado: false,
+        hayAlguno: false
+    };
+
+    if (!horaNorm) {
+        return info;
+    }
+
+    const clases = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
+
+    clases.forEach(function (clase, index) {
+        if (index === claseIndexExcluir) {
+            return;
+        }
+
+        if (normalizarHoraClase(clase.horaExacta) !== horaNorm) {
+            return;
+        }
+
+        info.hayAlguno = true;
+
+        const cursos = Array.isArray(clase.cursos) ? clase.cursos : [];
+
+        if (cursos.includes('Todos')) {
+            info.todosOcupado = true;
+            return;
+        }
+
+        cursos.forEach(function (curso) {
+            info.ocupados[curso] = true;
+        });
+    });
+
+    return info;
+}
+
+function cursoEstaBloqueadoEnHora(curso, infoOcupacion) {
+    if (!infoOcupacion || (!infoOcupacion.hayAlguno && !infoOcupacion.todosOcupado)) {
+        return false;
+    }
+
+    if (infoOcupacion.todosOcupado) {
+        return true;
+    }
+
+    if (curso === 'Todos') {
+        return Object.keys(infoOcupacion.ocupados).length > 0;
+    }
+
+    return !!infoOcupacion.ocupados[curso];
+}
+
+function refrescarSelectorCursosModalClase() {
+    const modal = document.getElementById('modalClase');
+
+    if (!modal || modal.style.display === 'none') {
+        return;
+    }
+
+    inicializarSelectorCursos(obtenerCursosSeleccionadosModal());
+}
+
 function obtenerOpcionesHorario(semana, dia, horario, claseIndex, cursosPendientes) {
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
@@ -3501,22 +3582,7 @@ function abrirModalClaseNueva(elemento) {
     
     // Obtener el array de clases existentes
     const clasesArray = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
-    
-    console.log('🔍 Verificando límites para franja:', horario);
-    
-    // ✅ FIX: Usar la función auxiliar para determinar límites
-    const maxClasesPermitidas = obtenerLimiteClasesPorFranja(horario);
-    
-    console.log('📚 Máximo de clases permitidas:', maxClasesPermitidas);
-    console.log('📊 Clases existentes:', clasesArray.length);
-    
-    // Verificar límite de clases según duración
-    if (clasesArray.length >= maxClasesPermitidas) {
-        mostrarNotificacion(`❌ Límite alcanzado: Máximo ${maxClasesPermitidas} clase(s) permitida(s) en esta franja`, 'error');
-        return;
-    }
-    
-    // Obtener opciones de horario disponibles
+
     const opcionesHorario = obtenerOpcionesHorario(semana, dia, horario, -1, []);
     
     if (opcionesHorario.length === 0) {
@@ -3536,8 +3602,8 @@ function abrirModalClaseNueva(elemento) {
     
     // Configurar selector de hora automático
     inicializarSelectorHora(opcionesHorario, "");
-    
-    inicializarSelectorCursos([]);
+
+    refrescarSelectorCursosModalClase();
     
     document.getElementById('modalClase').style.display = 'block';
     
@@ -3774,8 +3840,8 @@ function abrirModalClaseExistente(elemento) {
     
     // Configurar selector de hora con hora normalizada
     inicializarSelectorHora(opcionesHorario, horaSeleccionadaNormalizada);
-    
-    inicializarSelectorCursos(Array.isArray(claseData.cursos) ? claseData.cursos : []);
+
+    refrescarSelectorCursosModalClase();
     
     document.getElementById('modalClase').style.display = 'block';
 }
@@ -3865,7 +3931,14 @@ function inicializarSelectorHora(opcionesDisponibles, horaSeleccionada) {
         helpText.textContent = 'Hora específica dentro de la franja horaria';
     }
     container.appendChild(helpText);
-    
+
+    select.addEventListener('change', function () {
+        refrescarSelectorCursosModalClase();
+        refrescarOpcionesHoraModalClase();
+    });
+
+    refrescarSelectorCursosModalClase();
+
     console.log('✅ Selector de hora inicializado correctamente (SIEMPRE HABILITADO)');
 }
 
@@ -4010,24 +4083,51 @@ function traducirClima(clima) {
 function inicializarSelectorCursos(cursosSeleccionados) {
     const container = document.getElementById('cursosSelector');
     container.innerHTML = '';
-    
+
+    const ctx = obtenerContextoModalClase();
+    let infoOcupacion = { ocupados: {}, todosOcupado: false, hayAlguno: false };
+
+    if (ctx && ctx.horaNorm) {
+        infoOcupacion = obtenerCursosOcupadosEnHora(
+            ctx.semanaIndex,
+            ctx.diaIndex,
+            ctx.horario,
+            ctx.horaNorm,
+            ctx.claseIndex
+        );
+    }
+
+    cursosSeleccionados = (Array.isArray(cursosSeleccionados) ? cursosSeleccionados : []).filter(function (curso) {
+        return !cursoEstaBloqueadoEnHora(curso, infoOcupacion);
+    });
+
     const cursosDisponibles = config.cursos || ['1º', '2º', '3º', '4º', '5º', '6º', '7º', 'Todos'];
-    
+
     cursosDisponibles.forEach(curso => {
-        const isSelected = cursosSeleccionados.includes(curso);
+        const bloqueado = ctx && ctx.horaNorm && cursoEstaBloqueadoEnHora(curso, infoOcupacion);
+        const isSelected = !bloqueado && cursosSeleccionados.includes(curso);
         const option = document.createElement('div');
-        option.className = `curso-option ${isSelected ? 'selected' : ''} ${curso === 'Todos' ? 'todos' : ''}`;
+        option.className = `curso-option ${isSelected ? 'selected' : ''} ${curso === 'Todos' ? 'todos' : ''}${bloqueado ? ' bloqueado' : ''}`;
+
+        if (bloqueado) {
+            option.title = 'Ya hay una clase a esta hora para este curso/año';
+        }
+
         option.innerHTML = `
-            <input type="checkbox" ${isSelected ? 'checked' : ''} value="${curso}" style="display: none;">
+            <input type="checkbox" ${isSelected ? 'checked' : ''} value="${curso}" style="display: none;"${bloqueado ? ' disabled' : ''}>
             ${curso}
         `;
         option.addEventListener('click', function() {
+            if (this.classList.contains('bloqueado')) {
+                mostrarNotificacion('❌ Ese curso/año ya tiene clase a esta hora', 'error');
+                return;
+            }
+
             const checkbox = this.querySelector('input');
-            
-            // Si se selecciona "Todos", deseleccionar los demás
+
             if (curso === 'Todos' && !checkbox.checked) {
                 document.querySelectorAll('#cursosSelector .curso-option').forEach(opt => {
-                    if (opt !== this) {
+                    if (opt !== this && !opt.classList.contains('bloqueado')) {
                         const otherCheckbox = opt.querySelector('input');
                         otherCheckbox.checked = false;
                         opt.classList.remove('selected');
@@ -4036,10 +4136,9 @@ function inicializarSelectorCursos(cursosSeleccionados) {
                 checkbox.checked = true;
                 this.classList.add('selected');
             }
-            // Si se selecciona un curso específico, deseleccionar "Todos"
             else if (curso !== 'Todos' && !checkbox.checked) {
                 const todosOption = document.querySelector('#cursosSelector .curso-option.todos');
-                if (todosOption) {
+                if (todosOption && !todosOption.classList.contains('bloqueado')) {
                     const todosCheckbox = todosOption.querySelector('input');
                     todosCheckbox.checked = false;
                     todosOption.classList.remove('selected');
@@ -4047,7 +4146,6 @@ function inicializarSelectorCursos(cursosSeleccionados) {
                 checkbox.checked = true;
                 this.classList.add('selected');
             }
-            // Si se deselecciona
             else {
                 checkbox.checked = !checkbox.checked;
                 this.classList.toggle('selected', checkbox.checked);
@@ -4574,22 +4672,12 @@ function abrirModalEventoNuevo(elemento) {
     const eventosArray = eventosHorarioComoArray(semanaIndex, diaIndex, horario);
     
     const eventosActivos = eventosArray.filter(evento => evento && evento.texto).length;
-    const elementosExistentes = clasesArray.length + eventosActivos;
-    
-    console.log(`📊 Elementos en franja ${horario}: ${clasesArray.length} clases + ${eventosActivos} eventos = ${elementosExistentes}/4`);
-    
-    // ✅ FIX: Máximo 2 eventos por franja
+
     if (eventosActivos >= 2) {
         mostrarNotificacion('❌ Límite alcanzado: Máximo 2 eventos por franja horaria', 'error');
         return;
     }
-    
-    // ✅ FIX: Máximo 4 elementos totales (clases + eventos) por franja
-    if (elementosExistentes >= 4) {
-        mostrarNotificacion('❌ Límite alcanzado: Máximo 4 elementos (clases + eventos) por franja horaria', 'error');
-        return;
-    }
-    
+
     document.getElementById('modalEventoSemana').value = semana;
     document.getElementById('modalEventoDia').value = dia;
     document.getElementById('modalEventoHorario').value = horario;
@@ -4866,21 +4954,14 @@ function guardarEvento(event) {
     const eventosArray = eventosHorarioComoArray(semanaIndex, diaIndex, horario);
     
     const eventosActivos = eventosArray.filter(evento => evento && evento.texto).length;
-    const elementosExistentes = clasesArray.length + eventosActivos;
-    
-    // Si estamos editando un evento existente, no contar doble
+
     const esEdicion = eventoIndex < eventosActivos;
-    
+
     if (!esEdicion && eventosActivos >= 2) {
         mostrarNotificacion('❌ No se puede agregar evento: límite de 2 eventos por franja alcanzado', 'error');
         return;
     }
-    
-    if (!esEdicion && elementosExistentes >= 4) {
-        mostrarNotificacion('❌ No se puede agregar evento: límite de 4 elementos por franja alcanzado', 'error');
-        return;
-    }
-    
+
     // Asegurar estructura
     if (!calendarioData.semanas[semanaIndex]) calendarioData.semanas[semanaIndex] = {dias: []};
     if (!calendarioData.semanas[semanaIndex].dias[diaIndex]) calendarioData.semanas[semanaIndex].dias[diaIndex] = {eventosHorario: {}};
