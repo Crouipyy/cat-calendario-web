@@ -2,6 +2,7 @@
 const mysql = require('mysql2/promise');
 const { calendarioPlantillaParaUI } = require('./calendarioPlantilla');
 const { verificarBearer, normalizarPermisos } = require('./lib/auth');
+const { obtenerConexion: obtenerConexionAux, asegurarTablas, registrarLog } = require('./lib/db');
 
 // Función para obtener conexión a MySQL
 async function obtenerConexion() {
@@ -365,12 +366,13 @@ module.exports = async function handler(req, res) {
         }
         
         let actualizadoPor = 'FiveM';
+        let decoded = null;
         
         if (syncOk) {
             actualizadoPor = 'gmod';
             console.log('[API] Guardando calendario desde GMod (X-CatCal-Sync-Token)');
         } else if (authHeader && authHeader.startsWith('Bearer ')) {
-            const decoded = verificarBearer(req);
+            decoded = verificarBearer(req);
             if (!decoded) {
                 return res.status(401).json({
                     error: 'Token inválido'
@@ -401,6 +403,23 @@ module.exports = async function handler(req, res) {
                 const guardado = await guardarCalendario(calendario, actualizadoPor);
                 
                 if (guardado) {
+                    try {
+                        const logConn = await obtenerConexionAux();
+
+                        if (logConn) {
+                            await asegurarTablas(logConn);
+                            await registrarLog(logConn, {
+                                username: actualizadoPor,
+                                rol: syncOk ? 'gmod' : (decoded && decoded.rol ? decoded.rol : 'web'),
+                                accion: 'guardar_calendario',
+                                detalles: 'Calendario OOC/web actualizado (ts=' + calendario.ultimaActualizacion + ')'
+                            });
+                            await logConn.end();
+                        }
+                    } catch (logErr) {
+                        console.warn('[API] No se pudo registrar log de calendario:', logErr.message);
+                    }
+
                     return res.status(200).json({
                         success: true,
                         message: 'Calendario guardado correctamente',

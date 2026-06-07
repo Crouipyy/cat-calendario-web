@@ -3243,7 +3243,87 @@ function crearHTMLClase(clase, semana, dia, horario, claseIndex) {
 }
 
 // FUNCIÓN COMPLETAMENTE CORREGIDA - Maneja correctamente todas las franjas
-function obtenerOpcionesHorario(semana, dia, horario, claseIndex) {
+function normalizarHoraClase(horaExacta) {
+    if (!horaExacta) {
+        return '';
+    }
+
+    return String(horaExacta).split(':').slice(0, 2).join(':');
+}
+
+function cursosClaseSolapan(cursosA, cursosB) {
+    const a = Array.isArray(cursosA) ? cursosA.filter(Boolean) : [];
+    const b = Array.isArray(cursosB) ? cursosB.filter(Boolean) : [];
+
+    if (!a.length || !b.length) {
+        return false;
+    }
+
+    if (a.includes('Todos') || b.includes('Todos')) {
+        return true;
+    }
+
+    return a.some(function (curso) {
+        return b.indexOf(curso) !== -1;
+    });
+}
+
+function obtenerCursosSeleccionadosModal() {
+    return Array.from(document.querySelectorAll('#cursosSelector .curso-option.selected'))
+        .map(function (opt) {
+            const input = opt.querySelector('input');
+            return input ? input.value : null;
+        })
+        .filter(function (curso) {
+            return curso !== null;
+        });
+}
+
+function claseConflictaHorarioCursos(clase, horaNorm, cursosPendientes, claseIndexExcluir, index) {
+    if (index === claseIndexExcluir) {
+        return false;
+    }
+
+    if (!clase || !horaNorm) {
+        return false;
+    }
+
+    if (normalizarHoraClase(clase.horaExacta) !== horaNorm) {
+        return false;
+    }
+
+    if (!cursosPendientes || !cursosPendientes.length) {
+        return false;
+    }
+
+    return cursosClaseSolapan(clase.cursos, cursosPendientes);
+}
+
+function refrescarOpcionesHoraModalClase() {
+    const modal = document.getElementById('modalClase');
+
+    if (!modal || modal.style.display === 'none') {
+        return;
+    }
+
+    const semana = document.getElementById('modalSemana').value;
+    const dia = document.getElementById('modalDia').value;
+    const horario = document.getElementById('modalHorario').value;
+    const claseIndex = parseInt(document.getElementById('modalClaseIndex').value, 10) || 0;
+    const horaSelect = document.getElementById('horaExactaClaseSelect');
+    const horaActual = horaSelect ? horaSelect.value : '';
+    const opciones = obtenerOpcionesHorario(
+        semana,
+        dia,
+        horario,
+        claseIndex,
+        obtenerCursosSeleccionadosModal()
+    );
+
+    inicializarSelectorHora(opciones, horaActual);
+}
+
+function obtenerOpcionesHorario(semana, dia, horario, claseIndex, cursosPendientes) {
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
     
@@ -3328,24 +3408,31 @@ function obtenerOpcionesHorario(semana, dia, horario, claseIndex) {
         }
     }
     
-    // Si ya hay clases, determinar qué opciones están ocupadas
-    const horasOcupadas = clasesExistentes
-        .filter((clase, index) => index !== claseIndex)
-        .map(clase => {
-            if (clase.horaExacta) {
-                return clase.horaExacta.split(':').slice(0, 2).join(':');
+    // Bloquear hora solo si choca con los mismos cursos/años (permite misma hora para cursos distintos).
+    const opcionesDisponibles = opciones.filter(function (opcion) {
+        if (!cursosPendientes || !cursosPendientes.length) {
+            const clasesMismaHora = clasesExistentes.filter(function (clase, index) {
+                if (index === claseIndex) {
+                    return false;
+                }
+
+                return normalizarHoraClase(clase.horaExacta) === opcion.value;
+            });
+
+            if (!clasesMismaHora.length) {
+                return true;
             }
-            return null;
-        })
-        .filter(hora => hora);
-    
-    console.log('⛔ Horas ocupadas:', horasOcupadas);
-    console.log('📋 Todas las opciones:', opciones.map(o => o.value));
-    
-    // Filtrar opciones disponibles
-    const opcionesDisponibles = opciones.filter(opcion => 
-        !horasOcupadas.includes(opcion.value)
-    );
+
+            return !clasesMismaHora.some(function (clase) {
+                const cursos = Array.isArray(clase.cursos) ? clase.cursos : [];
+                return cursos.includes('Todos');
+            });
+        }
+
+        return !clasesExistentes.some(function (clase, index) {
+            return claseConflictaHorarioCursos(clase, opcion.value, cursosPendientes, claseIndex, index);
+        });
+    });
     
     console.log('✅ Opciones disponibles:', opcionesDisponibles.map(o => o.value));
     
@@ -3430,7 +3517,7 @@ function abrirModalClaseNueva(elemento) {
     }
     
     // Obtener opciones de horario disponibles
-    const opcionesHorario = obtenerOpcionesHorario(semana, dia, horario, -1);
+    const opcionesHorario = obtenerOpcionesHorario(semana, dia, horario, -1, []);
     
     if (opcionesHorario.length === 0) {
         mostrarNotificacion('❌ No hay horarios disponibles en esta franja', 'error');
@@ -3665,7 +3752,13 @@ function abrirModalClaseExistente(elemento) {
     };
     
     // Obtener opciones de horario disponibles (excluyendo la clase actual)
-    const opcionesHorario = obtenerOpcionesHorario(semana, dia, horario, parseInt(claseIndex));
+    const opcionesHorario = obtenerOpcionesHorario(
+        semana,
+        dia,
+        horario,
+        parseInt(claseIndex, 10),
+        Array.isArray(claseData.cursos) ? claseData.cursos : []
+    );
     
     // Normalizar la hora seleccionada (quitar segundos si existen)
     const horaSeleccionadaNormalizada = claseData.horaExacta ? 
@@ -3959,6 +4052,8 @@ function inicializarSelectorCursos(cursosSeleccionados) {
                 checkbox.checked = !checkbox.checked;
                 this.classList.toggle('selected', checkbox.checked);
             }
+
+            refrescarOpcionesHoraModalClase();
         });
         container.appendChild(option);
     });
@@ -4148,10 +4243,29 @@ function guardarClase(event) {
         calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario] = [];
     }
     
-    // Obtener y normalizar la hora exacta (CORREGIDO: usar el select correcto)
     const horaExactaSelect = document.getElementById('horaExactaClaseSelect');
     const horaExacta = horaExactaSelect ? horaExactaSelect.value.split(':').slice(0, 2).join(':') : "";
-    
+
+    if (horaExacta && cursosSeleccionados.length > 0) {
+        const clasesFranja = calendarioData.semanas[semanaIndex].dias[diaIndex].clases[horario] || [];
+        const conflicto = clasesFranja.some(function (clase, idx) {
+            if (idx === claseIndex) {
+                return false;
+            }
+
+            if (normalizarHoraClase(clase.horaExacta) !== horaExacta) {
+                return false;
+            }
+
+            return cursosClaseSolapan(clase.cursos, cursosSeleccionados);
+        });
+
+        if (conflicto) {
+            mostrarNotificacion('❌ Ya hay una clase a esa hora para los mismos cursos/años', 'error');
+            return;
+        }
+    }
+
     console.log('💾 Guardando clase con hora:', horaExacta);
     
     const nuevaClase = {
