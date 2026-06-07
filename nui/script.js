@@ -14,6 +14,11 @@ function jsArg(val) {
     return JSON.stringify(val == null ? '' : val);
 }
 
+/** Valor JS seguro dentro de atributos HTML con comillas dobles (onclick, oncontextmenu). */
+function htmlJsArg(val) {
+    return jsArg(val).replace(/"/g, '&quot;');
+}
+
 function escAttr(val) {
     return String(val == null ? '' : val)
         .replace(/&/g, '&amp;')
@@ -38,6 +43,7 @@ function actualizarBotonesAccionTablon() {
     if (MODO_WEB) {
         if (btnGuardar) {
             btnGuardar.style.display = (esProfesor && !puedePublicarTablon) ? 'block' : 'none';
+            btnGuardar.textContent = '💾 Guardar Cambios';
         }
         if (btnPublicar) {
             btnPublicar.style.display = puedePublicarTablon ? 'block' : 'none';
@@ -48,9 +54,12 @@ function actualizarBotonesAccionTablon() {
     } else {
         if (btnGuardar) {
             btnGuardar.style.display = esProfesor ? 'block' : 'none';
+            btnGuardar.textContent = puedePublicarTablon
+                ? '💾 Guardar y publicar tablón'
+                : '💾 Guardar Cambios';
         }
         if (btnPublicar) {
-            btnPublicar.style.display = puedePublicarTablon ? 'block' : 'none';
+            btnPublicar.style.display = 'none';
         }
         if (btnBorrar) {
             btnBorrar.style.display = (!MODO_WEB && puedePublicarTablon) ? 'block' : 'none';
@@ -2998,12 +3007,12 @@ function mostrarCalendario() {
                     </div>
                     ${esProfesor ? `
                         <button class="btn-editar-separador" 
-                                onclick="abrirModalClimaHorario(${jsArg(horario.hora)})" 
+                                onclick="abrirModalClimaHorario(${htmlJsArg(horario.hora)})" 
                                 style="position: absolute; top: 5px; right: 5px; background: #17a2b8; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">
                             🌤️
                         </button>
                         <button class="btn-editar-separador" 
-                                onclick="abrirModalSeparador(${jsArg(horario.hora)})" 
+                                onclick="abrirModalSeparador(${htmlJsArg(horario.hora)})" 
                                 style="position: absolute; top: 5px; right: 30px; background: #740001; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">
                             📏
                         </button>
@@ -3046,8 +3055,8 @@ function mostrarCalendario() {
                             html += `
                                 <div class="evento ${evento.cursiva ? 'cursiva' : ''}" 
                                     style="${estiloEvento}"
-                                    oncontextmenu="${esProfesor ? `mostrarContextMenuEvento(event, this, ${semanaActual}, ${diaIndex + 1}, ${jsArg(horario.hora)}, ${eventoIndex}); return false;` : ''}"
-                                    ${esProfesor ? `onclick="abrirModalEventoExistente(${semanaActual}, ${diaIndex + 1}, ${jsArg(horario.hora)}, ${eventoIndex})"` : ''}>
+                                    oncontextmenu="${esProfesor ? `mostrarContextMenuEvento(event, this, ${semanaActual}, ${diaIndex + 1}, ${htmlJsArg(horario.hora)}, ${eventoIndex}); return false;` : ''}"
+                                    ${esProfesor ? `onclick="abrirModalEventoExistente(${semanaActual}, ${diaIndex + 1}, ${htmlJsArg(horario.hora)}, ${eventoIndex})"` : ''}>
                                     ${evento.texto}
                                     ${esProfesor ? '<div style="font-size:9px;color:#666;">✏️ Click editar | 🔘 Click derecho eliminar</div>' : ''}
                                 </div>
@@ -3501,7 +3510,7 @@ function obtenerSeparadorEnFranja(horarioKey, separadorIndex) {
 }
 
 function generarHTMLSeparador(separador, horario, separadorIndex) {
-    const horarioJs = jsArg(horario);
+    const horarioJs = htmlJsArg(horario);
     const horarioAttr = escAttr(horario);
 
     let estilo = 'background: #740001; color: white; padding: 12px; height: 50px;';
@@ -3574,7 +3583,7 @@ function mostrarContextMenuSeparador(event, horario, separadorIndex) {
     contextMenu.style.left = event.clientX + 'px';
     contextMenu.style.top = event.clientY + 'px';
     
-    const horarioJs = jsArg(horario);
+    const horarioJs = htmlJsArg(horario);
     const horarioAttr = escAttr(horario);
 
     contextMenu.innerHTML = `
@@ -4890,7 +4899,7 @@ function mostrarContextMenuEvento(event, elemento, semana, dia, horario, eventoI
     contextMenu.style.top = event.clientY + 'px';
     
     contextMenu.innerHTML = `
-        <div class="context-menu-item eliminar" onclick="eliminarEvento(${semana}, ${dia}, ${jsArg(horario)}, ${eventoIndex})">
+        <div class="context-menu-item eliminar" onclick="eliminarEvento(${semana}, ${dia}, ${htmlJsArg(horario)}, ${eventoIndex})">
             🗑️ Eliminar Evento
         </div>
     `;
