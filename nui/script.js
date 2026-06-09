@@ -3071,8 +3071,6 @@ function mostrarCalendario() {
                     const eventosArray = diaData.eventosHorario && diaData.eventosHorario[horario.hora] ? 
                         (Array.isArray(diaData.eventosHorario[horario.hora]) ? diaData.eventosHorario[horario.hora] : [diaData.eventosHorario[horario.hora]]) : [];
                     
-                    const eventosActivos = eventosArray.filter(evento => evento && evento.texto).length;
-
                     html += `
                             <div class="clase-vacia agregar-mas"
                                 data-semana="${semanaActual}"
@@ -3083,8 +3081,7 @@ function mostrarCalendario() {
                             </div>
                         `;
 
-                    if (eventosActivos < 2) {
-                        html += `
+                    html += `
                             <div class="clase-vacia agregar-evento"
                                 data-semana="${semanaActual}"
                                 data-dia="${diaIndex + 1}"
@@ -3093,9 +3090,6 @@ function mostrarCalendario() {
                                 + Agregar Evento
                             </div>
                         `;
-                    } else {
-                        console.log(`🚫 Botón evento oculto: ${eventosActivos} eventos >= 2 límite`);
-                    }
                 }
                 
                 html += `</div>`;
@@ -3436,57 +3430,25 @@ function obtenerOpcionesHorario(semana, dia, horario, claseIndex, cursosPendient
     console.log('⏱️ Duración total calculada:', duracionTotal, 'minutos');
     console.log('📊 Rango:', convertirMinutosAHora(horaInicioMinutos), '-', convertirMinutosAHora(horaFinMinutos));
     
-    // ✅ LÓGICA SIMPLIFICADA Y CORREGIDA
-    let maxClases = 1;
-    let duracionClase = duracionTotal;
-    
-    // Para franjas de 30 minutos (20:00-20:30, 22:30-23:00) -> SOLO 1 CLASE
-    if (duracionTotal === 30) {
-        maxClases = 1;
-        duracionClase = 30;
-        console.log('🎯 Config: 1 clase de 30min (franja exacta de 30min)');
-    }
-    // Para franjas de 50 minutos (23:00-23:50) -> 2 clases
-    else if (duracionTotal === 50) {
-        maxClases = 2;
-        duracionClase = 25;
-        console.log('🎯 Config: 2 clases de 25min (franja de 50min)');
-    }
-    // Para franjas de 60 minutos (17:00-18:00, etc.) -> 2 clases
-    else if (duracionTotal >= 60) {
-        maxClases = 2;
-        duracionClase = 30;
-        console.log('🎯 Config: 2 clases de 30min (franja larga)');
-    }
-    // Para cualquier otra duración -> 1 clase
-    else {
-        maxClases = 1;
-        duracionClase = duracionTotal;
-        console.log('🎯 Config: 1 clase de ' + duracionClase + 'min (franja personalizada)');
-    }
-    
-    console.log('📚 Máximo de clases permitidas:', maxClases);
-    console.log('⏰ Duración por clase:', duracionClase, 'minutos');
-    
-    // Generar opciones según la duración
+    const pasoMinutos = 15;
+    const duracionEtiqueta = Math.min(pasoMinutos, duracionTotal);
+
+    console.log('📚 Franja sin límite de clases; paso de inicio:', pasoMinutos, 'min');
+
     const opciones = [];
-    for (let i = 0; i < maxClases; i++) {
-        const inicioMinutos = horaInicioMinutos + (i * duracionClase);
-        const finMinutos = inicioMinutos + duracionClase;
-        
-        // Verificar que no exceda el fin de la franja
-        if (finMinutos <= horaFinMinutos) {
-            const horaInicio = convertirMinutosAHora(inicioMinutos);
-            const horaFin = convertirMinutosAHora(finMinutos);
-            
-            opciones.push({
-                value: horaInicio,
-                label: `${formatearHoraParaVisor(horaInicio)} - ${formatearHoraParaVisor(horaFin)} (${duracionClase} min)`,
-                duracion: duracionClase
-            });
-            
-            console.log('➕ Opción generada:', horaInicio, '-', horaFin);
-        }
+    for (let inicioMinutos = horaInicioMinutos; inicioMinutos < horaFinMinutos; inicioMinutos += pasoMinutos) {
+        const finMinutos = Math.min(inicioMinutos + duracionEtiqueta, horaFinMinutos);
+        const horaInicio = convertirMinutosAHora(inicioMinutos);
+        const horaFin = convertirMinutosAHora(finMinutos);
+        const duracionOpcion = finMinutos - inicioMinutos;
+
+        opciones.push({
+            value: horaInicio,
+            label: `${formatearHoraParaVisor(horaInicio)} - ${formatearHoraParaVisor(horaFin)} (${duracionOpcion} min)`,
+            duracion: duracionOpcion
+        });
+
+        console.log('➕ Opción generada:', horaInicio, '-', horaFin);
     }
     
     // Bloquear hora solo si choca con los mismos cursos/años (permite misma hora para cursos distintos).
@@ -4279,39 +4241,19 @@ function inicializarSelectorColor(pickerId, hexId, previewId, colorDefault) {
     });
 }
 
-// Función auxiliar para determinar límites basados en duración - CORREGIDA
 function obtenerLimiteClasesPorFranja(horario) {
     const horarioConfig = config.horarios.find(h => h.hora === horario);
-    
-    if (!horarioConfig) return 2; // Por defecto
-    
-    // ✅ CORRECCIÓN: Calcular duración en minutos correctamente
+
+    if (!horarioConfig) {
+        return Number.MAX_SAFE_INTEGER;
+    }
+
     const horaInicioMinutos = convertirHoraDecimalAMinutos(horarioConfig.inicio);
     const horaFinMinutos = convertirHoraDecimalAMinutos(horarioConfig.fin);
     const duracionTotal = horaFinMinutos - horaInicioMinutos;
-    
-    console.log(`⏱️ Franja ${horario}: ${duracionTotal} minutos (${horarioConfig.inicio} -> ${horarioConfig.fin})`);
-    
-    // Para franjas de 30 minutos: solo 1 clase
-    if (duracionTotal === 30) {
-        console.log('🎯 Límite: 1 clase (franja de 30min)');
-        return 1;
-    }
-    // Para franjas de 50 minutos: 2 clases
-    else if (duracionTotal === 50) {
-        console.log('🎯 Límite: 2 clases (franja de 50min)');
-        return 2;
-    }
-    // Para franjas de 60+ minutos: 2 clases
-    else if (duracionTotal >= 60) {
-        console.log('🎯 Límite: 2 clases (franja de 60+ min)');
-        return 2;
-    }
-    // Para cualquier otra duración: 1 clase
-    else {
-        console.log('🎯 Límite: 1 clase (franja de ' + duracionTotal + 'min)');
-        return 1;
-    }
+    const pasoMinutos = 15;
+
+    return Math.max(1, Math.ceil(duracionTotal / pasoMinutos));
 }
 
 function guardarClase(event) {
@@ -4664,19 +4606,10 @@ function abrirModalEventoNuevo(elemento) {
     const dia = elemento.dataset.dia;
     const horario = elemento.dataset.horario;
     
-    // ✅ FIX: Verificar límite de eventos (máximo 2 por franja)
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
-    
-    const clasesArray = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
     const eventosArray = eventosHorarioComoArray(semanaIndex, diaIndex, horario);
-    
     const eventosActivos = eventosArray.filter(evento => evento && evento.texto).length;
-
-    if (eventosActivos >= 2) {
-        mostrarNotificacion('❌ Límite alcanzado: Máximo 2 eventos por franja horaria', 'error');
-        return;
-    }
 
     document.getElementById('modalEventoSemana').value = semana;
     document.getElementById('modalEventoDia').value = dia;
@@ -4949,19 +4882,6 @@ function guardarEvento(event) {
     const semanaIndex = semana - 1;
     const diaIndex = dia - 1;
     
-    // ✅ FIX: Verificar límites antes de guardar
-    const clasesArray = clasesEnFranjaCal(semanaIndex, diaIndex, horario);
-    const eventosArray = eventosHorarioComoArray(semanaIndex, diaIndex, horario);
-    
-    const eventosActivos = eventosArray.filter(evento => evento && evento.texto).length;
-
-    const esEdicion = eventoIndex < eventosActivos;
-
-    if (!esEdicion && eventosActivos >= 2) {
-        mostrarNotificacion('❌ No se puede agregar evento: límite de 2 eventos por franja alcanzado', 'error');
-        return;
-    }
-
     // Asegurar estructura
     if (!calendarioData.semanas[semanaIndex]) calendarioData.semanas[semanaIndex] = {dias: []};
     if (!calendarioData.semanas[semanaIndex].dias[diaIndex]) calendarioData.semanas[semanaIndex].dias[diaIndex] = {eventosHorario: {}};
