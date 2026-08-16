@@ -39,17 +39,20 @@ function actualizarBotonesAccionTablon() {
     const btnGuardar = document.getElementById('btnGuardar');
     const btnPublicar = document.getElementById('btnPublicarTablon');
     const btnBorrar = document.getElementById('btnBorrarHorario');
+    const btnFranjas = document.getElementById('btnGestionFranjas');
 
     if (MODO_WEB) {
         if (btnGuardar) {
-            btnGuardar.style.display = (esProfesor && !puedePublicarTablon) ? 'block' : 'none';
+            btnGuardar.style.display = esProfesor ? 'block' : 'none';
             btnGuardar.textContent = '💾 Guardar Cambios';
         }
         if (btnPublicar) {
             btnPublicar.style.display = puedePublicarTablon ? 'block' : 'none';
         }
         if (btnBorrar) {
-            btnBorrar.style.display = 'none';
+            // Reset en Vercel: admin o quien pueda publicar
+            btnBorrar.style.display = (esAdmin || puedePublicarTablon) ? 'block' : 'none';
+            btnBorrar.textContent = '🗑️ Reset horario';
         }
     } else {
         if (btnGuardar) {
@@ -62,8 +65,13 @@ function actualizarBotonesAccionTablon() {
             btnPublicar.style.display = 'none';
         }
         if (btnBorrar) {
-            btnBorrar.style.display = (!MODO_WEB && puedePublicarTablon) ? 'block' : 'none';
+            btnBorrar.style.display = puedePublicarTablon ? 'block' : 'none';
+            btnBorrar.textContent = '🗑️ Reset horario';
         }
+    }
+
+    if (btnFranjas) {
+        btnFranjas.style.display = esProfesor ? 'block' : 'none';
     }
 
     actualizarControlesPublicacionNotas();
@@ -1971,6 +1979,7 @@ function handleCalendarioPostMessage(event) {
         if (!config.horarios || config.horarios.length === 0) {
             config.horarios = JSON.parse(JSON.stringify(configPorDefecto.horarios));
         }
+        aplicarHorariosConfigDesdeCalendario();
 
         if (!config.climas || config.climas.length === 0) {
             catCalDebugLog('config.climas vacio -> por defecto');
@@ -2080,8 +2089,9 @@ async function cargarDatosDesdeAPI() {
             }
 
             ultimoTimestamp = nuevoTimestamp;
-            config = configPorDefecto;
+            config = JSON.parse(JSON.stringify(configPorDefecto));
             calendarioData = normalizarCalendarioRecibido(data.calendario);
+            aplicarHorariosConfigDesdeCalendario();
         } else {
             console.warn('[Calendario] No hay datos del calendario, usando estructura vacía');
             calendarioData = { semanas: [], meses: [], separadores: {}, climasHorario: {} };
@@ -2089,8 +2099,9 @@ async function cargarDatosDesdeAPI() {
 
         // Cargar configuración (por si el bloque anterior no entró)
         if (!config || !config.horarios || config.horarios.length === 0) {
-            config = configPorDefecto;
+            config = JSON.parse(JSON.stringify(configPorDefecto));
         }
+        aplicarHorariosConfigDesdeCalendario();
         
         // Asegurar que el body esté visible
         document.body.style.display = 'block';
@@ -2837,6 +2848,24 @@ function inicializarEventos() {
             return false;
         });
     }
+
+    const btnGestionFranjas = document.getElementById('btnGestionFranjas');
+    if (btnGestionFranjas) {
+        btnGestionFranjas.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            abrirModalFranjas(-1);
+            return false;
+        });
+    }
+    elOn('btnCerrarFranjas', 'click', cerrarModalFranjas);
+    elOn('btnGuardarFranja', 'click', guardarFranjaDesdeFormulario);
+    elOn('btnNuevaFranjaForm', 'click', function() {
+        document.getElementById('franjaEditIndex').value = '-1';
+        document.getElementById('franjaHoraInicio').value = '17:00';
+        document.getElementById('franjaHoraFin').value = '18:00';
+        document.getElementById('franjaClima').value = 'CLEAR';
+    });
     
     // Cerrar context menu al hacer click fuera
     document.addEventListener('click', function(event) {
@@ -3015,6 +3044,12 @@ function mostrarCalendario() {
                                 onclick="abrirModalSeparador(${htmlJsArg(horario.hora)})" 
                                 style="position: absolute; top: 5px; right: 30px; background: #740001; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">
                             📏
+                        </button>
+                        <button class="btn-editar-separador"
+                                onclick="abrirModalFranjas(${horarioIndex})"
+                                title="Editar esta franja"
+                                style="position: absolute; top: 5px; right: 55px; background: #0e1a40; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">
+                            ⏱️
                         </button>
                     ` : ''}
                 </div>
@@ -3430,25 +3465,57 @@ function obtenerOpcionesHorario(semana, dia, horario, claseIndex, cursosPendient
     console.log('⏱️ Duración total calculada:', duracionTotal, 'minutos');
     console.log('📊 Rango:', convertirMinutosAHora(horaInicioMinutos), '-', convertirMinutosAHora(horaFinMinutos));
     
-    const pasoMinutos = 15;
-    const duracionEtiqueta = Math.min(pasoMinutos, duracionTotal);
-
-    console.log('📚 Franja sin límite de clases; paso de inicio:', pasoMinutos, 'min');
-
+    // ✅ LÓGICA SIMPLIFICADA Y CORREGIDA
+    let maxClases = 1;
+    let duracionClase = duracionTotal;
+    
+    // Para franjas de 30 minutos (20:00-20:30, 22:30-23:00) -> SOLO 1 CLASE
+    if (duracionTotal === 30) {
+        maxClases = 1;
+        duracionClase = 30;
+        console.log('🎯 Config: 1 clase de 30min (franja exacta de 30min)');
+    }
+    // Para franjas de 50 minutos (23:00-23:50) -> 2 clases
+    else if (duracionTotal === 50) {
+        maxClases = 2;
+        duracionClase = 25;
+        console.log('🎯 Config: 2 clases de 25min (franja de 50min)');
+    }
+    // Para franjas de 60 minutos (17:00-18:00, etc.) -> 2 clases
+    else if (duracionTotal >= 60) {
+        maxClases = 2;
+        duracionClase = 30;
+        console.log('🎯 Config: 2 clases de 30min (franja larga)');
+    }
+    // Para cualquier otra duración -> 1 clase
+    else {
+        maxClases = 1;
+        duracionClase = duracionTotal;
+        console.log('🎯 Config: 1 clase de ' + duracionClase + 'min (franja personalizada)');
+    }
+    
+    console.log('📚 Máximo de clases permitidas:', maxClases);
+    console.log('⏰ Duración por clase:', duracionClase, 'minutos');
+    
+    // Generar opciones según la duración
     const opciones = [];
-    for (let inicioMinutos = horaInicioMinutos; inicioMinutos < horaFinMinutos; inicioMinutos += pasoMinutos) {
-        const finMinutos = Math.min(inicioMinutos + duracionEtiqueta, horaFinMinutos);
-        const horaInicio = convertirMinutosAHora(inicioMinutos);
-        const horaFin = convertirMinutosAHora(finMinutos);
-        const duracionOpcion = finMinutos - inicioMinutos;
-
-        opciones.push({
-            value: horaInicio,
-            label: `${formatearHoraParaVisor(horaInicio)} - ${formatearHoraParaVisor(horaFin)} (${duracionOpcion} min)`,
-            duracion: duracionOpcion
-        });
-
-        console.log('➕ Opción generada:', horaInicio, '-', horaFin);
+    for (let i = 0; i < maxClases; i++) {
+        const inicioMinutos = horaInicioMinutos + (i * duracionClase);
+        const finMinutos = inicioMinutos + duracionClase;
+        
+        // Verificar que no exceda el fin de la franja
+        if (finMinutos <= horaFinMinutos) {
+            const horaInicio = convertirMinutosAHora(inicioMinutos);
+            const horaFin = convertirMinutosAHora(finMinutos);
+            
+            opciones.push({
+                value: horaInicio,
+                label: `${formatearHoraParaVisor(horaInicio)} - ${formatearHoraParaVisor(horaFin)} (${duracionClase} min)`,
+                duracion: duracionClase
+            });
+            
+            console.log('➕ Opción generada:', horaInicio, '-', horaFin);
+        }
     }
     
     // Bloquear hora solo si choca con los mismos cursos/años (permite misma hora para cursos distintos).
@@ -4241,19 +4308,39 @@ function inicializarSelectorColor(pickerId, hexId, previewId, colorDefault) {
     });
 }
 
+// Función auxiliar para determinar límites basados en duración - CORREGIDA
 function obtenerLimiteClasesPorFranja(horario) {
     const horarioConfig = config.horarios.find(h => h.hora === horario);
-
-    if (!horarioConfig) {
-        return Number.MAX_SAFE_INTEGER;
-    }
-
+    
+    if (!horarioConfig) return 2; // Por defecto
+    
+    // ✅ CORRECCIÓN: Calcular duración en minutos correctamente
     const horaInicioMinutos = convertirHoraDecimalAMinutos(horarioConfig.inicio);
     const horaFinMinutos = convertirHoraDecimalAMinutos(horarioConfig.fin);
     const duracionTotal = horaFinMinutos - horaInicioMinutos;
-    const pasoMinutos = 15;
-
-    return Math.max(1, Math.ceil(duracionTotal / pasoMinutos));
+    
+    console.log(`⏱️ Franja ${horario}: ${duracionTotal} minutos (${horarioConfig.inicio} -> ${horarioConfig.fin})`);
+    
+    // Para franjas de 30 minutos: solo 1 clase
+    if (duracionTotal === 30) {
+        console.log('🎯 Límite: 1 clase (franja de 30min)');
+        return 1;
+    }
+    // Para franjas de 50 minutos: 2 clases
+    else if (duracionTotal === 50) {
+        console.log('🎯 Límite: 2 clases (franja de 50min)');
+        return 2;
+    }
+    // Para franjas de 60+ minutos: 2 clases
+    else if (duracionTotal >= 60) {
+        console.log('🎯 Límite: 2 clases (franja de 60+ min)');
+        return 2;
+    }
+    // Para cualquier otra duración: 1 clase
+    else {
+        console.log('🎯 Límite: 1 clase (franja de ' + duracionTotal + 'min)');
+        return 1;
+    }
 }
 
 function guardarClase(event) {
@@ -5223,6 +5310,279 @@ function cerrarModalClimaHorario() {
     document.getElementById('modalClimaHorario').style.display = 'none';
 }
 
+/** HH:MM → decimal (17:30 → 17.5). */
+function horaHHMMADecimal(hhmm) {
+    const s = String(hhmm || '').trim();
+    const m = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return 0;
+    const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
+    const min = Math.min(59, Math.max(0, parseInt(m[2], 10)));
+    return h + (min / 60);
+}
+
+function decimalAHoraHHMM(dec) {
+    dec = Number(dec) || 0;
+    let h = Math.floor(dec);
+    let min = Math.round((dec - h) * 60);
+    if (min >= 60) { h += 1; min = 0; }
+    if (h < 0) h = 0;
+    if (h > 23) h = 23;
+    const hs = (h < 10 ? '0' : '') + String(h);
+    const ms = (min < 10 ? '0' : '') + String(min);
+    return hs + ':' + ms;
+}
+
+function construirLabelFranja(inicioHHMM, finHHMM) {
+    return String(inicioHHMM).trim() + ' - ' + String(finHHMM).trim();
+}
+
+function normalizarEntradaHorario(row) {
+    if (!row || typeof row !== 'object') return null;
+    let hora = String(row.hora || '').trim();
+    let inicio = row.inicio;
+    let fin = row.fin;
+    if ((inicio == null || fin == null) && hora.indexOf(' - ') !== -1) {
+        const p = extraerHorasDelHorario(hora);
+        inicio = horaHHMMADecimal(p.inicio);
+        fin = horaHHMMADecimal(p.fin);
+        // Si fin <= inicio y cruza medianoche, fin+24 no; keep as-is for short overnight slots.
+    } else {
+        inicio = Number(inicio);
+        fin = Number(fin);
+        if (!hora && !isNaN(inicio) && !isNaN(fin)) {
+            hora = construirLabelFranja(decimalAHoraHHMM(inicio), decimalAHoraHHMM(fin));
+        }
+    }
+    if (!hora) return null;
+    return {
+        hora: hora,
+        inicio: isNaN(inicio) ? 0 : inicio,
+        fin: isNaN(fin) ? 0 : fin,
+        clima: String(row.clima || 'CLEAR')
+    };
+}
+
+function aplicarHorariosConfigDesdeCalendario() {
+    if (!calendarioData || typeof calendarioData !== 'object') return;
+    const raw = calendarioData.horariosConfig;
+    if (!Array.isArray(raw) || raw.length === 0) return;
+    const list = [];
+    for (let i = 0; i < raw.length; i++) {
+        const n = normalizarEntradaHorario(raw[i]);
+        if (n) list.push(n);
+    }
+    if (list.length === 0) return;
+    if (!config || typeof config !== 'object') {
+        config = JSON.parse(JSON.stringify(configPorDefecto));
+    }
+    config.horarios = list;
+}
+
+function sincronizarHorariosConfigEnCalendario() {
+    if (!calendarioData || typeof calendarioData !== 'object') {
+        calendarioData = {};
+    }
+    const src = (config && config.horarios && config.horarios.length)
+        ? config.horarios
+        : configPorDefecto.horarios;
+    calendarioData.horariosConfig = src.map(function (h) {
+        const n = normalizarEntradaHorario(h);
+        return n || { hora: h.hora, inicio: h.inicio, fin: h.fin, clima: h.clima || 'CLEAR' };
+    });
+}
+
+function migrarClaveEnMapa(mapObj, oldKey, newKey) {
+    if (!mapObj || typeof mapObj !== 'object' || oldKey === newKey) return;
+    if (Object.prototype.hasOwnProperty.call(mapObj, oldKey)) {
+        mapObj[newKey] = mapObj[oldKey];
+        delete mapObj[oldKey];
+    }
+}
+
+function asegurarEstructuraFranjaEnCalendario(horaKey) {
+    if (!calendarioData) return;
+    calendarioData.climasHorario = calendarioData.climasHorario || {};
+    calendarioData.separadores = calendarioData.separadores || {};
+    if (calendarioData.climasHorario[horaKey] == null) {
+        calendarioData.climasHorario[horaKey] = 'CLEAR';
+    }
+    if (!calendarioData.separadores[horaKey]) {
+        calendarioData.separadores[horaKey] = {
+            texto: '', colorFondo: '#740001', colorTexto: '#ffffff',
+            cursiva: false, mostrarHora: false, horaInicio: '', horaFin: ''
+        };
+    }
+    const semanas = Array.isArray(calendarioData.semanas) ? calendarioData.semanas : [];
+    for (let s = 0; s < semanas.length; s++) {
+        const dias = semanas[s] && Array.isArray(semanas[s].dias) ? semanas[s].dias : [];
+        for (let d = 0; d < dias.length; d++) {
+            const dia = dias[d];
+            if (!dia || typeof dia !== 'object') continue;
+            dia.clases = dia.clases || {};
+            dia.eventosHorario = dia.eventosHorario || {};
+            if (!Array.isArray(dia.clases[horaKey])) dia.clases[horaKey] = [];
+            if (!dia.eventosHorario[horaKey]) {
+                dia.eventosHorario[horaKey] = {
+                    texto: '', colorFondo: '#fff3cd', colorTexto: '#000000', cursiva: false
+                };
+            }
+        }
+    }
+}
+
+function eliminarClaveFranjaDelCalendario(horaKey) {
+    if (!calendarioData) return;
+    if (calendarioData.climasHorario) delete calendarioData.climasHorario[horaKey];
+    if (calendarioData.separadores) delete calendarioData.separadores[horaKey];
+    const semanas = Array.isArray(calendarioData.semanas) ? calendarioData.semanas : [];
+    for (let s = 0; s < semanas.length; s++) {
+        const dias = semanas[s] && Array.isArray(semanas[s].dias) ? semanas[s].dias : [];
+        for (let d = 0; d < dias.length; d++) {
+            const dia = dias[d];
+            if (!dia) continue;
+            if (dia.clases) delete dia.clases[horaKey];
+            if (dia.eventosHorario) delete dia.eventosHorario[horaKey];
+        }
+    }
+}
+
+function renombrarClaveFranjaEnCalendario(oldKey, newKey) {
+    if (!oldKey || !newKey || oldKey === newKey) return;
+    if (calendarioData.climasHorario) migrarClaveEnMapa(calendarioData.climasHorario, oldKey, newKey);
+    if (calendarioData.separadores) migrarClaveEnMapa(calendarioData.separadores, oldKey, newKey);
+    const semanas = Array.isArray(calendarioData.semanas) ? calendarioData.semanas : [];
+    for (let s = 0; s < semanas.length; s++) {
+        const dias = semanas[s] && Array.isArray(semanas[s].dias) ? semanas[s].dias : [];
+        for (let d = 0; d < dias.length; d++) {
+            const dia = dias[d];
+            if (!dia) continue;
+            if (dia.clases) migrarClaveEnMapa(dia.clases, oldKey, newKey);
+            if (dia.eventosHorario) migrarClaveEnMapa(dia.eventosHorario, oldKey, newKey);
+        }
+    }
+}
+
+function abrirModalFranjas(editIndex) {
+    if (!esProfesor) return;
+    const modal = document.getElementById('modalFranjas');
+    if (!modal) return;
+    renderListaFranjasEditor();
+    const idx = (editIndex == null || editIndex === '') ? -1 : Number(editIndex);
+    document.getElementById('franjaEditIndex').value = String(isNaN(idx) ? -1 : idx);
+    if (idx >= 0 && config.horarios && config.horarios[idx]) {
+        const h = config.horarios[idx];
+        const ini = (h.inicio != null) ? decimalAHoraHHMM(h.inicio) : extraerHorasDelHorario(h.hora).inicio;
+        const fin = (h.fin != null) ? decimalAHoraHHMM(h.fin) : extraerHorasDelHorario(h.hora).fin;
+        document.getElementById('franjaHoraInicio').value = ini;
+        document.getElementById('franjaHoraFin').value = fin;
+        document.getElementById('franjaClima').value = h.clima || 'CLEAR';
+    } else {
+        document.getElementById('franjaHoraInicio').value = '17:00';
+        document.getElementById('franjaHoraFin').value = '18:00';
+        document.getElementById('franjaClima').value = 'CLEAR';
+    }
+    modal.style.display = 'block';
+}
+
+function cerrarModalFranjas() {
+    const modal = document.getElementById('modalFranjas');
+    if (modal) modal.style.display = 'none';
+}
+
+function renderListaFranjasEditor() {
+    const host = document.getElementById('listaFranjasEditor');
+    if (!host) return;
+    const rows = (config && config.horarios) ? config.horarios : [];
+    if (!rows.length) {
+        host.innerHTML = '<p style="color:#888;font-size:13px;">No hay franjas. Creá una abajo.</p>';
+        return;
+    }
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+    html += '<tr style="background:#f0f0f0;"><th style="text-align:left;padding:6px;">Franja</th><th>Clima</th><th></th></tr>';
+    rows.forEach(function (h, i) {
+        html += '<tr style="border-bottom:1px solid #eee;">';
+        html += '<td style="padding:6px;">' + escAttr(h.hora) + '</td>';
+        html += '<td style="text-align:center;">' + escAttr(h.clima || 'CLEAR') + '</td>';
+        html += '<td style="text-align:right;padding:6px;white-space:nowrap;">';
+        html += '<button type="button" class="btn-guardar" style="padding:4px 8px;font-size:11px;" onclick="abrirModalFranjas(' + i + ')">Editar</button> ';
+        html += '<button type="button" class="btn-eliminar" style="padding:4px 8px;font-size:11px;" onclick="eliminarFranjaPorIndice(' + i + ')">Eliminar</button>';
+        html += '</td></tr>';
+    });
+    html += '</table>';
+    host.innerHTML = html;
+}
+
+function ordenarFranjasPorInicio() {
+    if (!config.horarios) return;
+    config.horarios.sort(function (a, b) {
+        return (Number(a.inicio) || 0) - (Number(b.inicio) || 0);
+    });
+}
+
+function guardarFranjaDesdeFormulario() {
+    if (!esProfesor) return;
+    const ini = document.getElementById('franjaHoraInicio').value;
+    const fin = document.getElementById('franjaHoraFin').value;
+    const clima = document.getElementById('franjaClima').value || 'CLEAR';
+    const editIdx = parseInt(document.getElementById('franjaEditIndex').value, 10);
+    if (!ini || !fin) {
+        mostrarNotificacion('Indicá hora de inicio y fin', 'error');
+        return;
+    }
+    const label = construirLabelFranja(ini, fin);
+    const row = {
+        hora: label,
+        inicio: horaHHMMADecimal(ini),
+        fin: horaHHMMADecimal(fin),
+        clima: clima
+    };
+    if (!config.horarios) config.horarios = [];
+
+    if (!isNaN(editIdx) && editIdx >= 0 && editIdx < config.horarios.length) {
+        const oldKey = config.horarios[editIdx].hora;
+        config.horarios[editIdx] = row;
+        if (oldKey !== label) {
+            renombrarClaveFranjaEnCalendario(oldKey, label);
+        }
+        asegurarEstructuraFranjaEnCalendario(label);
+        if (calendarioData.climasHorario) {
+            calendarioData.climasHorario[label] = clima;
+        }
+        mostrarNotificacion('Franja actualizada: ' + label, 'success');
+    } else {
+        for (let i = 0; i < config.horarios.length; i++) {
+            if (config.horarios[i].hora === label) {
+                mostrarNotificacion('Ya existe esa franja', 'error');
+                return;
+            }
+        }
+        config.horarios.push(row);
+        asegurarEstructuraFranjaEnCalendario(label);
+        if (calendarioData.climasHorario) {
+            calendarioData.climasHorario[label] = clima;
+        }
+        mostrarNotificacion('Franja creada: ' + label, 'success');
+    }
+    ordenarFranjasPorInicio();
+    sincronizarHorariosConfigEnCalendario();
+    renderListaFranjasEditor();
+    document.getElementById('franjaEditIndex').value = '-1';
+    mostrarCalendario();
+}
+
+function eliminarFranjaPorIndice(idx) {
+    if (!esProfesor || !config.horarios || !config.horarios[idx]) return;
+    const h = config.horarios[idx];
+    if (!window.confirm('¿Eliminar la franja "' + h.hora + '" y sus clases asociadas?')) return;
+    eliminarClaveFranjaDelCalendario(h.hora);
+    config.horarios.splice(idx, 1);
+    sincronizarHorariosConfigEnCalendario();
+    renderListaFranjasEditor();
+    document.getElementById('franjaEditIndex').value = '-1';
+    mostrarCalendario();
+    mostrarNotificacion('Franja eliminada', 'success');
+}
+
 function generarHorarioVacioDesdeConfig() {
     const horariosCfg = (config && config.horarios && config.horarios.length) ? config.horarios : configPorDefecto.horarios;
     const diasSemana = (config && config.diasSemana && config.diasSemana.length) ? config.diasSemana : configPorDefecto.diasSemana;
@@ -5288,6 +5648,15 @@ function generarHorarioVacioDesdeConfig() {
         out.climasHorario[horario.hora] = horario.clima || 'CLEAR';
     });
 
+    out.horariosConfig = horariosCfg.map(function (h) {
+        return {
+            hora: h.hora,
+            inicio: h.inicio,
+            fin: h.fin,
+            clima: h.clima || 'CLEAR'
+        };
+    });
+
     return out;
 }
 
@@ -5297,7 +5666,7 @@ function aplicarCalendarioTrasBorrarHorario(payload) {
     }
 
     const preservedTablon = calendarioData && calendarioData.tablonSecciones;
-    calendarioData = payload.calendario;
+    calendarioData = normalizarCalendarioRecibido(payload.calendario);
 
     if (preservedTablon && (!calendarioData.tablonSecciones || typeof calendarioData.tablonSecciones !== 'object')) {
         calendarioData.tablonSecciones = preservedTablon;
@@ -5306,28 +5675,30 @@ function aplicarCalendarioTrasBorrarHorario(payload) {
     if (payload.config) {
         config = payload.config;
     }
+    aplicarHorariosConfigDesdeCalendario();
 
     semanaActual = 1;
     mostrarCalendario();
     refrescarTablonTrasAbrir();
-    mostrarNotificacion('Horario borrado por completo.', 'success');
+    mostrarNotificacion('Horario reseteado.', 'success');
 }
 
 function borrarHorarioCompleto() {
-    if (MODO_WEB) {
+    const canReset = MODO_WEB
+        ? (esAdmin || puedePublicarTablon || esProfesor)
+        : puedePublicarTablon;
+
+    if (!canReset) {
+        mostrarNotificacion('No tienes permiso para resetear el horario', 'error');
         return;
     }
 
-    if (!puedePublicarTablon) {
-        mostrarNotificacion('No tienes permiso para borrar el horario', 'error');
-        return;
-    }
-
-    const msg = '¿Borrar TODO el horario escolar (clases, eventos y franjas) de las dos semanas?\n\nLas secciones del tablón (normas, optativas, clubes, notas) NO se tocarán.';
+    const msg = '¿RESET del horario escolar?\n\nSe borrarán clases y eventos de las dos semanas.\nLas franjas horarias y el tablón (normas, optativas, clubes, notas) se conservan.';
     if (!window.confirm(msg)) {
         return;
     }
 
+    sincronizarHorariosConfigEnCalendario();
     const preservedTablon = calendarioData && calendarioData.tablonSecciones;
     const horarioVacio = generarHorarioVacioDesdeConfig();
 
@@ -5337,7 +5708,7 @@ function borrarHorarioCompleto() {
 
     if (MODO_WEB) {
         if (!tokenAutenticacion) {
-            mostrarNotificacion('Debes iniciar sesión para borrar el horario', 'error');
+            mostrarNotificacion('Debes iniciar sesión para resetear el horario', 'error');
             mostrarLoginSiNecesario();
             return;
         }
@@ -5346,14 +5717,17 @@ function borrarHorarioCompleto() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${tokenAutenticacion}`
+                'Authorization': 'Bearer ' + tokenAutenticacion
             },
             body: JSON.stringify({ calendario: horarioVacio })
         })
         .then(function (response) {
             if (!response.ok) {
                 if (response.status === 403) {
-                    throw new Error('Solo staff/administradores pueden borrar el horario OOC');
+                    throw new Error('Sin permiso para resetear el horario');
+                }
+                if (response.status === 401) {
+                    throw new Error('Sesión expirada');
                 }
                 throw new Error('Error en la respuesta del servidor');
             }
@@ -5367,12 +5741,12 @@ function borrarHorarioCompleto() {
                     calendarioData.ultimaActualizacion = data.ultimaActualizacion;
                 }
             } else {
-                mostrarNotificacion('No se pudo borrar el horario en la web', 'error');
+                mostrarNotificacion('No se pudo resetear el horario en la web', 'error');
             }
         })
         .catch(function (error) {
-            console.error('Error al borrar horario:', error);
-            mostrarNotificacion('Error al borrar: ' + error.message, 'error');
+            console.error('Error al resetear horario:', error);
+            mostrarNotificacion('Error al resetear: ' + error.message, 'error');
         });
         return;
     }
@@ -5380,15 +5754,15 @@ function borrarHorarioCompleto() {
     if (typeof gmod !== 'undefined' && gmod && typeof gmod.CalBorrarHorario === 'function') {
         try {
             gmod.CalBorrarHorario();
-            mostrarNotificacion('Borrado de horario enviado al servidor…', 'info');
+            mostrarNotificacion('Reset de horario enviado al servidor…', 'info');
         } catch (e) {
             console.error(e);
-            mostrarNotificacion('Error al borrar el horario', 'error');
+            mostrarNotificacion('Error al resetear el horario', 'error');
         }
         return;
     }
 
-    mostrarNotificacion('Borrar horario no está disponible en este entorno.', 'error');
+    mostrarNotificacion('Reset de horario no está disponible en este entorno.', 'error');
 }
 
 // Publicar tablón en la web (staff IC / admin OOC)
@@ -5401,6 +5775,7 @@ function publicarTablon() {
     if (MODO_WEB || esProfesor) {
         leerTablonSeccionesDelDOM();
     }
+    sincronizarHorariosConfigEnCalendario();
 
     if (MODO_WEB) {
         if (!tokenAutenticacion) {
@@ -5480,6 +5855,7 @@ function guardarCalendario() {
     }
 
     leerTablonSeccionesDelDOM();
+    sincronizarHorariosConfigEnCalendario();
 
     if (MODO_WEB) {
         if (!tokenAutenticacion) {
