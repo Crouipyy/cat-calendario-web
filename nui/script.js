@@ -2075,7 +2075,7 @@ async function cargarDatosDesdeAPI() {
             aplicarRolUsuario(null);
         }
         
-        const response = await fetch(`${API_URL}/api/calendario`);
+        const response = await fetch(`${API_URL}/api/calendario`, { cache: 'no-store' });
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -2175,7 +2175,7 @@ function iniciarPollingPeriodico() {
             
             console.log('[Calendario] 🔍 Verificando cambios...');
             
-            const response = await fetch(`${API_URL}/api/calendario`);
+            const response = await fetch(`${API_URL}/api/calendario`, { cache: 'no-store' });
             
             if (!response.ok) {
                 console.warn('[Calendario] Error en polling:', response.status);

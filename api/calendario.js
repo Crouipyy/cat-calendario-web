@@ -306,6 +306,8 @@ module.exports = async function handler(req, res) {
         if (req.method === 'GET') {
             // Obtener calendario (público)
             try {
+                res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+                res.setHeader('Pragma', 'no-cache');
                 const calendario = await leerCalendario();
                 
                 // Asegurar que siempre retornamos un objeto válido
