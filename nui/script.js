@@ -190,6 +190,10 @@ function formatearRangoMinutosMadridALocal(iniMin, finMin, cruzaMedianoche) {
 }
 
 function debeMostrarHorarioEnZonaLocal() {
+    // GMod DHTML suele reportar UTC u otra zona rara: el tablón in-game siempre es España.
+    if (typeof window !== 'undefined' && window.MODO_GMOD === true) {
+        return false;
+    }
     try {
         const visor = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -1813,7 +1817,7 @@ const configPorDefecto = {
         {nombre: "Feria del Libro", icono: "📖"},
         {nombre: "Torneo de Duelo", icono: "⚔️"}
     ],
-    separadores: ["TOQUE DE QUEDA", "DESCANSO", "COMEDOR", "RECREO", "ACTIVIDADES EXTRAESCOLARES", "CLUBES", "HORARIO NOCTURNO", "HORA DE ESTUDIO", "CLASES NOCTURNAS", "GUARDIA"],
+    separadores: ["HORARIO LECTIVO", "TOQUE DE QUEDA", "DESCANSO", "COMEDOR", "RECREO", "ACTIVIDADES EXTRAESCOLARES", "CLUBES", "HORARIO NOCTURNO", "HORA DE ESTUDIO", "CLASES NOCTURNAS", "GUARDIA"],
     colores: [
         {nombre: "Rojo Gryffindor", valor: "#740001"},
         {nombre: "Dorado Gryffindor", valor: "#d3a625"},
@@ -2790,7 +2794,8 @@ function inicializarEventos() {
         { id: 'btnCancelarEvento', fn: cerrarModalEvento },
         { id: 'btnCancelarSeparador', fn: cerrarModalSeparador },
         { id: 'btnConfirmarEliminarSeparador', fn: confirmarEliminarSeparador },
-        { id: 'btnCancelarEliminarSeparador', fn: cerrarModalEliminarSeparador }
+        { id: 'btnCancelarEliminarSeparador', fn: cerrarModalEliminarSeparador },
+        { id: 'btnEliminarSeparadorModal', fn: eliminarSeparadorDesdeModal }
     ];
     
     elementosModals.forEach(item => {
@@ -2860,6 +2865,7 @@ function inicializarEventos() {
     }
     elOn('btnCerrarFranjas', 'click', cerrarModalFranjas);
     elOn('btnGuardarFranja', 'click', guardarFranjaDesdeFormulario);
+    elOn('btnOrdenarFranjasJornada', 'click', aplicarOrdenJornadaFranjas);
     elOn('btnNuevaFranjaForm', 'click', function() {
         document.getElementById('franjaEditIndex').value = '-1';
         document.getElementById('franjaHoraInicio').value = '17:00';
@@ -2986,10 +2992,11 @@ function mostrarCalendario() {
         </th>`;
     });
     
-    html += `</tr></thead><tbody>`;
+    html += `</tr></thead>`;
     
-    // Filas de horarios con información de debug
+    // Filas de horarios: un tbody por franja para poder arrastrar el bloque entero.
     (config.horarios || []).forEach((horario, horarioIndex) => {
+        html += `<tbody class="franja-grupo${esProfesor ? ' franja-grupo--editable' : ''}" data-franja-index="${horarioIndex}" data-horario="${escAttr(horario.hora)}">`;
         // Calcular duración real para mostrar en debug
         const { inicio: horaInicioStr, fin: horaFinStr } = extraerHorasDelHorario(horario.hora);
         const horarioConfig = config.horarios.find(h => h.hora === horario.hora);
@@ -3027,6 +3034,7 @@ function mostrarCalendario() {
         html += `<tr>
             <td style="background: #f8f9fa; font-weight: bold; vertical-align: top; position: relative;">
                 <div style="padding: 8px;">
+                    ${esProfesor ? '<div class="franja-drag-handle" title="Arrastrar para reordenar" aria-hidden="true">⋮⋮</div>' : ''}
                     ${formatearFranjaHorariaVisor(horario.hora, horarioConfig)}
                     <div style="font-size: 11px; color: #666; margin-top: 3px;">
                         🌤️ ${traducirClima(climaHorario)}
@@ -3134,10 +3142,12 @@ function mostrarCalendario() {
         });
         
         html += `</tr>`;
+        html += `</tbody>`;
     });
     
-    html += `</tbody></table>`;
+    html += `</table>`;
     calendario.innerHTML = html;
+    bindDragReorderFranjas();
     
     console.log('📅 Calendario renderizado con información de duraciones');
 }
@@ -3583,18 +3593,15 @@ function convertirHoraDecimalAMinutos(horaDecimal) {
 
 // Función para extraer horas de inicio y fin de un horario string
 function extraerHorasDelHorario(horarioStr) {
-    console.log('📋 Extrayendo horas de:', horarioStr);
-    
-    // Ejemplo: "20:00 - 20:30" -> ["20:00", "20:30"]
-    const partes = horarioStr.split(' - ');
-    if (partes.length !== 2) {
+    const s = String(horarioStr || '').trim();
+    const m = s.match(/(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–—]\s*(\d{1,2}:\d{2}(?::\d{2})?)/);
+    if (!m) {
         console.error('❌ Formato de horario inválido:', horarioStr);
         return { inicio: '00:00', fin: '00:00' };
     }
-    
     return {
-        inicio: partes[0].trim(),
-        fin: partes[1].trim()
+        inicio: normalizarHoraHHMM(m[1]),
+        fin: normalizarHoraHHMM(m[2])
     };
 }
 
@@ -3670,25 +3677,45 @@ function configurarOpcionHoraSeparador() {
     }
 }
 
-function obtenerSeparadorEnFranja(horarioKey, separadorIndex) {
+function indiceSeparadorValido(index) {
+    if (index === null || index === undefined || index === '') return -1;
+    const n = Number(index);
+    return (isNaN(n) || n < 0) ? -1 : n;
+}
+
+function separadoresComoArray(horarioKey) {
     const franja = calendarioData.separadores && calendarioData.separadores[horarioKey];
-    if (!franja) {
-        return null;
+    if (!franja) return [];
+    if (Array.isArray(franja)) return franja.slice();
+    if (franja.texto != null || franja.colorFondo != null) return [franja];
+    const keys = Object.keys(franja).filter(function (k) { return /^\d+$/.test(k); })
+        .sort(function (a, b) { return Number(a) - Number(b); });
+    if (keys.length) {
+        return keys.map(function (k) { return franja[k]; }).filter(Boolean);
     }
+    return [franja];
+}
 
-    if (Array.isArray(franja)) {
-        if (separadorIndex === null || separadorIndex === undefined) {
-            return null;
-        }
-
-        return franja[separadorIndex] || null;
+function escribirSeparadoresFranja(horarioKey, lista) {
+    if (!calendarioData.separadores) calendarioData.separadores = {};
+    const limpia = (lista || []).filter(function (sep) {
+        return sep && String(sep.texto || '').trim() !== '';
+    });
+    if (limpia.length === 0) {
+        delete calendarioData.separadores[horarioKey];
+    } else {
+        calendarioData.separadores[horarioKey] = limpia;
     }
+}
 
-    if (separadorIndex === null || separadorIndex === undefined || separadorIndex === 0) {
-        return franja;
+function obtenerSeparadorEnFranja(horarioKey, separadorIndex) {
+    const lista = separadoresComoArray(horarioKey);
+    if (!lista.length) return null;
+    const idx = indiceSeparadorValido(separadorIndex);
+    if (idx < 0) {
+        return lista.length === 1 ? lista[0] : null;
     }
-
-    return null;
+    return lista[idx] || null;
 }
 
 function generarHTMLSeparador(separador, horario, separadorIndex) {
@@ -3727,7 +3754,8 @@ function generarHTMLSeparador(separador, horario, separadorIndex) {
                     ${horaMostrar}
                 </div>
                 <span style="font-weight: bold; flex: 1; text-align: center;">${separador.texto}</span>
-                ${esProfesor ? `<button class="btn-editar-separador" onclick="event.stopPropagation(); abrirModalSeparador(${horarioJs}, ${separadorIndex})" style="margin-left: 10px;">✏️</button>` : ''}
+                ${esProfesor ? `<button class="btn-editar-separador" onclick="event.stopPropagation(); abrirModalSeparador(${horarioJs}, ${separadorIndex})" style="margin-left: 10px;" title="Editar">✏️</button>
+                <button class="btn-editar-separador" onclick="event.stopPropagation(); eliminarSeparador(${horarioJs}, ${separadorIndex})" style="margin-left: 6px; background:#8b0000;" title="Eliminar">🗑️</button>` : ''}
             </div>
         `;
     } else {
@@ -3735,7 +3763,8 @@ function generarHTMLSeparador(separador, horario, separadorIndex) {
             <div style="display: flex; align-items: center; justify-content: center; height: 100%; padding: 0 10px;"
                  oncontextmenu="${esProfesor ? `mostrarContextMenuSeparador(event, ${horarioJs}, ${separadorIndex}); return false;` : ''}">
                 <span style="font-weight: bold;">${separador.texto}</span>
-                ${esProfesor ? `<button class="btn-editar-separador" onclick="event.stopPropagation(); abrirModalSeparador(${horarioJs}, ${separadorIndex})" style="margin-left: 10px;">✏️</button>` : ''}
+                ${esProfesor ? `<button class="btn-editar-separador" onclick="event.stopPropagation(); abrirModalSeparador(${horarioJs}, ${separadorIndex})" style="margin-left: 10px;" title="Editar">✏️</button>
+                <button class="btn-editar-separador" onclick="event.stopPropagation(); eliminarSeparador(${horarioJs}, ${separadorIndex})" style="margin-left: 6px; background:#8b0000;" title="Eliminar">🗑️</button>` : ''}
             </div>
         `;
     }
@@ -4819,8 +4848,15 @@ function abrirModalEventoExistente(semana, dia, horario, eventoIndex) {
 
 function abrirModalSeparador(horario, separadorIndex = null) {
     if (!esProfesor) return;
-    
-    separadorParaEditar = { horario, index: separadorIndex };
+
+    let idx = indiceSeparadorValido(separadorIndex);
+    const lista = separadoresComoArray(horario);
+    // El lápiz de la columna (sin índice): si ya hay una sola división, editarla; no duplicarla.
+    if (idx < 0 && lista.length === 1) {
+        idx = 0;
+    }
+
+    separadorParaEditar = { horario, index: idx < 0 ? null : idx };
     
     // ✅ FIX: Obtener el separador específico o crear uno nuevo
     let separadorData = {
@@ -4832,18 +4868,14 @@ function abrirModalSeparador(horario, separadorIndex = null) {
         horaInicio: "",
         horaFin: ""
     };
-    
-    const separadoresFranja = calendarioData.separadores && calendarioData.separadores[horario];
-    if (separadoresFranja) {
-        if (Array.isArray(separadoresFranja)) {
-            // Si es un array y tenemos un índice válido, obtener ese separador
-            if (separadorIndex !== null && separadoresFranja[separadorIndex]) {
-                separadorData = Object.assign({}, separadorData, separadoresFranja[separadorIndex]);
-            }
-        } else if (separadorIndex === null || separadorIndex === 0) {
-            // Si es un objeto individual y es el primer separador (o nuevo)
-            separadorData = Object.assign({}, separadorData, separadoresFranja);
-        }
+
+    if (idx >= 0 && lista[idx]) {
+        separadorData = Object.assign({}, separadorData, lista[idx]);
+    }
+
+    const btnEliminarModal = document.getElementById('btnEliminarSeparadorModal');
+    if (btnEliminarModal) {
+        btnEliminarModal.style.display = (idx >= 0 && lista[idx] && String(lista[idx].texto || '').trim()) ? 'inline-block' : 'none';
     }
     
     // Llenar selector de textos predefinidos
@@ -5047,9 +5079,22 @@ function guardarSeparador(event) {
         horaFin = `${horas.padStart(2, '0')}:${minutos.padStart(2, '0')}`; // Mantener solo HH:MM
     }
     
-    const textoFinal = textoPersonalizado || textoSeparador;
-    
+    const textoFinal = String(textoPersonalizado || textoSeparador || '').trim();
+
     if (!calendarioData.separadores) calendarioData.separadores = {};
+
+    // "Sin separador" = borrar la división, no guardar una vacía (que dejaba HORARIO LECTIVO).
+    if (!textoFinal) {
+        const idxBorrar = indiceSeparadorValido(index);
+        if (idxBorrar >= 0 || separadoresComoArray(horario).length === 1) {
+            separadorParaEliminar = { horario: horario, index: idxBorrar >= 0 ? idxBorrar : 0 };
+            confirmarEliminarSeparador();
+            return;
+        }
+        cerrarModalSeparador();
+        mostrarNotificacion('No hay texto: no se creó ninguna división', 'info');
+        return;
+    }
     
     const nuevoSeparador = {
         texto: textoFinal,
@@ -5060,27 +5105,15 @@ function guardarSeparador(event) {
         horaInicio: horaInicio,
         horaFin: horaFin
     };
-    
-    // ✅ FIX: Manejar arrays de separadores
-    if (!calendarioData.separadores[horario]) {
-        // Si no existe separador para esta franja, crear array con el nuevo
-        calendarioData.separadores[horario] = [nuevoSeparador];
-    } else if (Array.isArray(calendarioData.separadores[horario])) {
-        // Si ya es un array
-        if (index !== null && index < calendarioData.separadores[horario].length) {
-            // Reemplazar separador existente
-            calendarioData.separadores[horario][index] = nuevoSeparador;
-        } else {
-            // Agregar nuevo separador al final del array
-            calendarioData.separadores[horario].push(nuevoSeparador);
-        }
+
+    const lista = separadoresComoArray(horario);
+    const idx = indiceSeparadorValido(index);
+    if (idx >= 0 && idx < lista.length) {
+        lista[idx] = nuevoSeparador;
     } else {
-        // Si es un objeto individual, convertirlo a array y agregar el nuevo
-        calendarioData.separadores[horario] = [
-            calendarioData.separadores[horario],
-            nuevoSeparador
-        ];
+        lista.push(nuevoSeparador);
     }
+    escribirSeparadoresFranja(horario, lista);
     
     cerrarModalSeparador();
     mostrarCalendario();
@@ -5165,7 +5198,7 @@ function confirmarEliminarSeparador() {
     if (!separadorParaEliminar || typeof separadorParaEliminar !== 'object') return;
 
     const horario = separadorParaEliminar.horario;
-    const index = separadorParaEliminar.index;
+    let index = indiceSeparadorValido(separadorParaEliminar.index);
 
     if (!horario) {
         mostrarNotificacion('Error: No se pudo encontrar el separador', 'error');
@@ -5173,34 +5206,42 @@ function confirmarEliminarSeparador() {
         return;
     }
 
-    const separadorData = obtenerSeparadorEnFranja(horario, index);
-    if (!separadorData) {
+    const lista = separadoresComoArray(horario);
+    if (!lista.length) {
         mostrarNotificacion('Error: No se pudo encontrar el separador', 'error');
         cerrarModalEliminarSeparador();
         return;
     }
 
-    if (calendarioData.separadores && calendarioData.separadores[horario]) {
-        if (Array.isArray(calendarioData.separadores[horario])) {
-            if (index !== null && index !== undefined && index < calendarioData.separadores[horario].length) {
-                calendarioData.separadores[horario].splice(index, 1);
-
-                if (calendarioData.separadores[horario].length === 0) {
-                    delete calendarioData.separadores[horario];
-                }
-            }
-        } else {
-            delete calendarioData.separadores[horario];
-        }
-
-        mostrarNotificacion('Separador eliminado correctamente', 'success');
-        guardarCalendario();
-    } else {
-        mostrarNotificacion('Error: No se pudo encontrar el separador', 'error');
+    if (index < 0 && lista.length === 1) {
+        index = 0;
     }
+    if (index < 0 || index >= lista.length) {
+        mostrarNotificacion('Error: No se pudo encontrar el separador', 'error');
+        cerrarModalEliminarSeparador();
+        return;
+    }
+
+    lista.splice(index, 1);
+    escribirSeparadoresFranja(horario, lista);
+
+    mostrarNotificacion('Separador eliminado correctamente', 'success');
+    guardarCalendario();
+
+    const modalSep = document.getElementById('modalSeparador');
+    if (modalSep) modalSep.style.display = 'none';
+    separadorParaEditar = null;
 
     cerrarModalEliminarSeparador();
     mostrarCalendario();
+}
+
+function eliminarSeparadorDesdeModal() {
+    if (!separadorParaEditar || !separadorParaEditar.horario) return;
+    const horario = separadorParaEditar.horario;
+    const index = separadorParaEditar.index;
+    document.getElementById('modalSeparador').style.display = 'none';
+    eliminarSeparador(horario, index);
 }
 
 // Asegurar que esta función existe
@@ -5310,20 +5351,35 @@ function cerrarModalClimaHorario() {
     document.getElementById('modalClimaHorario').style.display = 'none';
 }
 
-/** HH:MM → decimal (17:30 → 17.5). */
-function horaHHMMADecimal(hhmm) {
+/** HH:MM o HH:MM:SS → HH:MM. El input type=time a veces devuelve segundos. */
+function normalizarHoraHHMM(hhmm) {
     const s = String(hhmm || '').trim();
-    const m = s.match(/^(\d{1,2}):(\d{2})$/);
-    if (!m) return 0;
+    const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (!m) return '';
     const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
     const min = Math.min(59, Math.max(0, parseInt(m[2], 10)));
+    return ((h < 10 ? '0' : '') + String(h)) + ':' + ((min < 10 ? '0' : '') + String(min));
+}
+
+/** HH:MM → decimal (17:30 → 17.5). Acepta HH:MM:SS. */
+function horaHHMMADecimal(hhmm) {
+    const s = normalizarHoraHHMM(hhmm);
+    const m = s.match(/^(\d{2}):(\d{2})$/);
+    if (!m) return 0;
+    const h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
     return h + (min / 60);
 }
 
 function decimalAHoraHHMM(dec) {
-    dec = Number(dec) || 0;
-    let h = Math.floor(dec);
-    let min = Math.round((dec - h) * 60);
+    if (typeof dec === 'string' && dec.indexOf(':') !== -1) {
+        const n = normalizarHoraHHMM(dec);
+        if (n) return n;
+    }
+    const num = Number(dec);
+    if (isNaN(num)) return '00:00';
+    let h = Math.floor(num);
+    let min = Math.round((num - h) * 60);
     if (min >= 60) { h += 1; min = 0; }
     if (h < 0) h = 0;
     if (h > 23) h = 23;
@@ -5333,27 +5389,46 @@ function decimalAHoraHHMM(dec) {
 }
 
 function construirLabelFranja(inicioHHMM, finHHMM) {
-    return String(inicioHHMM).trim() + ' - ' + String(finHHMM).trim();
+    return normalizarHoraHHMM(inicioHHMM) + ' - ' + normalizarHoraHHMM(finHHMM);
 }
 
 function normalizarEntradaHorario(row) {
     if (!row || typeof row !== 'object') return null;
-    let hora = String(row.hora || '').trim();
+    let hora = String(row.hora || '').trim().replace(/(\d{1,2}:\d{2}):\d{2}/g, '$1');
     let inicio = row.inicio;
     let fin = row.fin;
-    if ((inicio == null || fin == null) && hora.indexOf(' - ') !== -1) {
-        const p = extraerHorasDelHorario(hora);
-        inicio = horaHHMMADecimal(p.inicio);
-        fin = horaHHMMADecimal(p.fin);
-        // Si fin <= inicio y cruza medianoche, fin+24 no; keep as-is for short overnight slots.
+    const p = hora ? extraerHorasDelHorario(hora) : { inicio: '', fin: '' };
+    const iniLabel = horaHHMMADecimal(p.inicio);
+    const finLabel = horaHHMMADecimal(p.fin);
+    if (typeof inicio === 'string' && inicio.indexOf(':') !== -1) {
+        inicio = horaHHMMADecimal(inicio);
     } else {
         inicio = Number(inicio);
+    }
+    if (typeof fin === 'string' && fin.indexOf(':') !== -1) {
+        fin = horaHHMMADecimal(fin);
+    } else {
         fin = Number(fin);
-        if (!hora && !isNaN(inicio) && !isNaN(fin)) {
-            hora = construirLabelFranja(decimalAHoraHHMM(inicio), decimalAHoraHHMM(fin));
+    }
+    // inicio=0 con etiqueta 17:00 = bug del input type=time con segundos.
+    if (isNaN(inicio) || (inicio === 0 && iniLabel > 0)) inicio = iniLabel;
+    if (isNaN(fin) || (fin === 0 && finLabel > 0)) fin = finLabel;
+    if ((isNaN(inicio) || isNaN(fin) || (!hora && (inicio == null || fin == null))) && hora.indexOf('-') !== -1) {
+        inicio = iniLabel;
+        fin = finLabel;
+    }
+    if (!hora && !isNaN(inicio) && !isNaN(fin)) {
+        hora = construirLabelFranja(decimalAHoraHHMM(inicio), decimalAHoraHHMM(fin));
+    } else if (hora) {
+        hora = construirLabelFranja(
+            decimalAHoraHHMM(isNaN(inicio) ? 0 : inicio),
+            decimalAHoraHHMM(isNaN(fin) ? 0 : fin)
+        );
+        if (hora === ' - ' || hora.indexOf('00:00 - 00:00') === 0 && p.inicio && p.inicio !== '00:00') {
+            hora = construirLabelFranja(p.inicio, p.fin);
         }
     }
-    if (!hora) return null;
+    if (!hora || hora === ' - ') return null;
     return {
         hora: hora,
         inicio: isNaN(inicio) ? 0 : inicio,
@@ -5364,12 +5439,21 @@ function normalizarEntradaHorario(row) {
 
 function aplicarHorariosConfigDesdeCalendario() {
     if (!calendarioData || typeof calendarioData !== 'object') return;
-    const raw = calendarioData.horariosConfig;
+    let raw = calendarioData.horariosConfig;
+    if (raw && !Array.isArray(raw) && typeof raw === 'object') {
+        raw = Object.keys(raw).sort(function (a, b) { return Number(a) - Number(b); })
+            .map(function (k) { return raw[k]; }).filter(Boolean);
+    }
     if (!Array.isArray(raw) || raw.length === 0) return;
     const list = [];
     for (let i = 0; i < raw.length; i++) {
+        const oldKey = String((raw[i] && raw[i].hora) || '').trim();
         const n = normalizarEntradaHorario(raw[i]);
-        if (n) list.push(n);
+        if (!n) continue;
+        if (oldKey && oldKey !== n.hora) {
+            renombrarClaveFranjaEnCalendario(oldKey, n.hora);
+        }
+        list.push(n);
     }
     if (list.length === 0) return;
     if (!config || typeof config !== 'object') {
@@ -5406,12 +5490,7 @@ function asegurarEstructuraFranjaEnCalendario(horaKey) {
     if (calendarioData.climasHorario[horaKey] == null) {
         calendarioData.climasHorario[horaKey] = 'CLEAR';
     }
-    if (!calendarioData.separadores[horaKey]) {
-        calendarioData.separadores[horaKey] = {
-            texto: '', colorFondo: '#740001', colorTexto: '#ffffff',
-            cursiva: false, mostrarHora: false, horaInicio: '', horaFin: ''
-        };
-    }
+    // No recrear un separador vacío: si se borró "HORARIO LECTIVO" debe quedarse borrado.
     const semanas = Array.isArray(calendarioData.semanas) ? calendarioData.semanas : [];
     for (let s = 0; s < semanas.length; s++) {
         const dias = semanas[s] && Array.isArray(semanas[s].dias) ? semanas[s].dias : [];
@@ -5471,10 +5550,15 @@ function abrirModalFranjas(editIndex) {
     document.getElementById('franjaEditIndex').value = String(isNaN(idx) ? -1 : idx);
     if (idx >= 0 && config.horarios && config.horarios[idx]) {
         const h = config.horarios[idx];
-        const ini = (h.inicio != null) ? decimalAHoraHHMM(h.inicio) : extraerHorasDelHorario(h.hora).inicio;
-        const fin = (h.fin != null) ? decimalAHoraHHMM(h.fin) : extraerHorasDelHorario(h.hora).fin;
-        document.getElementById('franjaHoraInicio').value = ini;
-        document.getElementById('franjaHoraFin').value = fin;
+        const fromLabel = extraerHorasDelHorario(h.hora);
+        const ini = (fromLabel.inicio && fromLabel.inicio !== '00:00')
+            ? fromLabel.inicio
+            : ((h.inicio != null) ? decimalAHoraHHMM(h.inicio) : '17:00');
+        const fin = (fromLabel.fin && fromLabel.fin !== '00:00')
+            ? fromLabel.fin
+            : ((h.fin != null) ? decimalAHoraHHMM(h.fin) : '18:00');
+        document.getElementById('franjaHoraInicio').value = normalizarHoraHHMM(ini) || '17:00';
+        document.getElementById('franjaHoraFin').value = normalizarHoraHHMM(fin) || '18:00';
         document.getElementById('franjaClima').value = h.clima || 'CLEAR';
     } else {
         document.getElementById('franjaHoraInicio').value = '17:00';
@@ -5489,6 +5573,56 @@ function cerrarModalFranjas() {
     if (modal) modal.style.display = 'none';
 }
 
+function minutosInicioFranja(row) {
+    if (!row) return 0;
+    let v = Number(row.inicio);
+    if (isNaN(v)) v = 0;
+    if (v === 0 && row.hora) {
+        const p = extraerHorasDelHorario(row.hora);
+        const fromLabel = horaHHMMADecimal(p.inicio);
+        if (fromLabel > 0) v = fromLabel;
+    }
+    return v;
+}
+
+function claveOrdenJornada(row) {
+    let v = minutosInicioFranja(row);
+    // Jornada del tablón: tarde → noche → madrugada (00:00-11:59 al final, no arriba).
+    if (v < 12) v += 24;
+    return v;
+}
+
+function empujarFranjasMadrugadaAlFinal() {
+    if (!config.horarios || config.horarios.length < 2) return false;
+    const hayTarde = config.horarios.some(function (h) {
+        return minutosInicioFranja(h) >= 12;
+    });
+    if (!hayTarde) return false;
+    let moved = false;
+    let guard = 0;
+    while (guard++ < config.horarios.length && minutosInicioFranja(config.horarios[0]) < 12) {
+        config.horarios.push(config.horarios.shift());
+        moved = true;
+    }
+    return moved;
+}
+
+function reordenarFranja(fromIdx, toIdx) {
+    if (!esProfesor || !config.horarios) return false;
+    fromIdx = Number(fromIdx);
+    toIdx = Number(toIdx);
+    if (isNaN(fromIdx) || isNaN(toIdx)) return false;
+    if (fromIdx === toIdx) return false;
+    if (fromIdx < 0 || toIdx < 0) return false;
+    if (fromIdx >= config.horarios.length || toIdx >= config.horarios.length) return false;
+    const moved = config.horarios.splice(fromIdx, 1)[0];
+    config.horarios.splice(toIdx, 0, moved);
+    sincronizarHorariosConfigEnCalendario();
+    renderListaFranjasEditor();
+    mostrarCalendario();
+    return true;
+}
+
 function renderListaFranjasEditor() {
     const host = document.getElementById('listaFranjasEditor');
     if (!host) return;
@@ -5497,32 +5631,131 @@ function renderListaFranjasEditor() {
         host.innerHTML = '<p style="color:#888;font-size:13px;">No hay franjas. Creá una abajo.</p>';
         return;
     }
-    let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
-    html += '<tr style="background:#f0f0f0;"><th style="text-align:left;padding:6px;">Franja</th><th>Clima</th><th></th></tr>';
+    let html = '<table class="franjas-editor-tabla">';
+    html += '<tr><th></th><th style="text-align:left;padding:6px;">Franja</th><th>Clima</th><th></th></tr>';
     rows.forEach(function (h, i) {
-        html += '<tr style="border-bottom:1px solid #eee;">';
+        html += '<tr class="franja-editor-row" data-franja-index="' + i + '">';
+        html += '<td class="franja-drag-handle" draggable="true" title="Arrastrar para reordenar">⋮⋮</td>';
         html += '<td style="padding:6px;">' + escAttr(h.hora) + '</td>';
         html += '<td style="text-align:center;">' + escAttr(h.clima || 'CLEAR') + '</td>';
         html += '<td style="text-align:right;padding:6px;white-space:nowrap;">';
+        html += '<button type="button" class="btn-cerrar" style="padding:4px 8px;font-size:11px;" onclick="reordenarFranja(' + i + ',' + Math.max(0, i - 1) + ')">↑</button> ';
+        html += '<button type="button" class="btn-cerrar" style="padding:4px 8px;font-size:11px;" onclick="reordenarFranja(' + i + ',' + Math.min(rows.length - 1, i + 1) + ')">↓</button> ';
         html += '<button type="button" class="btn-guardar" style="padding:4px 8px;font-size:11px;" onclick="abrirModalFranjas(' + i + ')">Editar</button> ';
         html += '<button type="button" class="btn-eliminar" style="padding:4px 8px;font-size:11px;" onclick="eliminarFranjaPorIndice(' + i + ')">Eliminar</button>';
         html += '</td></tr>';
     });
     html += '</table>';
     host.innerHTML = html;
+    bindDragReorderFranjasEditor(host);
+}
+
+function insertarFranjaEnOrden(row) {
+    if (!config.horarios) config.horarios = [];
+    // Conservar el orden a mano (drag). Las nuevas van al final; el admin las mueve.
+    config.horarios.push(row);
 }
 
 function ordenarFranjasPorInicio() {
     if (!config.horarios) return;
     config.horarios.sort(function (a, b) {
-        return (Number(a.inicio) || 0) - (Number(b.inicio) || 0);
+        return claveOrdenJornada(a) - claveOrdenJornada(b);
+    });
+}
+
+function aplicarOrdenJornadaFranjas() {
+    if (!esProfesor) return;
+    ordenarFranjasPorInicio();
+    sincronizarHorariosConfigEnCalendario();
+    renderListaFranjasEditor();
+    mostrarCalendario();
+    mostrarNotificacion('Franjas ordenadas: tarde → noche → madrugada', 'success');
+}
+
+let _franjaDragFrom = null;
+
+function bindDragReorderFranjasEditor(host) {
+    if (!host || !esProfesor) return;
+    const rows = host.querySelectorAll('.franja-editor-row');
+    rows.forEach(function (tr) {
+        const handle = tr.querySelector('.franja-drag-handle');
+        if (handle) {
+            handle.addEventListener('dragstart', function (ev) {
+                _franjaDragFrom = Number(tr.getAttribute('data-franja-index'));
+                tr.classList.add('franja-dragging');
+                try { ev.dataTransfer.setData('text/plain', String(_franjaDragFrom)); } catch (e1) {}
+                try { ev.dataTransfer.effectAllowed = 'move'; } catch (e2) {}
+            });
+            handle.addEventListener('dragend', function () {
+                tr.classList.remove('franja-dragging');
+                host.querySelectorAll('.franja-drop-over').forEach(function (el) {
+                    el.classList.remove('franja-drop-over');
+                });
+                _franjaDragFrom = null;
+            });
+        }
+        tr.addEventListener('dragover', function (ev) {
+            if (_franjaDragFrom == null) return;
+            ev.preventDefault();
+            tr.classList.add('franja-drop-over');
+        });
+        tr.addEventListener('dragleave', function () {
+            tr.classList.remove('franja-drop-over');
+        });
+        tr.addEventListener('drop', function (ev) {
+            ev.preventDefault();
+            tr.classList.remove('franja-drop-over');
+            const toIdx = Number(tr.getAttribute('data-franja-index'));
+            reordenarFranja(_franjaDragFrom, toIdx);
+        });
+    });
+}
+
+function bindDragReorderFranjas() {
+    if (!esProfesor) return;
+    const table = document.querySelector('#calendario .tabla-calendario');
+    if (!table) return;
+    const groups = table.querySelectorAll('tbody.franja-grupo');
+    groups.forEach(function (body) {
+        const handle = body.querySelector('.franja-drag-handle');
+        if (handle) {
+            handle.setAttribute('draggable', 'true');
+            handle.addEventListener('dragstart', function (ev) {
+                _franjaDragFrom = Number(body.getAttribute('data-franja-index'));
+                body.classList.add('franja-dragging');
+                try { ev.dataTransfer.setData('text/plain', String(_franjaDragFrom)); } catch (e1) {}
+                try { ev.dataTransfer.effectAllowed = 'move'; } catch (e2) {}
+                ev.stopPropagation();
+            });
+            handle.addEventListener('dragend', function () {
+                body.classList.remove('franja-dragging');
+                table.querySelectorAll('.franja-drop-over').forEach(function (el) {
+                    el.classList.remove('franja-drop-over');
+                });
+                _franjaDragFrom = null;
+            });
+        }
+        body.addEventListener('dragover', function (ev) {
+            if (_franjaDragFrom == null) return;
+            ev.preventDefault();
+            body.classList.add('franja-drop-over');
+        });
+        body.addEventListener('dragleave', function () {
+            body.classList.remove('franja-drop-over');
+        });
+        body.addEventListener('drop', function (ev) {
+            ev.preventDefault();
+            body.classList.remove('franja-drop-over');
+            const toIdx = Number(body.getAttribute('data-franja-index'));
+            reordenarFranja(_franjaDragFrom, toIdx);
+        });
     });
 }
 
 function guardarFranjaDesdeFormulario() {
     if (!esProfesor) return;
-    const ini = document.getElementById('franjaHoraInicio').value;
-    const fin = document.getElementById('franjaHoraFin').value;
+    const ini = normalizarHoraHHMM(document.getElementById('franjaHoraInicio').value);
+    const fin = normalizarHoraHHMM(document.getElementById('franjaHoraFin').value);
     const clima = document.getElementById('franjaClima').value || 'CLEAR';
     const editIdx = parseInt(document.getElementById('franjaEditIndex').value, 10);
     if (!ini || !fin) {
@@ -5540,7 +5773,8 @@ function guardarFranjaDesdeFormulario() {
 
     if (!isNaN(editIdx) && editIdx >= 0 && editIdx < config.horarios.length) {
         const oldKey = config.horarios[editIdx].hora;
-        config.horarios[editIdx] = row;
+        config.horarios.splice(editIdx, 1);
+        insertarFranjaEnOrden(row);
         if (oldKey !== label) {
             renombrarClaveFranjaEnCalendario(oldKey, label);
         }
@@ -5556,17 +5790,17 @@ function guardarFranjaDesdeFormulario() {
                 return;
             }
         }
-        config.horarios.push(row);
+        insertarFranjaEnOrden(row);
         asegurarEstructuraFranjaEnCalendario(label);
         if (calendarioData.climasHorario) {
             calendarioData.climasHorario[label] = clima;
         }
         mostrarNotificacion('Franja creada: ' + label, 'success');
     }
-    ordenarFranjasPorInicio();
     sincronizarHorariosConfigEnCalendario();
     renderListaFranjasEditor();
-    document.getElementById('franjaEditIndex').value = '-1';
+    const newIdx = config.horarios.findIndex(function (h) { return h.hora === label; });
+    document.getElementById('franjaEditIndex').value = String(newIdx >= 0 ? newIdx : -1);
     mostrarCalendario();
 }
 

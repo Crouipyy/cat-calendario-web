@@ -417,6 +417,7 @@
                 
                 <div class="modal-botones">
                     <button type="submit" class="btn-guardar">💾 Guardar Separador</button>
+                    <button type="button" id="btnEliminarSeparadorModal" class="btn-eliminar" style="display: none;">🗑️ Eliminar</button>
                     <button type="button" id="btnCancelarSeparador" class="btn-cerrar">❌ Cancelar</button>
                 </div>
             </form>
@@ -611,16 +612,16 @@
         <div class="modal-content" style="max-width: 640px;">
             <h3>⏱️ Franjas de clase</h3>
             <p style="font-size: 13px; color: #555; margin-bottom: 12px;">
-                Crear, editar o eliminar filas del horario (ej. <code>17:00 - 18:00</code>).
-                Tras cambiar, pulsá <strong>Guardar Cambios</strong> para publicar en la web.
+                Crear, editar, eliminar o <strong>arrastrar</strong> filas del horario (ej. <code>17:00 - 18:00</code>).
+                El orden de la lista es el del tablón. Tras cambiar, pulsá <strong>Guardar Cambios</strong> para publicar.
             </p>
             <div id="listaFranjasEditor" style="max-height: 320px; overflow: auto; margin-bottom: 14px;"></div>
             <div class="form-group" style="border-top: 1px solid #ddd; padding-top: 12px;">
                 <label>Nueva / editar franja</label>
                 <input type="hidden" id="franjaEditIndex" value="-1">
                 <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                    <label style="font-size:12px;">Inicio <input type="time" id="franjaHoraInicio" value="17:00"></label>
-                    <label style="font-size:12px;">Fin <input type="time" id="franjaHoraFin" value="18:00"></label>
+                    <label style="font-size:12px;">Inicio <input type="time" id="franjaHoraInicio" value="17:00" step="60"></label>
+                    <label style="font-size:12px;">Fin <input type="time" id="franjaHoraFin" value="18:00" step="60"></label>
                     <label style="font-size:12px;">Clima
                         <select id="franjaClima">
                             <option value="CLEAR">CLEAR</option>
@@ -635,6 +636,7 @@
             </div>
             <div class="modal-botones">
                 <button type="button" id="btnGuardarFranja" class="btn-guardar">💾 Guardar franja</button>
+                <button type="button" id="btnOrdenarFranjasJornada" class="btn-cerrar" title="Tarde y noche arriba, madrugada al final">↕ Tarde → madrugada</button>
                 <button type="button" id="btnNuevaFranjaForm" class="btn-cerrar">＋ Limpiar formulario</button>
                 <button type="button" id="btnCerrarFranjas" class="btn-cerrar">Cerrar</button>
             </div>

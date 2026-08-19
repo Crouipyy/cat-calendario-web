@@ -2664,6 +2664,55 @@ select.tablon-notas-in-casa {
     line-height: 1.4;
 }
 
+.franjas-editor-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.franjas-editor-tabla th {
+    background: #f0f0f0;
+    padding: 6px;
+}
+
+.franja-editor-row {
+    border-bottom: 1px solid #eee;
+    cursor: grab;
+}
+
+.franja-editor-row.franja-dragging,
+tbody.franja-grupo.franja-dragging {
+    opacity: 0.45;
+}
+
+.franja-editor-row.franja-drop-over,
+tbody.franja-grupo.franja-drop-over {
+    outline: 2px dashed #d3a625;
+    background: rgba(211, 166, 37, 0.12);
+}
+
+.franja-drag-handle {
+    display: inline-block;
+    cursor: grab;
+    color: #740001;
+    font-weight: 700;
+    letter-spacing: -2px;
+    padding: 2px 6px;
+    user-select: none;
+    margin-right: 4px;
+}
+
+.franja-grupo--editable .franja-drag-handle {
+    position: absolute;
+    left: 4px;
+    top: 6px;
+    z-index: 2;
+}
+
+.franja-grupo--editable td:first-child > div {
+    padding-left: 22px;
+}
+
 /* Asegurar que el texto de ayuda se vea bien */
 .form-group small {
     color: #6c757d;
