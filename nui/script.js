@@ -27,6 +27,33 @@ function escAttr(val) {
         .replace(/</g, '&lt;');
 }
 
+function escHtml(val) {
+    return String(val == null ? '' : val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function escCssColor(val) {
+    const s = String(val == null ? '' : val).trim();
+    if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s)) {
+        return s;
+    }
+    if (/^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(\s*,\s*(0|0?\.\d+|1(\.0)?))?\s*\)$/.test(s)) {
+        return s;
+    }
+    return '';
+}
+
+function escCssFontSize(val) {
+    const s = String(val == null ? '' : val).trim();
+    if (/^\d{1,3}px$/.test(s)) {
+        return s;
+    }
+    return '';
+}
+
 function actualizarControlesPublicacionNotas() {
     const pub = document.getElementById('tablon-notas-publicado');
     const pubLbl = pub && pub.closest ? pub.closest('.tablon-notas-meta-lbl') : null;
@@ -1679,6 +1706,18 @@ function normalizarCalendarioRecibido(cal) {
     }
 
     out.meses = arrayDesdeObjetoOAgujero(out.meses);
+    if (Array.isArray(out.meses)) {
+        out.meses = out.meses.map(function (fila) {
+            const diasMes = arrayDesdeObjetoOAgujero(fila);
+            if (diasMes.length > 7) {
+                return diasMes.slice(0, 7);
+            }
+            while (diasMes.length < 7) {
+                diasMes.push('Enero');
+            }
+            return diasMes;
+        });
+    }
 
     return out;
 }
@@ -1760,6 +1799,25 @@ let tokenAutenticacion = localStorage.getItem('calendario_token') || null;
 let usuarioActual = null;
 let ultimoTimestamp = null; // Para detectar cambios en modo web
 let pollingInterval = null; // Referencia al intervalo de polling
+let hayCambiosSinGuardar = false;
+let pollingIgnorarRemoto = false;
+
+function marcarCalendarioSucio() {
+    hayCambiosSinGuardar = true;
+}
+
+function marcarCalendarioLimpio() {
+    hayCambiosSinGuardar = false;
+    pollingIgnorarRemoto = false;
+}
+
+function cabecerasCalendarioGet() {
+    const headers = {};
+    if (tokenAutenticacion) {
+        headers.Authorization = 'Bearer ' + tokenAutenticacion;
+    }
+    return headers;
+}
 
 // Log para debugging
 console.log('[Calendario] Modo Web detectado:', MODO_WEB);
@@ -1817,7 +1875,7 @@ const configPorDefecto = {
         {nombre: "Feria del Libro", icono: "📖"},
         {nombre: "Torneo de Duelo", icono: "⚔️"}
     ],
-    separadores: ["HORARIO LECTIVO", "TOQUE DE QUEDA", "DESCANSO", "COMEDOR", "RECREO", "ACTIVIDADES EXTRAESCOLARES", "CLUBES", "HORARIO NOCTURNO", "HORA DE ESTUDIO", "CLASES NOCTURNAS", "GUARDIA"],
+    separadores: ["HORARIO LECTIVO", "TOQUE DE QUEDA", "NUEVO DÍA", "DESCANSO", "COMEDOR", "CENA OBLIGATORIA", "RECREO", "ACTIVIDADES EXTRAESCOLARES", "ACTIVIDADES - CLUBES", "CLUBES", "HORARIO NOCTURNO", "HORA DE ESTUDIO", "CLASES NOCTURNAS", "GUARDIA"],
     colores: [
         {nombre: "Rojo Gryffindor", valor: "#740001"},
         {nombre: "Dorado Gryffindor", valor: "#d3a625"},
@@ -2074,8 +2132,11 @@ async function cargarDatosDesdeAPI() {
         } else {
             aplicarRolUsuario(null);
         }
-        
-        const response = await fetch(`${API_URL}/api/calendario`, { cache: 'no-store' });
+
+        const response = await fetch(`${API_URL}/api/calendario`, {
+            cache: 'no-store',
+            headers: cabecerasCalendarioGet()
+        });
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -2096,6 +2157,7 @@ async function cargarDatosDesdeAPI() {
             config = JSON.parse(JSON.stringify(configPorDefecto));
             calendarioData = normalizarCalendarioRecibido(data.calendario);
             aplicarHorariosConfigDesdeCalendario();
+            marcarCalendarioLimpio();
         } else {
             console.warn('[Calendario] No hay datos del calendario, usando estructura vacía');
             calendarioData = { semanas: [], meses: [], separadores: {}, climasHorario: {} };
@@ -2175,7 +2237,10 @@ function iniciarPollingPeriodico() {
             
             console.log('[Calendario] 🔍 Verificando cambios...');
             
-            const response = await fetch(`${API_URL}/api/calendario`, { cache: 'no-store' });
+            const response = await fetch(`${API_URL}/api/calendario`, {
+                cache: 'no-store',
+                headers: cabecerasCalendarioGet()
+            });
             
             if (!response.ok) {
                 console.warn('[Calendario] Error en polling:', response.status);
@@ -2191,10 +2256,28 @@ function iniciarPollingPeriodico() {
                 if (ultimoTimestamp !== null && nuevoTimestamp > ultimoTimestamp) {
                     console.log('[Calendario] 🔄 Cambios detectados! Actualizando calendario...');
                     console.log('[Calendario] Timestamp anterior:', ultimoTimestamp, 'Nuevo:', nuevoTimestamp);
-                    
-                    // Actualizar datos
+
+                    if (hayCambiosSinGuardar) {
+                        if (pollingIgnorarRemoto) {
+                            return;
+                        }
+                        const ok = window.confirm(
+                            'El calendario cambió en el servidor y tienes cambios sin guardar.\n\n' +
+                            '¿Descartar tu edición local y cargar la versión nueva?'
+                        );
+                        if (!ok) {
+                            pollingIgnorarRemoto = true;
+                            mostrarNotificacion(
+                                'Se mantienen tus cambios locales. Guárdalos o recarga la página; no se actualizará solo.',
+                                'info'
+                            );
+                            return;
+                        }
+                    }
+
                     ultimoTimestamp = nuevoTimestamp;
                     calendarioData = normalizarCalendarioRecibido(data.calendario);
+                    marcarCalendarioLimpio();
                     
                     // Actualizar la vista si el calendario está visible
                     if (document.body.style.display !== 'none') {
@@ -2644,6 +2727,7 @@ async function hacerLogin() {
             const modalLogin = document.getElementById('modalLogin');
             if (modalLogin) modalLogin.style.display = 'none';
             mostrarNotificacion('Sesión iniciada correctamente', 'success');
+            await cargarDatosDesdeAPI();
         } else {
             mostrarNotificacion(data.error || 'Error al iniciar sesión', 'error');
         }
@@ -2934,7 +3018,7 @@ function mostrarCalendario() {
                             width: calc((100% - 120px) * ${barra.diasDuracion} / ${numDias}); 
                             background: ${colorEstacion};
                             ${cursorStyle}">
-                    ${iconoEstacion} ${nombreBarra}
+                    ${iconoEstacion} ${escHtml(nombreBarra)}
                     ${esProfesor ? '<br><small style="font-size: 10px;">✏️ Click para editar</small>' : ''}
                 </div>
             `;
@@ -2978,16 +3062,16 @@ function mostrarCalendario() {
         
         html += `<th>
             <div class="mes-header" onclick="${esProfesor ? `abrirModalMeses(${semanaActual})` : ''}">
-                ${mesData || mesesDisponibles[0] || 'Enero'} 📅
+                ${escHtml(mesData || mesesDisponibles[0] || 'Enero')} 📅
             </div>
             <div class="dia-header" onclick="${esProfesor ? `abrirModalClima(${semanaActual}, ${index + 1})` : ''}">
-                ${dia}
+                ${escHtml(dia)}
                 ${esProfesor ? '<br><small>👆 Click para editar clima</small>' : ''}
             </div>
             <div class="info-dia">
-                🌡️ ${(diaData && diaData.temperatura) || '--'}°C<br>
-                🌙 ${(diaData && diaData.luna) || '--'}<br>
-                ${obtenerIconoEvento(diaData && diaData.evento) || '🎉'} ${(diaData && diaData.evento) || '--'}<br>
+                🌡️ ${escHtml((diaData && diaData.temperatura) || '--')}°C<br>
+                🌙 ${escHtml((diaData && diaData.luna) || '--')}<br>
+                ${obtenerIconoEvento(diaData && diaData.evento) || '🎉'} ${escHtml((diaData && diaData.evento) || '--')}<br>
             </div>
         </th>`;
     });
@@ -3005,7 +3089,7 @@ function mostrarCalendario() {
         if (horarioConfig) {
             const horaInicioMinutos = convertirHoraDecimalAMinutos(horarioConfig.inicio);
             const horaFinMinutos = convertirHoraDecimalAMinutos(horarioConfig.fin);
-            duracionTotal = horaFinMinutos - horaInicioMinutos;
+            duracionTotal = duracionMinutosFranja(horaInicioMinutos, horaFinMinutos);
         }
         
         // Obtener clima de la franja horaria
@@ -3049,9 +3133,16 @@ function mostrarCalendario() {
                             🌤️
                         </button>
                         <button class="btn-editar-separador" 
-                                onclick="abrirModalSeparador(${htmlJsArg(horario.hora)})" 
+                                onclick="abrirModalSeparador(${htmlJsArg(horario.hora)}, null)" 
+                                title="Añadir separador"
                                 style="position: absolute; top: 5px; right: 30px; background: #740001; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">
                             📏
+                        </button>
+                        <button class="btn-editar-separador"
+                                onclick="abrirModalSeparador(${htmlJsArg(horario.hora)}, null)"
+                                title="Añadir otro separador"
+                                style="position: absolute; top: 28px; right: 30px; background: #5d5d5d; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">
+                            ＋
                         </button>
                         <button class="btn-editar-separador"
                                 onclick="abrirModalFranjas(${horarioIndex})"
@@ -3100,7 +3191,7 @@ function mostrarCalendario() {
                                     style="${estiloEvento}"
                                     oncontextmenu="${esProfesor ? `mostrarContextMenuEvento(event, this, ${semanaActual}, ${diaIndex + 1}, ${htmlJsArg(horario.hora)}, ${eventoIndex}); return false;` : ''}"
                                     ${esProfesor ? `onclick="abrirModalEventoExistente(${semanaActual}, ${diaIndex + 1}, ${htmlJsArg(horario.hora)}, ${eventoIndex})"` : ''}>
-                                    ${evento.texto}
+                                    ${escHtml(evento.texto)}
                                     ${esProfesor ? '<div style="font-size:9px;color:#666;">✏️ Click editar | 🔘 Click derecho eliminar</div>' : ''}
                                 </div>
                             `;
@@ -3232,7 +3323,7 @@ function crearHTMLClase(clase, semana, dia, horario, claseIndex) {
     const cursos = Array.isArray(clase.cursos) ? clase.cursos : [];
     const cursosHTML = cursos.length > 0 
         ? `<div class="clase-cursos">${cursos.map(curso => 
-            `<span class="curso-badge ${curso === 'Todos' ? 'todos' : ''}">${curso}</span>`
+            `<span class="curso-badge ${curso === 'Todos' ? 'todos' : ''}">${escHtml(curso)}</span>`
           ).join('')}</div>`
         : '';
     
@@ -3256,9 +3347,9 @@ function crearHTMLClase(clase, semana, dia, horario, claseIndex) {
              ${esProfesor ? 'onclick="abrirModalClaseExistente(this)"' : ''}>
             ${multiClassIndicator}
             <div class="clase-contenido">
-                <div class="clase-titulo">${clase.titulo}</div>
+                <div class="clase-titulo">${escHtml(clase.titulo)}</div>
                 <div class="clase-detalles">
-                    <span>👨‍🏫 ${clase.profesor || 'Sin profesor'}</span>
+                    <span>👨‍🏫 ${escHtml(clase.profesor || 'Sin profesor')}</span>
                     ${horaHTML}
                 </div>
                 ${cursosHTML}
@@ -3470,7 +3561,7 @@ function obtenerOpcionesHorario(semana, dia, horario, claseIndex, cursosPendient
         console.log('⚠️ Usando cálculo desde string');
     }
     
-    const duracionTotal = horaFinMinutos - horaInicioMinutos;
+    const duracionTotal = duracionMinutosFranja(horaInicioMinutos, horaFinMinutos);
     
     console.log('⏱️ Duración total calculada:', duracionTotal, 'minutos');
     console.log('📊 Rango:', convertirMinutosAHora(horaInicioMinutos), '-', convertirMinutosAHora(horaFinMinutos));
@@ -3589,6 +3680,14 @@ function convertirHoraDecimalAMinutos(horaDecimal) {
     
     console.log(`🔢 ${horaDecimal} -> ${horas}h ${minutos}m -> ${(horas * 60) + minutos}min`);
     return (horas * 60) + minutos;
+}
+
+function duracionMinutosFranja(inicioMin, finMin) {
+    let dur = (Number(finMin) || 0) - (Number(inicioMin) || 0);
+    if (dur <= 0) {
+        dur += 1440;
+    }
+    return dur;
 }
 
 // Función para extraer horas de inicio y fin de un horario string
@@ -3722,11 +3821,8 @@ function generarHTMLSeparador(separador, horario, separadorIndex) {
     const horarioJs = htmlJsArg(horario);
     const horarioAttr = escAttr(horario);
 
-    let estilo = 'background: #740001; color: white; padding: 12px; height: 50px;';
-    if (separador.colorFondo) estilo += `background: ${separador.colorFondo} !important;`;
-    if (separador.colorTexto) estilo += `color: ${separador.colorTexto} !important;`;
-    estilo += 'border-bottom: 2px solid #d3a625; border-top: 2px solid #d3a625; font-size: 16px; font-weight: bold; text-align: center; vertical-align: middle;';
-    
+    const estilo = generarEstiloSeparador(separador);
+
     const numDias = (config.diasSemana || []).length;
     
     let contenido = '';
@@ -3753,7 +3849,7 @@ function generarHTMLSeparador(separador, horario, separadorIndex) {
                 <div style="background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 4px; font-size: 14px; min-width: 120px; text-align: center;">
                     ${horaMostrar}
                 </div>
-                <span style="font-weight: bold; flex: 1; text-align: center;">${separador.texto}</span>
+                <span style="font-weight: bold; flex: 1; text-align: center;">${escHtml(separador.texto)}</span>
                 ${esProfesor ? `<button class="btn-editar-separador" onclick="event.stopPropagation(); abrirModalSeparador(${horarioJs}, ${separadorIndex})" style="margin-left: 10px;" title="Editar">✏️</button>
                 <button class="btn-editar-separador" onclick="event.stopPropagation(); eliminarSeparador(${horarioJs}, ${separadorIndex})" style="margin-left: 6px; background:#8b0000;" title="Eliminar">🗑️</button>` : ''}
             </div>
@@ -3762,7 +3858,7 @@ function generarHTMLSeparador(separador, horario, separadorIndex) {
         contenido = `
             <div style="display: flex; align-items: center; justify-content: center; height: 100%; padding: 0 10px;"
                  oncontextmenu="${esProfesor ? `mostrarContextMenuSeparador(event, ${horarioJs}, ${separadorIndex}); return false;` : ''}">
-                <span style="font-weight: bold;">${separador.texto}</span>
+                <span style="font-weight: bold;">${escHtml(separador.texto)}</span>
                 ${esProfesor ? `<button class="btn-editar-separador" onclick="event.stopPropagation(); abrirModalSeparador(${horarioJs}, ${separadorIndex})" style="margin-left: 10px;" title="Editar">✏️</button>
                 <button class="btn-editar-separador" onclick="event.stopPropagation(); eliminarSeparador(${horarioJs}, ${separadorIndex})" style="margin-left: 6px; background:#8b0000;" title="Eliminar">🗑️</button>` : ''}
             </div>
@@ -4061,6 +4157,7 @@ function confirmarEliminarClase() {
         
         claseParaEliminar = null;
         cerrarModalEliminar();
+        marcarCalendarioSucio();
         mostrarCalendario();
     }
 }
@@ -4346,7 +4443,7 @@ function obtenerLimiteClasesPorFranja(horario) {
     // ✅ CORRECCIÓN: Calcular duración en minutos correctamente
     const horaInicioMinutos = convertirHoraDecimalAMinutos(horarioConfig.inicio);
     const horaFinMinutos = convertirHoraDecimalAMinutos(horarioConfig.fin);
-    const duracionTotal = horaFinMinutos - horaInicioMinutos;
+    const duracionTotal = duracionMinutosFranja(horaInicioMinutos, horaFinMinutos);
     
     console.log(`⏱️ Franja ${horario}: ${duracionTotal} minutos (${horarioConfig.inicio} -> ${horarioConfig.fin})`);
     
@@ -4447,6 +4544,7 @@ function guardarClase(event) {
     });
     
     cerrarModal();
+    marcarCalendarioSucio();
     mostrarCalendario();
     mostrarNotificacion('Clase guardada correctamente', 'success');
 }
@@ -4466,6 +4564,7 @@ function guardarMeses(event) {
     });
     
     cerrarModalMeses();
+    marcarCalendarioSucio();
     mostrarCalendario();
 }
 
@@ -4492,6 +4591,7 @@ function guardarClima(event) {
     calendarioData.semanas[semanaIndex].dias[diaIndex].evento = document.getElementById('eventoClima').value;
     
     cerrarModalClima();
+    marcarCalendarioSucio();
     mostrarCalendario();
     mostrarNotificacion('Información del día guardada correctamente', 'success');
 }
@@ -4657,16 +4757,21 @@ function ocultarTooltip() {
 
 function generarEstiloEvento(evento) {
     let estilo = '';
-    if (evento.colorFondo) estilo += `background: ${evento.colorFondo};`;
-    if (evento.colorTexto) estilo += `color: ${evento.colorTexto};`;
-    if (evento.tamanoTexto) estilo += `font-size: ${evento.tamanoTexto};`;
+    const bg = escCssColor(evento.colorFondo);
+    const fg = escCssColor(evento.colorTexto);
+    const tam = escCssFontSize(evento.tamanoTexto);
+    if (bg) estilo += `background: ${bg};`;
+    if (fg) estilo += `color: ${fg};`;
+    if (tam) estilo += `font-size: ${tam};`;
     return estilo;
 }
 
 function generarEstiloSeparador(separador) {
     let estilo = 'background: #740001; color: white; padding: 12px; height: 50px;';
-    if (separador.colorFondo) estilo += `background: ${separador.colorFondo} !important;`;
-    if (separador.colorTexto) estilo += `color: ${separador.colorTexto} !important;`;
+    const bg = escCssColor(separador.colorFondo);
+    const fg = escCssColor(separador.colorTexto);
+    if (bg) estilo += `background: ${bg} !important;`;
+    if (fg) estilo += `color: ${fg} !important;`;
     if (separador.cursiva) estilo += 'font-style: italic;';
     estilo += 'border-bottom: 2px solid #d3a625; border-top: 2px solid #d3a625; font-size: 16px; font-weight: bold; text-align: center; vertical-align: middle;';
     return estilo;
@@ -4851,10 +4956,6 @@ function abrirModalSeparador(horario, separadorIndex = null) {
 
     let idx = indiceSeparadorValido(separadorIndex);
     const lista = separadoresComoArray(horario);
-    // El lápiz de la columna (sin índice): si ya hay una sola división, editarla; no duplicarla.
-    if (idx < 0 && lista.length === 1) {
-        idx = 0;
-    }
 
     separadorParaEditar = { horario, index: idx < 0 ? null : idx };
     
@@ -5033,6 +5134,7 @@ function guardarEvento(event) {
     }
     
     cerrarModalEvento();
+    marcarCalendarioSucio();
     mostrarCalendario();
     mostrarNotificacion('Evento guardado correctamente', 'success');
 }
@@ -5116,6 +5218,7 @@ function guardarSeparador(event) {
     escribirSeparadoresFranja(horario, lista);
     
     cerrarModalSeparador();
+    marcarCalendarioSucio();
     mostrarCalendario();
     mostrarNotificacion('Separador guardado correctamente', 'success');
 }
@@ -5340,6 +5443,7 @@ function guardarClimaHorario(event) {
     console.log('climasHorario actualizado:', calendarioData.climasHorario);
     
     cerrarModalClimaHorario();
+    marcarCalendarioSucio();
     mostrarCalendario();
     mostrarNotificacion(`Clima de ${horario} actualizado a: ${traducirClima(nuevoClima)}`, 'success');
     
@@ -5619,6 +5723,7 @@ function reordenarFranja(fromIdx, toIdx) {
     config.horarios.splice(toIdx, 0, moved);
     sincronizarHorariosConfigEnCalendario();
     renderListaFranjasEditor();
+    marcarCalendarioSucio();
     mostrarCalendario();
     return true;
 }
@@ -5773,6 +5878,15 @@ function guardarFranjaDesdeFormulario() {
 
     if (!isNaN(editIdx) && editIdx >= 0 && editIdx < config.horarios.length) {
         const oldKey = config.horarios[editIdx].hora;
+        if (oldKey !== label) {
+            for (let i = 0; i < config.horarios.length; i++) {
+                if (i === editIdx) continue;
+                if (config.horarios[i].hora === label) {
+                    mostrarNotificacion('Ya existe esa franja', 'error');
+                    return;
+                }
+            }
+        }
         config.horarios.splice(editIdx, 1);
         insertarFranjaEnOrden(row);
         if (oldKey !== label) {
@@ -5782,6 +5896,7 @@ function guardarFranjaDesdeFormulario() {
         if (calendarioData.climasHorario) {
             calendarioData.climasHorario[label] = clima;
         }
+        marcarCalendarioSucio();
         mostrarNotificacion('Franja actualizada: ' + label, 'success');
     } else {
         for (let i = 0; i < config.horarios.length; i++) {
@@ -5795,6 +5910,7 @@ function guardarFranjaDesdeFormulario() {
         if (calendarioData.climasHorario) {
             calendarioData.climasHorario[label] = clima;
         }
+        marcarCalendarioSucio();
         mostrarNotificacion('Franja creada: ' + label, 'success');
     }
     sincronizarHorariosConfigEnCalendario();
@@ -5825,30 +5941,30 @@ function generarHorarioVacioDesdeConfig() {
     const tempsCfg = (config && config.temperaturas) ? config.temperaturas : (configPorDefecto.temperaturas || {});
 
     const out = {
-        semanas: {},
-        meses: {},
+        semanas: [],
+        meses: [],
         separadores: {},
         climasHorario: {},
         ultimaActualizacion: Math.floor(Date.now() / 1000)
     };
 
-    for (let semana = 1; semana <= 2; semana++) {
+    for (let semana = 0; semana < 2; semana++) {
         out.meses[semana] = [];
-        for (let dia = 1; dia <= 7; dia++) {
-            const mesIndex = ((semana - 1) * 7 + dia - 1) % 12;
+        for (let dia = 0; dia < 7; dia++) {
+            const mesIndex = (semana * 7 + dia) % 12;
             out.meses[semana][dia] = mesesCfg[mesIndex] || 'Enero';
         }
     }
 
-    for (let semana = 1; semana <= 2; semana++) {
-        out.semanas[semana] = { estacion: 'Mixta', dias: {} };
+    for (let semana = 0; semana < 2; semana++) {
+        out.semanas[semana] = { estacion: 'Mixta', dias: [] };
 
-        for (let dia = 1; dia <= 7; dia++) {
+        for (let dia = 0; dia < 7; dia++) {
             const tempConfig = tempsCfg.Primavera || { min: 15, max: 25 };
             const temperatura = Math.floor(Math.random() * (tempConfig.max - tempConfig.min + 1)) + tempConfig.min;
 
             out.semanas[semana].dias[dia] = {
-                nombre: diasSemana[dia - 1] || ('Día ' + dia),
+                nombre: diasSemana[dia] || ('Día ' + (dia + 1)),
                 evento: 'Ninguno',
                 luna: lunasCfg[Math.floor(Math.random() * lunasCfg.length)] || 'Luna Nueva',
                 temperatura: temperatura,
@@ -5870,15 +5986,6 @@ function generarHorarioVacioDesdeConfig() {
     }
 
     horariosCfg.forEach(function (horario) {
-        out.separadores[horario.hora] = {
-            texto: '',
-            colorFondo: '#740001',
-            colorTexto: '#ffffff',
-            cursiva: false,
-            mostrarHora: false,
-            horaInicio: '',
-            horaFin: ''
-        };
         out.climasHorario[horario.hora] = horario.clima || 'CLEAR';
     });
 
@@ -5927,17 +6034,29 @@ function borrarHorarioCompleto() {
         return;
     }
 
-    const msg = '¿RESET del horario escolar?\n\nSe borrarán clases y eventos de las dos semanas.\nLas franjas horarias y el tablón (normas, optativas, clubes, notas) se conservan.';
+    const msg = '¿RESET del horario escolar?\n\nSe borrarán clases y eventos de las dos semanas.\nSe conservan franjas, divisiones (toque de queda / nuevo día / clubes) y el tablón.';
     if (!window.confirm(msg)) {
         return;
     }
 
     sincronizarHorariosConfigEnCalendario();
     const preservedTablon = calendarioData && calendarioData.tablonSecciones;
+    const preservedSeparadores = calendarioData && calendarioData.separadores
+        ? JSON.parse(JSON.stringify(calendarioData.separadores))
+        : null;
+    const preservedClimas = calendarioData && calendarioData.climasHorario
+        ? JSON.parse(JSON.stringify(calendarioData.climasHorario))
+        : null;
     const horarioVacio = generarHorarioVacioDesdeConfig();
 
     if (preservedTablon) {
         horarioVacio.tablonSecciones = preservedTablon;
+    }
+    if (preservedSeparadores && typeof preservedSeparadores === 'object') {
+        horarioVacio.separadores = preservedSeparadores;
+    }
+    if (preservedClimas && typeof preservedClimas === 'object') {
+        horarioVacio.climasHorario = Object.assign({}, horarioVacio.climasHorario || {}, preservedClimas);
     }
 
     if (MODO_WEB) {
@@ -5953,7 +6072,10 @@ function borrarHorarioCompleto() {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + tokenAutenticacion
             },
-            body: JSON.stringify({ calendario: horarioVacio })
+            body: JSON.stringify({
+                calendario: horarioVacio,
+                ultimaActualizacion: calendarioData.ultimaActualizacion || ultimoTimestamp
+            })
         })
         .then(function (response) {
             if (!response.ok) {
@@ -5962,6 +6084,9 @@ function borrarHorarioCompleto() {
                 }
                 if (response.status === 401) {
                     throw new Error('Sesión expirada');
+                }
+                if (response.status === 409) {
+                    throw new Error('Otro profesor guardó el calendario mientras editabas. Recarga antes de resetear.');
                 }
                 throw new Error('Error en la respuesta del servidor');
             }
@@ -6025,7 +6150,8 @@ function publicarTablon() {
                 'Authorization': `Bearer ${tokenAutenticacion}`
             },
             body: JSON.stringify({
-                calendario: calendarioData
+                calendario: calendarioData,
+                ultimaActualizacion: calendarioData.ultimaActualizacion || ultimoTimestamp
             })
         })
         .then(response => {
@@ -6041,6 +6167,9 @@ function publicarTablon() {
                 if (response.status === 403) {
                     throw new Error('Solo administradores pueden publicar el tablón OOC');
                 }
+                if (response.status === 409) {
+                    throw new Error('Otro profesor guardó el calendario mientras editabas. Recarga antes de publicar.');
+                }
                 throw new Error('Error en la respuesta del servidor');
             }
             return response.json();
@@ -6051,6 +6180,7 @@ function publicarTablon() {
                     ultimoTimestamp = data.ultimaActualizacion;
                     calendarioData.ultimaActualizacion = data.ultimaActualizacion;
                 }
+                marcarCalendarioLimpio();
                 mostrarNotificacion('✅ Tablón publicado correctamente', 'success');
             } else {
                 mostrarNotificacion('❌ Error al publicar el tablón', 'error');
@@ -6105,7 +6235,8 @@ function guardarCalendario() {
                 'Authorization': `Bearer ${tokenAutenticacion}`
             },
             body: JSON.stringify({
-                calendario: calendarioData
+                calendario: calendarioData,
+                ultimaActualizacion: calendarioData.ultimaActualizacion || ultimoTimestamp
             })
         })
         .then(function (response) {
@@ -6121,6 +6252,9 @@ function guardarCalendario() {
                 if (response.status === 403) {
                     throw new Error('No tienes permiso para guardar el calendario');
                 }
+                if (response.status === 409) {
+                    throw new Error('Otro profesor guardó el calendario mientras editabas. Recarga antes de guardar para no pisar su trabajo.');
+                }
                 throw new Error('Error en la respuesta del servidor');
             }
             return response.json();
@@ -6131,6 +6265,7 @@ function guardarCalendario() {
                     ultimoTimestamp = data.ultimaActualizacion;
                     calendarioData.ultimaActualizacion = data.ultimaActualizacion;
                 }
+                marcarCalendarioLimpio();
                 mostrarNotificacion('Calendario guardado correctamente', 'success');
             } else {
                 mostrarNotificacion('Error al guardar el calendario', 'error');
@@ -6148,6 +6283,7 @@ function guardarCalendario() {
     if (typeof gmod !== 'undefined' && gmod && typeof gmod.CalGuardar === 'function') {
         try {
             gmod.CalGuardar(JSON.stringify({ calendario: calendarioData }));
+            marcarCalendarioLimpio();
             mostrarNotificacion('Guardado enviado. El clima automático solo usa datos ya guardados en el servidor; confirma con el aviso en el juego.', 'info');
         } catch (e) {
             console.error(e);
@@ -6186,7 +6322,8 @@ function guardarCalendario() {
                 'Content-Type': 'application/json; charset=UTF-8',
             },
             body: JSON.stringify({
-                calendario: calendarioData
+                calendario: calendarioData,
+                ultimaActualizacion: calendarioData.ultimaActualizacion || ultimoTimestamp
             })
         })
         .then(response => {
@@ -6450,6 +6587,7 @@ function confirmarEliminarBarraEstacion() {
     
     calendarioData.semanas[semanaIndex].barrasEstacion.splice(barraParaEliminar, 1);
     renderizarListaBarras();
+    marcarCalendarioSucio();
     mostrarCalendario();
     mostrarNotificacion('Barra eliminada. Recuerda guardar los cambios.', 'success');
     
@@ -6554,6 +6692,7 @@ function guardarBarra() {
     
     cerrarModalEditarBarra();
     renderizarListaBarras();
+    marcarCalendarioSucio();
     mostrarCalendario();
     
     actualizarBotonesAccionTablon();

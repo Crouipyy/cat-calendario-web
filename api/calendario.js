@@ -4,6 +4,67 @@ const { calendarioPlantillaParaUI } = require('./calendarioPlantilla');
 const { verificarBearer, normalizarPermisos } = require('./lib/auth');
 const { obtenerConexion: obtenerConexionAux, asegurarTablas, registrarLog } = require('./lib/db');
 
+function arrayDesdeObjetoOAgujero(arrOrObj) {
+    if (arrOrObj == null) {
+        return [];
+    }
+    if (Array.isArray(arrOrObj)) {
+        if (arrOrObj.length > 1 && arrOrObj[0] == null && arrOrObj[1] != null) {
+            return arrOrObj.slice(1);
+        }
+        return arrOrObj.slice();
+    }
+    const keys = Object.keys(arrOrObj).sort(function (a, b) {
+        return Number(a) - Number(b);
+    });
+    return keys.map(function (k) {
+        return arrOrObj[k];
+    }).filter(function (x) {
+        return x != null;
+    });
+}
+
+function normalizarMesesCalendario(datos) {
+    if (!datos || typeof datos !== 'object') {
+        return datos;
+    }
+    const meses = arrayDesdeObjetoOAgujero(datos.meses);
+    datos.meses = meses.map(function (fila) {
+        const diasMes = arrayDesdeObjetoOAgujero(fila);
+        if (diasMes.length > 7) {
+            return diasMes.slice(0, 7);
+        }
+        while (diasMes.length < 7) {
+            diasMes.push('Enero');
+        }
+        return diasMes;
+    });
+    return datos;
+}
+
+function sanitizarCalendarioPublico(datos) {
+    if (!datos || typeof datos !== 'object') {
+        return datos;
+    }
+    const copy = JSON.parse(JSON.stringify(datos));
+    const ts = copy.tablonSecciones;
+    if (ts && ts.notasBoletin && typeof ts.notasBoletin === 'object') {
+        ts.notasBoletin.filas = [];
+    }
+    return copy;
+}
+
+function puedeVerBoletinCompleto(decoded) {
+    if (!decoded) {
+        return false;
+    }
+    if (decoded.rol === 'admin') {
+        return true;
+    }
+    const permisos = normalizarPermisos(decoded);
+    return permisos.indexOf('editar') !== -1 || permisos.indexOf('publicar') !== -1;
+}
+
 // Función para obtener conexión a MySQL
 async function obtenerConexion() {
     // Verificar que las variables de entorno necesarias estén configuradas
@@ -184,8 +245,7 @@ async function leerCalendario() {
                     }
                 }
                 datos.ultimaActualizacion = tsMerged;
-
-                return datos;
+                return normalizarMesesCalendario(datos);
             } catch (parseError) {
                 console.error('[API] Error parseando JSON desde MySQL:', parseError);
                 console.error('[API] Datos raw:', rows[0].datos ? String(rows[0].datos).substring(0, 100) : 'null');
@@ -254,6 +314,7 @@ async function guardarCalendario(datos, actualizadoPor = 'web') {
         }
 
         // Actualizar timestamp
+        datos = normalizarMesesCalendario(datos);
         datos.ultimaActualizacion = Math.floor(Date.now() / 1000);
         const datosJSON = JSON.stringify(datos);
         
@@ -309,8 +370,7 @@ module.exports = async function handler(req, res) {
                 res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
                 res.setHeader('Pragma', 'no-cache');
                 const calendario = await leerCalendario();
-                
-                // Asegurar que siempre retornamos un objeto válido
+
                 if (!calendario) {
                     console.warn('[API] ⚠️ leerCalendario retornó null/undefined, usando plantilla UI');
                     return res.status(200).json({
@@ -318,10 +378,15 @@ module.exports = async function handler(req, res) {
                         calendario: calendarioPlantillaParaUI()
                     });
                 }
-                
+
+                const decodedGet = verificarBearer(req);
+                const payloadCal = puedeVerBoletinCompleto(decodedGet)
+                    ? calendario
+                    : sanitizarCalendarioPublico(calendario);
+
                 return res.status(200).json({
                     success: true,
-                    calendario: calendario,
+                    calendario: payloadCal,
                     ultimaActualizacion: Math.floor(Number(calendario && calendario.ultimaActualizacion)) || 0
                 });
             } catch (error) {
@@ -400,6 +465,23 @@ module.exports = async function handler(req, res) {
                 error: 'No autorizado: configura CAT_CAL_SYNC o CAT_CAL_SYNC_SECRET y usa X-CatCal-Sync-Token (GMod), o Bearer (web).'
             });
         }
+
+            if (!syncOk) {
+                const actual = await leerCalendario();
+                const serverTs = Math.floor(Number(actual && actual.ultimaActualizacion)) || 0;
+                const clientTs = Math.floor(Number(
+                    (req.body && req.body.ultimaActualizacion != null)
+                        ? req.body.ultimaActualizacion
+                        : (calendario && calendario.ultimaActualizacion)
+                )) || 0;
+
+                if (clientTs > 0 && serverTs > 0 && clientTs !== serverTs) {
+                    return res.status(409).json({
+                        error: 'El calendario fue modificado por otra persona. Recarga antes de guardar.',
+                        ultimaActualizacion: serverTs
+                    });
+                }
+            }
 
             try {
                 const guardado = await guardarCalendario(calendario, actualizadoPor);
