@@ -380,7 +380,11 @@ module.exports = async function handler(req, res) {
                 }
 
                 const decodedGet = verificarBearer(req);
-                const payloadCal = puedeVerBoletinCompleto(decodedGet)
+                const syncSecretGet = (process.env.CAT_CAL_SYNC_SECRET || process.env.CAT_CAL_SYNC || '').trim();
+                const syncHeaderRawGet = req.headers['x-catcal-sync-token'];
+                const syncHeaderGet = typeof syncHeaderRawGet === 'string' ? syncHeaderRawGet.trim() : '';
+                const syncOkGet = syncSecretGet !== '' && syncHeaderGet !== '' && syncHeaderGet === syncSecretGet;
+                const payloadCal = (puedeVerBoletinCompleto(decodedGet) || syncOkGet)
                     ? calendario
                     : sanitizarCalendarioPublico(calendario);
 
