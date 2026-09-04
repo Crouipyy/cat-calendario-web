@@ -2118,16 +2118,15 @@ async function cargarDatosDesdeAPI() {
                     }
                 });
                 const verifyData = await verifyResponse.json();
-                if (verifyData.success) {
+                if (verifyResponse.ok && verifyData.success) {
                     aplicarRolUsuario(verifyData.usuario);
-                } else {
+                } else if (verifyResponse.status === 401) {
                     tokenAutenticacion = null;
                     localStorage.removeItem('calendario_token');
                     aplicarRolUsuario(null);
                 }
             } catch (e) {
                 console.error('Error verificando token:', e);
-                aplicarRolUsuario(null);
             }
         } else {
             aplicarRolUsuario(null);

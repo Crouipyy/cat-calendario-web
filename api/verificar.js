@@ -2,7 +2,7 @@
 // válido. Devuelve también el rol para que la UI sepa si tiene que pintar
 // el panel de Administración.
 
-const { verificarBearer, normalizarPermisos } = require('../lib/auth');
+const { verificarBearer, normalizarPermisos } = require('./lib/auth');
 
 module.exports = async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
