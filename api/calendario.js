@@ -384,7 +384,8 @@ module.exports = async function handler(req, res) {
                 const syncHeaderRawGet = req.headers['x-catcal-sync-token'];
                 const syncHeaderGet = typeof syncHeaderRawGet === 'string' ? syncHeaderRawGet.trim() : '';
                 const syncOkGet = syncSecretGet !== '' && syncHeaderGet !== '' && syncHeaderGet === syncSecretGet;
-                const payloadCal = (puedeVerBoletinCompleto(decodedGet) || syncOkGet)
+                const browserGet = !!(req.headers.origin || req.headers.referer);
+                const payloadCal = (puedeVerBoletinCompleto(decodedGet) || syncOkGet || !browserGet)
                     ? calendario
                     : sanitizarCalendarioPublico(calendario);
 
