@@ -21,18 +21,11 @@ const ESTACION_POR_DIA_GLOBAL = [
 
 function calendarioPlantillaParaUI() {
     const ultima = Math.floor(Date.now() / 1000);
+    // Sin placeholders vacíos: un objeto {texto:''} por franja bloqueaba apilar divisiones
+    // (toque de queda + clubes) en la misma franja.
     const separadores = {};
     const climasHorario = {};
     for (const h of HORARIOS_PLANTILLA) {
-        separadores[h.hora] = {
-            texto: '',
-            colorFondo: '#740001',
-            colorTexto: '#ffffff',
-            cursiva: false,
-            mostrarHora: false,
-            horaInicio: '',
-            horaFin: ''
-        };
         climasHorario[h.hora] = h.clima || 'CLEAR';
     }
 
