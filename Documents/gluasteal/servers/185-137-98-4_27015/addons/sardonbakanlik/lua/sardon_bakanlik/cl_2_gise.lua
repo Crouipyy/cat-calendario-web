@@ -53,7 +53,7 @@ local function Ciz(x, y, w, h)
           local gecik = b.durum == "gecikti"
           U.Kart(x, cy, solW, 70, gecik)
           U.Yazi(U.Kisalt(b.baslik, 14, 600, solW - 250), 14, 600, x + 20, cy + 24, R.fildisi)
-          U.Yazi(b.yazan_ad .. " · " .. B.Tarih(b.zaman) .. (gecik and " · VENCIDO" or (" · vence " .. B.Once(os.time() - (b.bitis - os.time())):gsub(" önce", " después"))), 11, 700, x + 20, cy + 48, gecik and R.kizil or R.soluk)
+          U.Yazi(b.yazan_ad .. " · " .. B.Tarih(b.zaman) .. (gecik and " · VENCIDO" or (" · vence " .. B.Once(os.time() - (b.bitis - os.time())):gsub(" atrás", " después"))), 11, 700, x + 20, cy + 48, gecik and R.kizil or R.soluk)
           U.Yazi(B.Para(b.deger), 18, 600, x + solW - 140, cy + 35, R.altinAcik, 2)
           if U.Dugme(x + solW - 122, cy + 18, 104, 34, "Pagar", "ana") then B.Iste("ceza.ode", {id = b.id}) end
           cy = cy + 80

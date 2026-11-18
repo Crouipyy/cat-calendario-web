@@ -335,7 +335,7 @@ B.Sayfa("personel", {
           end
      end,
      veri = function(anahtar)
-          -- kadro değiştiyse seçili kişinin ayrıntısı da tazelensin
+          -- kadro değiştiyse seçili persona(s)nin ayrıntısı da tazelensin
           if anahtar == "personel.liste" and D.secili and RealTime() - (B.IstekAn["personel.kisi"] or 0) > 1 then B.Sor("personel.kisi", {id = D.secili}) end
      end,
      ciz = Ciz,
