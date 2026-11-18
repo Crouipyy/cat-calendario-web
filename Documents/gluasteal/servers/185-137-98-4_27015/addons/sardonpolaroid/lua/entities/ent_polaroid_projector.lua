@@ -1,7 +1,7 @@
 -- "addons\\sardonpolaroid\\lua\\entities\\ent_polaroid_projector.lua"
 -- Retrieved by https://github.com/lewisclark/glua-steal
 AddCSLuaFile()
-ENT.PrintName = "Polaroid Projektör"
+ENT.PrintName = "Proyector Polaroid"
 ENT.Category = "!! Sardon"
 ENT.Base = "base_anim"
 ENT.Type = "anim"

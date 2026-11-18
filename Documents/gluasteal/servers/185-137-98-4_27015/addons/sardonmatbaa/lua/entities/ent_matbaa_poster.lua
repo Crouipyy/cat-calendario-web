@@ -6,7 +6,7 @@ AddCSLuaFile()
 -- bkz. sv_init.lua HangPoster). Fizik, formatın boyutunda ince bir kutu -- oyuncular içinden
 -- geçer (COLLISION_GROUP_WEAPON) ama E ile bakılıp sökülebilir. Konumlar harita başına
 -- data/sardon_matbaa/<harita>_posterler.json'a kaydedilir.
-ENT.PrintName = "Poster"
+ENT.PrintName = "Póster"
 ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.Category = "!! Sardon"
@@ -107,10 +107,10 @@ else
 	end
 end
 
--- Superadmin: C basılı + posterin üstüne sağ tık -> "Posteri Kaldır" (polaroid masasındaki
--- "Gizli" / "Boyutu Degistir" ile aynı properties menüsü). Poster envantere dönmez, silinir.
+-- Superadmin: C + clic derecho sobre el póster -> "Quitar póster" (mismo menú properties
+-- que "Oculto" / "Cambiar tamaño" en la mesa polaroid). El póster no vuelve al inventario; se elimina.
 properties.Add("matbaaPosterKaldir", {
-	MenuLabel = "Posteri Kaldır",
+	MenuLabel = "Quitar póster",
 	Order = 1,
 	MenuIcon = "icon16/picture_delete.png",
 	Filter = function(self, ent, ply)
@@ -126,9 +126,9 @@ properties.Add("matbaaPosterKaldir", {
 
 		if !self:Filter(ent, ply) then return end
 
-		ix.log.AddRaw(string.format("%s (%s) bir posteri kaldırdı: %s (basan: %s)", ply:Name(), ply:SteamID(), ent:GetURL(), ent:GetPrinter()))
+		ix.log.AddRaw(string.format("%s (%s) quitó un póster: %s (impreso por: %s)", ply:Name(), ply:SteamID(), ent:GetURL(), ent:GetPrinter()))
 		SafeRemoveEntity(ent)
 		SardonMatbaa.SavePosters()
-		ply:Notify("Poster kaldırıldı.")
+		ply:Notify("Póster eliminado.")
 	end
 })

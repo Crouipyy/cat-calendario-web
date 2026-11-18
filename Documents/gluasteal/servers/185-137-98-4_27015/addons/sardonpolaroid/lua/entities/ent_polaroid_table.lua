@@ -1,7 +1,7 @@
 -- "addons\\sardonpolaroid\\lua\\entities\\ent_polaroid_table.lua"
 -- Retrieved by https://github.com/lewisclark/glua-steal
 AddCSLuaFile()
-ENT.PrintName = "Polaroid Table"
+ENT.PrintName = "Mesa Polaroid"
 ENT.Category = "!! Sardon"
 ENT.Base = "base_anim"
 ENT.Type = "anim"
@@ -73,7 +73,7 @@ function ENT:Draw()
 end
 
 properties.Add("setHidden", {
-     MenuLabel = "Gizli",
+     MenuLabel = "Oculto",
      Order = 1,
      MenuIcon = "icon16/eye.png",
      Filter = function( self, ent, ply )
@@ -102,7 +102,7 @@ properties.Add("setHidden", {
 })
 
 properties.Add("updateSize", {
-     MenuLabel = "Boyutu Degistir",
+     MenuLabel = "Cambiar tamaño",
      Order = 2,
      MenuIcon = "icon16/arrow_inout.png",
      Filter = function( self, ent, ply )
@@ -127,9 +127,9 @@ properties.Add("updateSize", {
           print(ply)
 
 
-          ply:RequestString("Boyutu gir", "Sayi olarak gir", function(text)
+          ply:RequestString("Introduce el tamaño", "Introduce un número", function(text)
                num = tonumber(text)
-               if (num != num) then ply:Notify("Duzgun bir numara gir") end
+               if (num != num) then ply:Notify("Introduce un número válido") end
                ent:SetSize(math.max(num, 0.1))
           end, tostring(ent:GetSize()))
      end

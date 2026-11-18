@@ -135,7 +135,7 @@ local function createFonts()
 		local mw = surface.GetTextSize("MMMMMMMMMM0123456789")
 
 		if fw == mw then
-			MsgC(Color(216, 134, 119), "[Matbaa] Montserrat yüklenemedi, arayüz yedek fontla çiziliyor. Workshop koleksiyonundaki font paketini (resource/fonts/montserrat-*.ttf) kontrol et.\n")
+			MsgC(Color(216, 134, 119), "[Imprenta] No se pudo cargar Montserrat; la interfaz usa una fuente de reserva. Revisa el paquete de fuentes del Workshop (resource/fonts/montserrat-*.ttf).\n")
 		end
 	end
 end
@@ -291,7 +291,7 @@ local function makeButton(parent, text, onClick, opts)
 	return btn
 end
 
--- "01  MATERIALES ────────── ÇANTAN · IMPRENTA" başlığı
+-- "01  MATERIALES ────────── MOCHILA · IMPRENTA" título
 local function sectionTitle(parent, num, text, caption)
 	local p = vgui.Create("DPanel", parent)
 	p:Dock(TOP)
@@ -496,7 +496,7 @@ function SardonMatbaa.OpenMenu(machine, ink, paper)
 		draw.SimpleText("Cerrar", "SardonMatbaa.Small", padX + kw + sc(10), fy, T.muted, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 
 		spaced("TODA BUENA HISTORIA EMPIEZA CON UNA PÁGINA.", "SardonMatbaa.Caption", w / 2, fy, T.goldDim, 1.6, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-		spaced(string.format("SÜRE: %d SN + COPIAS BAŞI %d SN", cfg.SabitSure, cfg.AdetBasinaSure), "SardonMatbaa.Caption", w - padX, fy, T.faint, 1, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+		spaced(string.format("DURACIÓN: %d S + %d S POR COPIA", cfg.SabitSure, cfg.AdetBasinaSure), "SardonMatbaa.Caption", w - padX, fy, T.faint, 1, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 	end
 
 	local close = makeButton(win, "", function() root:Remove() end, { icon = "close" })
@@ -677,7 +677,7 @@ function SardonMatbaa.OpenMenu(machine, ink, paper)
 			spaced("VISTA PREVIA", "SardonMatbaa.Section", w / 2, sc(50), T.goldBright, 1.4, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			drawPaper(f, px, py, pw, ph, true)
 			draw.SimpleText(f.ad .. " · " .. f.genislik .. " × " .. f.yukseklik .. " px", "SardonMatbaa.Label", w / 2, h - sc(50), T.muted, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-			draw.SimpleText("Cerrarmak necesita tıkla ya da ESC", "SardonMatbaa.Tiny", w / 2, h - sc(28), T.faint, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText("Clic o ESC para cerrar", "SardonMatbaa.Tiny", w / 2, h - sc(28), T.faint, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 	end
 
@@ -883,7 +883,7 @@ function SardonMatbaa.OpenMenu(machine, ink, paper)
 	local entry = vgui.Create("DTextEntry", wrap)
 	entry:Dock(FILL)
 	entry:SetFont("SardonMatbaa.Label")
-	entry:SetPlaceholderText("https://i.imgur.com/gorselin.png")
+	entry:SetPlaceholderText("https://i.imgur.com/ejemplo.png")
 	entry:SetDrawLanguageID(false)
 	entry:SetPaintBackground(false)
 	entry:SetUpdateOnType(true)
@@ -945,7 +945,7 @@ function SardonMatbaa.OpenMenu(machine, ink, paper)
 		elseif ist == "loading" then
 			text, col = "Cargando imagen…", T.gold
 		else
-			text, col = "Doğrudan .png / .jpg görsel bağlantısı · Enter ya da Vista previa ile doğrula", C_145_153_131
+			text, col = "Enlace directo .png / .jpg · Enter o Vista previa para validar", C_145_153_131
 		end
 
 		draw.SimpleText(text, "SardonMatbaa.Small", 0, sc(9), col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
@@ -977,7 +977,7 @@ function SardonMatbaa.OpenMenu(machine, ink, paper)
 		icon("paper", x, cy - is / 2, is, T.gold)
 		x = x - sc(12)
 		x = x - draw.SimpleText("+", "SardonMatbaa.Label", x, cy, T.goldDim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER) - sc(12)
-		x = x - draw.SimpleText(" mürekkep", "SardonMatbaa.Label", x, cy, T.text, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+		x = x - draw.SimpleText(" tinta", "SardonMatbaa.Label", x, cy, T.text, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 		x = x - draw.SimpleText(inkCost * n, "SardonMatbaa.Value", x, cy, T.goldBright, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 		x = x - is - sc(6)
 		icon("ink", x, cy - is / 2, is, T.gold)
@@ -1134,19 +1134,19 @@ function SardonMatbaa.OpenMenu(machine, ink, paper)
 
 		if busy() then
 			if myJob() then
-				text, col, ic = "Impresión en curso. Paneli kapatabilirsin; kutun hazır olunca makinenin önüne çıkar.", T.gold, "clock"
+				text, col, ic = "Impresión en curso. Puedes cerrar el panel; la caja aparecerá delante de la máquina cuando esté lista.", T.gold, "clock"
 			else
-				text, col, ic = "Makine " .. machine:GetJobOwner() .. " está imprimiendo. Espera a que termine.", T.gold, "clock"
+				text, col, ic = "La máquina está imprimiendo para " .. machine:GetJobOwner() .. ". Espera a que termine.", T.gold, "clock"
 			end
 		elseif m <= 0 then
 			local inkCost, papCost = SardonMatbaa.GetCost(state.format)
-			text = "Material insuficiente: 1 adet " .. state.format.ad .. " necesita " .. inkCost .. " tinta + " .. papCost .. " papel."
+			text = "Material insuficiente: 1 × " .. state.format.ad .. " necesita " .. inkCost .. " tinta + " .. papCost .. " papel."
 		elseif !state.url then
 			text, col = state.urlError and "Introduce un enlace de imagen válido." or "Introduce el enlace y previsualiza.", state.urlError and T.danger or T.muted
 		elseif ist == "loading" then
 			text, col, ic = "Cargando imagen, espera…", T.gold, "clock"
 		elseif ist == "fail" then
-			text = "No se pudo cargar la imagen; başka bir bağlantı dene."
+			text = "No se pudo cargar la imagen; prueba con otro enlace."
 		else
 			text, col, ic = "Materiales listos. Puedes imprimir.", T.success, "check"
 		end

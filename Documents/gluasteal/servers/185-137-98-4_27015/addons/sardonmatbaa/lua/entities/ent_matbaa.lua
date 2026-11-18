@@ -5,7 +5,7 @@ AddCSLuaFile()
 -- Baskı makinesi. E ile panel açılır (sardon_matbaa/cl_menu.lua); mürekkep ve boş kağıt
 -- itemleri makineye atılınca da (Think'teki kutu taraması) bırakan karakterin stoğuna geçer.
 -- Aynı anda tek iş basar; iş bilgisi NetworkVar'larda, üstteki 3D2D levhada gösterilir.
-ENT.PrintName = "Baskı Makinesi"
+ENT.PrintName = "Máquina de impresión"
 ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.Category = "!! Sardon"
@@ -122,7 +122,7 @@ else
 			surface.SetDrawColor(col_gold)
 			surface.DrawOutlinedRect(-w / 2, -h, w, h, 2)
 
-			draw.SimpleText("MATBAA", "SardonMatbaa.Sign", 0, -h + 14, col_gold, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+			draw.SimpleText("IMPRENTA", "SardonMatbaa.Sign", 0, -h + 14, col_gold, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
 
 			if self:IsBusy() then
 				local total = math.max(0.01, self:GetJobEnd() - self:GetJobStart())

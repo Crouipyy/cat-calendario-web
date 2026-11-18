@@ -26,7 +26,7 @@ net.Receive("SardonPolaroid.ChooseMode", function()
      end
 
      SardonPolaroidQuery = Derma_Query("¿Cómo quieres capturar el recuerdo?", "Capere Momentum",
-          "Selfi", function() choose(1) end,
+          "Selfie", function() choose(1) end,
           "De frente", function() choose(2) end,
           "Cancelar", function() choose(0) end)
 
@@ -644,7 +644,7 @@ local function Duzenle()
      local sw = ScrW()
      local pad = math.max(4, math.Round(ScrH() / 135))
      surface.SetFont("SardonFoto.Tus")
-     local _, th = surface.GetTextSize("Ağ")
+     local _, th = surface.GetTextSize("Ag")
      local satirlar, satir, gen = {}, {}, 0
      for _, ip in ipairs(ipuclari) do
           surface.SetFont("SardonFoto.Tus")

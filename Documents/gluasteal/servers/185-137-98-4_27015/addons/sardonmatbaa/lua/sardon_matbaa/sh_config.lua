@@ -53,7 +53,7 @@ SardonMatbaa.Config = {
 	-- Bir karakterin aynı anda asılı tutabileceği poster sayısı
 	PosterLimiti = 10,
 	-- false: asılı posteri E ile sadece asan kişi söküp envantere alabilir.
-	-- Superadminler her posteri C + sağ tık menüsündeki "Posteri Kaldır" ile silebilir.
+	-- Los superadmins pueden borrar cualquier póster con C + clic derecho → "Quitar póster".
 	PosteriHerkesSokebilir = false,
 
 	-- Modeller
@@ -65,5 +65,5 @@ SardonMatbaa.Config = {
 	-- Kutunun makineye göre çıkacağı yer (makinenin yerel koordinatı)
 	KutuOfset = Vector(40, 0, 10),
 
-	Kategori = "Matbaa",
+	Kategori = "Imprenta",
 }

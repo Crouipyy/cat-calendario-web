@@ -2,7 +2,7 @@
 -- Retrieved by https://github.com/lewisclark/glua-steal
 AddCSLuaFile()
 
-ENT.PrintName = "Polaroid Print"
+ENT.PrintName = "Impresión Polaroid"
 ENT.Category = "!! Sardon"
 ENT.Base = "base_anim"
 ENT.Type = "anim"
@@ -25,7 +25,7 @@ function ENT:OnPopulateEntityInfo(panel)
      local name = panel:AddRow("name")
      name:SetImportant()
      name:SetBackgroundColor(Color(218, 34, 187))
-     name:SetText("Yakalanmış Anı")
+     name:SetText("Recuerdo capturado")
      name:SizeToContents()
 
      panel:SizeToContents()

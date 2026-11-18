@@ -2,7 +2,7 @@
 -- Retrieved by https://github.com/lewisclark/glua-steal
 AddCSLuaFile()
 
-ENT.PrintName = "Polaroid Camera"
+ENT.PrintName = "Cámara Polaroid"
 ENT.Category = "!! Sardon"
 ENT.Base = "base_ai"
 ENT.Type = "ai"

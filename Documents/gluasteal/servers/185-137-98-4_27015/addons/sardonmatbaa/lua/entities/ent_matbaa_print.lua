@@ -5,7 +5,7 @@ AddCSLuaFile()
 -- Yere bırakılmış basılı ürün (sh_items.lua'daki drop'un düşürdüğü entity). Üzerinde görsel
 -- çizilir; E ile envantere geri alınır. Polaroid'in anıları gibi ent_polaroid_table /
 -- ent_polaroid_projector'a atılınca görseli onlara yansıtır.
-ENT.PrintName = "Basılı Ürün"
+ENT.PrintName = "Producto impreso"
 ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.Category = "!! Sardon"
