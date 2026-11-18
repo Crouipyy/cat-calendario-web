@@ -92,7 +92,7 @@ local function DurusmaCiz(x, y, w, h, v)
      end
 
      cy = cy + 16
-     U.Bolum("Tribunal", x, cy + 10, solW, #d.heyet .. " oy")
+     U.Bolum("Tribunal", x, cy + 10, solW, #d.heyet .. " votos")
      cy = cy + 30
      for _, hy in ipairs(d.heyet) do
           U.Kutu(x, cy + 33, solW, 1, R.cizgi, 0.22)
