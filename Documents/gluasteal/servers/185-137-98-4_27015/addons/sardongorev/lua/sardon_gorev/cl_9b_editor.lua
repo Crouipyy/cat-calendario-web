@@ -31,44 +31,44 @@ local TUR_SECENEK = {}
 for _, t in ipairs(G.Turler) do TUR_SECENEK[#TUR_SECENEK + 1] = { id = t.id, ad = t.ad } end
 
 local GENEL = {
-     { k = "id", ad = "Kimlik", tip = "metin", ipucu = "Küçük harf, rakam, alt çizgi. Değişirse eski guardar silinir." },
-     { k = "ad", ad = "Ad", tip = "metin" },
-     { k = "tur", ad = "Tür", tip = "secim", secenekler = TUR_SECENEK },
-     { k = "ozet", ad = "Kısa özet", tip = "yazi", ipucu = "Afişte ve günlükte italik satır. {jugador}, {ad}, {hane} kullanılabilir." },
-     { k = "aciklama", ad = "Açıklama", tip = "yazi" },
-     { k = "aktif", ad = "Yayında", tip = "bool", ipucu = "Kapalıyken yalnız test edilebilir." },
-     { k = "baslatma", ad = "Nasıl başlar", tip = "secim", goster = function(d) return d.tur ~= "karsilasma" and d.tur ~= "gunluk" end, secenekler = {
-          { id = "otomatik", ad = "Kendiliğinden (koşullar sağlanınca)" }, { id = "veren", ad = "Misión veren dünya actoründen" },
-          { id = "olay", ad = "Bir olayla (SardonGorev.Tetikle)" }, { id = "elle", ad = "Yalnız elle / başka misiónden" } } },
-     { k = "olay", ad = "Olay adı", tip = "metin", goster = function(d) return d.baslatma == "olay" end },
-     { k = "siralama", ad = "Sıra (küçük önce)", tip = "sayi", min = 0, max = 10000 },
-     { k = "tekrar", ad = "Tekrar", tip = "secim", secenekler = {
-          { id = "yok", ad = "Bir kez" }, { id = "gunluk", ad = "Günde bir" }, { id = "haftalik", ad = "Haftada bir" },
-          { id = "bekleme", ad = "Belli bir bekleme sonra" }, { id = "sinirsiz", ad = "Sınırsız" } } },
-     { k = "bekleme", ad = "Bekleme (sn)", tip = "sayi", min = 0, max = 2592000, goster = function(d) return d.tekrar == "bekleme" end },
-     { k = "kapsam", ad = "İlerleme kaydı", tip = "secim", secenekler = { { id = "karakter", ad = "Karakter başına" }, { id = "hesap", ad = "Hesap (Steam) başına" } } },
-     { k = "iptal", ad = "Jugador bırakabilir", tip = "bool" },
-     { k = "olunce", ad = "Ölünce", tip = "secim", secenekler = { { id = "devam", ad = "Sürer" }, { id = "kontrol", ad = "Kontrol noktasından yeniden" }, { id = "basarisiz", ad = "Başarısız olur" } } },
-     { k = "karsilasmaEngel", ad = "Sürerken karşılaşma çıkmasın", tip = "bool" },
-     { k = "gunlukAgirlik", ad = "Günlük seçilme ağırlığı", tip = "sayi", min = 0, max = 100, goster = function(d) return d.tur == "gunluk" end },
-     { k = "kosullar", ad = "Başlama koşulları", tip = "kosullar" },
+     { k = "id", ad = "ID", tip = "metin", ipucu = "Minúsculas, números y guion bajo. Si cambia, se borra la entrada antigua." },
+     { k = "ad", ad = "Nombre", tip = "metin" },
+     { k = "tur", ad = "Tipo", tip = "secim", secenekler = TUR_SECENEK },
+     { k = "ozet", ad = "Resumen corto", tip = "yazi", ipucu = "Línea en cursiva en el cartel y el diario. Puedes usar {jugador}, {ad}, {hane}." },
+     { k = "aciklama", ad = "Descripción", tip = "yazi" },
+     { k = "aktif", ad = "Publicada", tip = "bool", ipucu = "Si está apagada, solo se puede probar." },
+     { k = "baslatma", ad = "Cómo empieza", tip = "secim", goster = function(d) return d.tur ~= "karsilasma" and d.tur ~= "gunluk" end, secenekler = {
+          { id = "otomatik", ad = "Automático (cuando se cumplan las condiciones)" }, { id = "veren", ad = "Desde un actor del mundo que da la misión" },
+          { id = "olay", ad = "Con un evento (SardonGorev.Tetikle)" }, { id = "elle", ad = "Solo a mano / desde otra misión" } } },
+     { k = "olay", ad = "Nombre del evento", tip = "metin", goster = function(d) return d.baslatma == "olay" end },
+     { k = "siralama", ad = "Orden (menor primero)", tip = "sayi", min = 0, max = 10000 },
+     { k = "tekrar", ad = "Repetición", tip = "secim", secenekler = {
+          { id = "yok", ad = "Una vez" }, { id = "gunluk", ad = "Una vez al día" }, { id = "haftalik", ad = "Una vez a la semana" },
+          { id = "bekleme", ad = "Tras un tiempo de espera" }, { id = "sinirsiz", ad = "Ilimitada" } } },
+     { k = "bekleme", ad = "Espera (s)", tip = "sayi", min = 0, max = 2592000, goster = function(d) return d.tekrar == "bekleme" end },
+     { k = "kapsam", ad = "Registro de progreso", tip = "secim", secenekler = { { id = "karakter", ad = "Por personaje" }, { id = "hesap", ad = "Por cuenta (Steam)" } } },
+     { k = "iptal", ad = "El jugador puede abandonar", tip = "bool" },
+     { k = "olunce", ad = "Al morir", tip = "secim", secenekler = { { id = "devam", ad = "Continúa" }, { id = "kontrol", ad = "Reiniciar desde el punto de control" }, { id = "basarisiz", ad = "Fracasa" } } },
+     { k = "karsilasmaEngel", ad = "Sin encuentros mientras está activa", tip = "bool" },
+     { k = "gunlukAgirlik", ad = "Peso de selección diaria", tip = "sayi", min = 0, max = 100, goster = function(d) return d.tur == "gunluk" end },
+     { k = "kosullar", ad = "Condiciones de inicio", tip = "kosullar" },
      { k = "oduller", ad = "Recompensas", tip = "oduller" },
 }
 
 local ADIM = {
-     { k = "id", ad = "Kimlik", tip = "metin" },
-     { k = "ad", ad = "Takipçide görünen ad", tip = "metin" },
-     { k = "not", ad = "Editör notu", tip = "yazi" },
-     { k = "hedefKip", ad = "Paso ne zaman biter", tip = "secim", secenekler = { { id = "hepsi", ad = "Bütün zorunlu hedefler bitince" }, { id = "biri", ad = "Herhangi bir hedef bitince" } } },
-     { k = "sonraki", ad = "Sonraki paso", tip = "adim" },
-     { k = "kontrol", ad = "Kontrol noktası", tip = "bool", ipucu = "Jugador çıkıp girince bu pasodan sürer." },
+     { k = "id", ad = "ID", tip = "metin" },
+     { k = "ad", ad = "Nombre en el rastreador", tip = "metin" },
+     { k = "not", ad = "Nota del editor", tip = "yazi" },
+     { k = "hedefKip", ad = "Cuándo termina el paso", tip = "secim", secenekler = { { id = "hepsi", ad = "Cuando terminen todos los objetivos obligatorios" }, { id = "biri", ad = "Cuando termine cualquier objetivo" } } },
+     { k = "sonraki", ad = "Siguiente paso", tip = "adim" },
+     { k = "kontrol", ad = "Punto de control", tip = "bool", ipucu = "Si el jugador sale y vuelve, continúa desde este paso." },
 }
 
-local LISTE_GIRIS = { k = "giris", ad = "Giriş eylemleri", tip = "liste", semaTur = "Eylem", kategoriler = G.EylemKategori }
-local LISTE_HEDEF = { k = "hedefler", ad = "Hedefler", tip = "liste", semaTur = "Hedef" }
-local LISTE_REPLIK = { k = "replikler", ad = "Replikler", tip = "liste", alanlar = G.ReplikAlanlari, ozet = G.ReplikOzet }
-local LISTE_CIKIS = { k = "cikis", ad = "Çıkış eylemleri", tip = "liste", semaTur = "Eylem", kategoriler = G.EylemKategori }
-local LISTE_KONUSUNCA = { k = "konusunca", ad = "Konuşunca", tip = "liste", alanlar = G.KonusuncaAlanlari, ozet = G.KonusuncaOzet }
+local LISTE_GIRIS = { k = "giris", ad = "Acciones de entrada", tip = "liste", semaTur = "Eylem", kategoriler = G.EylemKategori }
+local LISTE_HEDEF = { k = "hedefler", ad = "Objetivos", tip = "liste", semaTur = "Hedef" }
+local LISTE_REPLIK = { k = "replikler", ad = "Réplicas", tip = "liste", alanlar = G.ReplikAlanlari, ozet = G.ReplikOzet }
+local LISTE_CIKIS = { k = "cikis", ad = "Acciones de salida", tip = "liste", semaTur = "Eylem", kategoriler = G.EylemKategori }
+local LISTE_KONUSUNCA = { k = "konusunca", ad = "Al hablar", tip = "liste", alanlar = G.KonusuncaAlanlari, ozet = G.KonusuncaOzet }
 
 /*
 *   Pencere
@@ -82,8 +82,8 @@ local function Ctx()
 end
 
 local SEKMELER = {
-     { id = "genel", ad = "Genel" }, { id = "aktorler", ad = "Actorler" }, { id = "adimlar", ad = "Pasolar" },
-     { id = "replikler", ad = "Genel Replikler" }, { id = "seslendirme", ad = "Seslendirme" }, { id = "json", ad = "JSON" },
+     { id = "genel", ad = "General" }, { id = "aktorler", ad = "Actores" }, { id = "adimlar", ad = "Pasos" },
+     { id = "replikler", ad = "Réplicas generales" }, { id = "seslendirme", ad = "Locución" }, { id = "json", ad = "JSON" },
 }
 
 local function Bolum(parent, metin)
@@ -110,10 +110,10 @@ SekmeKur.genel = function(p)
      end)
      form:DockMargin(0, 0, O(12), 0)
      if E.def.tur == "karsilasma" then
-          Bolum(kay, "Karşılaşma (rastgele çıkış)")
+          Bolum(kay, "Encuentro (aparición aleatoria)")
           local k = K.Form(kay, G.KarsilasmaAlanlari, E.def.karsilasma, Ctx(), Kirlet)
           k:DockMargin(0, 0, O(12), 0)
-          local bilgi = K.Etiket(kay, "Eylemlerde '@karsilasma' yeri seçilen noktayı, '@jugador' jugadornun yerini gösterir. Saat / hava / seviye gibi şartları 'Başlama koşulları'na ekleyin.", R.soluk, F(12, "italik"))
+          local bilgi = K.Etiket(kay, "En las acciones, '@karsilasma' es el punto elegido y '@jugador' la posición del jugador. Añade requisitos de hora / clima / nivel en 'Condiciones de inicio'.", R.soluk, F(12, "italik"))
           bilgi:Dock(TOP)
           bilgi:SetWrap(true)
           bilgi:SetAutoStretchVertical(true)
@@ -151,7 +151,7 @@ SekmeKur.aktorler = function(p)
           local yeni = {}
           for _, a in ipairs(G.AktorAlanlari) do yeni[a.k] = istable(a.v) and table.Copy(a.v) or a.v end
           yeni.id = "aktor" .. (#def.aktorler + 1)
-          yeni.ad = "Yeni actor"
+          yeni.ad = "Nuevo actor"
           def.aktorler[#def.aktorler + 1] = yeni
           E.aktorNo = #def.aktorler
           Kirlet()
@@ -159,7 +159,7 @@ SekmeKur.aktorler = function(p)
      end, "ana")
      ekle:Dock(LEFT)
      ekle:SetWide(O(120))
-     local sil = K.Dugme(alt, "Sil", function()
+     local sil = K.Dugme(alt, "Eliminar", function()
           if not def.aktorler[E.aktorNo] then return end
           table.remove(def.aktorler, E.aktorNo)
           Kirlet()
@@ -170,7 +170,7 @@ SekmeKur.aktorler = function(p)
 
      local a = def.aktorler[E.aktorNo]
      if not a then
-          local l = K.Etiket(p, "Henüz actor yok. Actorler misiónin figürleridir (rehber, dükkâncı, yabancı…).", R.soluk, F(15, "italik"))
+          local l = K.Etiket(p, "Aún no hay actores. Los actores son las figuras de la misión (guía, tendero, desconocido…).", R.soluk, F(15, "italik"))
           l:Dock(FILL)
           l:DockMargin(O(20), 0, 0, 0)
           return
@@ -221,7 +221,7 @@ SekmeKur.adimlar = function(p)
                G.Yaz(i .. ".", F(13, "kalin"), O(12), O(16), R.altin)
                G.Yaz(a.id or "?", F(14, "kalin"), O(36), O(16), R.fildisi)
                G.Yaz(G.Kisalt(a.ad or "", 30), F(12, "italik"), O(36), O(32), R.soluk)
-               G.Yaz(#(a.giris or {}) .. " eylem · " .. #(a.hedefler or {}) .. " hedef · " .. #(a.replikler or {}) .. " replik" .. ((a.sonraki or "") ~= "" and ("  → " .. a.sonraki) or ""), F(11, "govde"), O(36), O(46), R.soluk)
+               G.Yaz(#(a.giris or {}) .. " acciones · " .. #(a.hedefler or {}) .. " objetivos · " .. #(a.replikler or {}) .. " réplicas" .. ((a.sonraki or "") ~= "" and ("  → " .. a.sonraki) or ""), F(11, "govde"), O(36), O(46), R.soluk)
           end
           b.DoClick = function() E.adimNo = i G.EditorPencere:SekmeAc("adimlar") end
      end
@@ -235,7 +235,7 @@ SekmeKur.adimlar = function(p)
           b:DockMargin(0, 0, O(4), 0)
      end
      D("+ Paso", function()
-          local yeni = { id = "adim" .. (#def.adimlar + 1), ad = "Yeni paso", giris = {}, hedefler = {}, cikis = {}, replikler = {}, hedefKip = "hepsi", sonraki = "", kontrol = true }
+          local yeni = { id = "adim" .. (#def.adimlar + 1), ad = "Nuevo paso", giris = {}, hedefler = {}, cikis = {}, replikler = {}, hedefKip = "hepsi", sonraki = "", kontrol = true }
           table.insert(def.adimlar, E.adimNo + 1, yeni)
           E.adimNo = E.adimNo + 1
           Kirlet()
@@ -259,8 +259,8 @@ SekmeKur.adimlar = function(p)
           local i = E.adimNo
           if i < #def.adimlar then def.adimlar[i], def.adimlar[i + 1] = def.adimlar[i + 1], def.adimlar[i] E.adimNo = i + 1 Kirlet() G.EditorPencere:SekmeAc("adimlar") end
      end, nil, O(36))
-     D("Sil", function()
-          if #def.adimlar <= 1 then Not("Misiónin en az bir pasoı olmalı.", "hata") return end
+     D("Eliminar", function()
+          if #def.adimlar <= 1 then Not("La misión debe tener al menos un paso.", "hata") return end
           table.remove(def.adimlar, E.adimNo)
           Kirlet()
           G.EditorPencere:SekmeAc("adimlar")
@@ -277,19 +277,19 @@ SekmeKur.adimlar = function(p)
      local form = K.Form(kay, ADIM, a, ctx, Kirlet)
      form:DockMargin(0, 0, O(12), 0)
 
-     Bolum(kay, "1 · Giriş eylemleri (sırayla oynar; 'bekle' açık olanlar bitene kadar bekletir)")
+     Bolum(kay, "1 · Acciones de entrada (en orden; las que tienen 'esperar' bloquean hasta terminar)")
      local f1 = K.Form(kay, { LISTE_GIRIS }, a, ctx, Kirlet)
      f1:DockMargin(0, 0, O(12), 0)
-     Bolum(kay, "2 · Hedefler (giriş bitince başlar)")
+     Bolum(kay, "2 · Objetivos (empiezan al terminar la entrada)")
      local f2 = K.Form(kay, { LISTE_HEDEF }, a, ctx, Kirlet)
      f2:DockMargin(0, 0, O(12), 0)
-     Bolum(kay, "Actorle al hablar (hedefler sürerken; dükkâncı, sohbet)")
+     Bolum(kay, "Al hablar con el actor (mientras hay objetivos; tendero, charla)")
      local f5 = K.Form(kay, { LISTE_KONUSUNCA }, a, ctx, Kirlet)
      f5:DockMargin(0, 0, O(12), 0)
-     Bolum(kay, "Replikler (hedefler sürerken actorün kendiliğinden söyledikleri)")
+     Bolum(kay, "Réplicas (lo que el actor dice solo mientras hay objetivos)")
      local f3 = K.Form(kay, { LISTE_REPLIK }, a, ctx, Kirlet)
      f3:DockMargin(0, 0, O(12), 0)
-     Bolum(kay, "3 · Çıkış eylemleri (hedefler bitince)")
+     Bolum(kay, "3 · Acciones de salida (al terminar los objetivos)")
      local f4 = K.Form(kay, { LISTE_CIKIS }, a, ctx, Kirlet)
      f4:DockMargin(0, 0, O(12), 0)
 end
@@ -297,7 +297,7 @@ end
 SekmeKur.replikler = function(p)
      local kay = K.Kaydir(p)
      kay:Dock(FILL)
-     local bilgi = K.Etiket(kay, "Bu replikler misiónin her pasoında geçerlidir (actor sahnedeyse). Pasoa özel replikleri Pasolar sekmesinde ekleyin.", R.soluk, F(13, "italik"))
+     local bilgi = K.Etiket(kay, "Estas réplicas valen en todos los pasos de la misión (si el actor está en escena). Añade réplicas propias del paso en la pestaña Pasos.", R.soluk, F(13, "italik"))
      bilgi:Dock(TOP)
      bilgi:SetTall(O(30))
      local f = K.Form(kay, { LISTE_REPLIK }, E.def, Ctx(), Kirlet)
@@ -315,11 +315,11 @@ local function Sozler(def)
      end
      local function Eylemler(liste, on)
           for i, e in ipairs(liste or {}) do
-               if e.t == "konus" then Satir(on .. " · eylem " .. i, e.aktor ~= "" and e.aktor or "narrador", e)
+               if e.t == "konus" then Satir(on .. " · acción " .. i, e.aktor ~= "" and e.aktor or "narrador", e)
                elseif e.t == "diyalog" then
-                    for j, s in ipairs(e.satirlar or {}) do Satir(on .. " · diyalog " .. i .. "." .. j, (s.kim or "") ~= "" and s.kim or e.aktor, s) end
+                    for j, s in ipairs(e.satirlar or {}) do Satir(on .. " · diálogo " .. i .. "." .. j, (s.kim or "") ~= "" and s.kim or e.aktor, s) end
                     for j, c in ipairs(e.secenekler or {}) do
-                         for k, s in ipairs(c.yanit or {}) do Satir(on .. " · diyalog " .. i .. " seçenek " .. j .. "." .. k, (s.kim or "") ~= "" and s.kim or e.aktor, s) end
+                         for k, s in ipairs(c.yanit or {}) do Satir(on .. " · diálogo " .. i .. " opción " .. j .. "." .. k, (s.kim or "") ~= "" and s.kim or e.aktor, s) end
                     end
                end
           end
@@ -327,13 +327,13 @@ local function Sozler(def)
      for _, a in ipairs(def.adimlar or {}) do
           Eylemler(a.giris, a.id)
           for i, k in ipairs(a.konusunca or {}) do Eylemler(k.eylemler, a.id .. " (al hablar " .. i .. ")") end
-          Eylemler(a.cikis, a.id .. " (çıkış)")
+          Eylemler(a.cikis, a.id .. " (salida)")
           for i, r in ipairs(a.replikler or {}) do
-               for j, s in ipairs(r.satirlar or {}) do Satir(a.id .. " · replik " .. i .. "." .. j, r.aktor, s) end
+               for j, s in ipairs(r.satirlar or {}) do Satir(a.id .. " · réplica " .. i .. "." .. j, r.aktor, s) end
           end
      end
      for i, r in ipairs(def.replikler or {}) do
-          for j, s in ipairs(r.satirlar or {}) do Satir("genel replik " .. i .. "." .. j, r.aktor, s) end
+          for j, s in ipairs(r.satirlar or {}) do Satir("réplica general " .. i .. "." .. j, r.aktor, s) end
      end
      return out
 end
@@ -348,7 +348,7 @@ SekmeKur.seslendirme = function(p)
      ust:Dock(TOP)
      ust:SetTall(O(40))
      local sozler = Sozler(def)
-     local doldur = K.Dugme(ust, "Boş ses yollarını doldur", function()
+     local doldur = K.Dugme(ust, "Rellenar rutas de audio vacías", function()
           local sayac = {}
           for _, x in ipairs(sozler) do
                if (x.s.ses or "") == "" then
@@ -362,22 +362,22 @@ SekmeKur.seslendirme = function(p)
      end, "ana")
      doldur:Dock(LEFT)
      doldur:SetWide(O(220))
-     local kopya = K.Dugme(ust, "Metni panoya kopyala", function()
-          local satirlar = { "# " .. (def.ad or def.id) .. " — seslendirme metni", "" }
+     local kopya = K.Dugme(ust, "Copiar texto al portapapeles", function()
+          local satirlar = { "# " .. (def.ad or def.id) .. " — texto de locución", "" }
           for _, x in ipairs(sozler) do
-               satirlar[#satirlar + 1] = string.format("[%s]  %s  →  %s", x.kim, x.s.metin, (x.s.ses or "") ~= "" and x.s.ses or "(dosya adı yok)")
+               satirlar[#satirlar + 1] = string.format("[%s]  %s  →  %s", x.kim, x.s.metin, (x.s.ses or "") ~= "" and x.s.ses or "(sin nombre de archivo)")
           end
           SetClipboardText(table.concat(satirlar, "\n"))
-          Not("Seslendirme metni panoya kopyalandı (" .. #sozler .. " satır).")
+          Not("Texto de locución copiado al portapapeles (" .. #sozler .. " líneas).")
      end)
      kopya:Dock(LEFT)
      kopya:SetWide(O(200))
      kopya:DockMargin(O(8), 0, 0, 0)
-     local yenile = K.Dugme(ust, "Sunucudaki sesleri yenile", function() G.EditorIste("sesler") end)
+     local yenile = K.Dugme(ust, "Actualizar sonidos del servidor", function() G.EditorIste("sesler") end)
      yenile:Dock(LEFT)
      yenile:SetWide(O(220))
      yenile:DockMargin(O(8), 0, 0, 0)
-     local bilgi = K.Etiket(ust, "Dosyalar: garrysmod/data/sardon_gorev/sesler/ (mp3 · ogg · wav)", R.soluk, F(12, "italik"))
+     local bilgi = K.Etiket(ust, "Archivos: garrysmod/data/sardon_gorev/sesler/ (mp3 · ogg · wav)", R.soluk, F(12, "italik"))
      bilgi:Dock(FILL)
      bilgi:DockMargin(O(14), 0, 0, 0)
 
@@ -398,7 +398,7 @@ SekmeKur.seslendirme = function(p)
                G.Kutu(0, 0, O(3), h, durum and R.yesil or R.kirmizi)
                G.Yaz(x.konum .. "  ·  " .. x.kim, F(11, "kalin"), O(12), O(13), R.altin)
                G.Yaz(G.Kisalt(x.s.metin, 110), F(14, "govde"), O(12), O(33), R.fildisi)
-               G.Yaz((x.s.ses or "") ~= "" and (x.s.ses .. (durum and string.format("  ·  %.1f sn", durum.sure or 0) or "  ·  sunucuda yok")) or "ses yolu yok",
+               G.Yaz((x.s.ses or "") ~= "" and (x.s.ses .. (durum and string.format("  ·  %.1f s", durum.sure or 0) or "  ·  no está en el servidor")) or "sin ruta de audio",
                     F(12, "govde"), w - O(110), O(13), durum and R.soluk or R.kirmizi, 2)
           end
           local dinle = K.Dugme(r, "▶", function() if yol then G.SesOnizle(yol) end end)
@@ -406,7 +406,7 @@ SekmeKur.seslendirme = function(p)
           dinle:Dock(RIGHT)
           dinle:DockMargin(0, O(11), O(10), O(11))
      end
-     bilgi:SetText("Dosyalar: garrysmod/data/sardon_gorev/sesler/ (mp3 · ogg · wav)   ·   " .. #sozler .. " söz, " .. eksik .. " eksik ses")
+     bilgi:SetText("Archivos: garrysmod/data/sardon_gorev/sesler/ (mp3 · ogg · wav)   ·   " .. #sozler .. " líneas, " .. eksik .. " audio faltante")
 end
 
 SekmeKur.json = function(p)
@@ -414,17 +414,17 @@ SekmeKur.json = function(p)
      ust:Dock(TOP)
      ust:SetTall(O(40))
      local e
-     local uygula = K.Dugme(ust, "Uygula", function()
+     local uygula = K.Dugme(ust, "Aplicar", function()
           local t = util.JSONToTable(e:GetValue() or "")
-          if not istable(t) or not istable(t.adimlar) then Not("JSON okunamadı.", "hata") return end
+          if not istable(t) or not istable(t.adimlar) then Not("No se pudo leer el JSON.", "hata") return end
           E.def = t
           Kirlet()
           G.EditorPencere:Yenile()
-          Not("JSON uygulandı (kaydetmeyi unutma).")
+          Not("JSON aplicado (no olvides guardar).")
      end, "ana")
      uygula:Dock(LEFT)
      uygula:SetWide(O(120))
-     local kop = K.Dugme(ust, "Panoya kopyala", function() SetClipboardText(e:GetValue()) Not("Kopyalandı.") end)
+     local kop = K.Dugme(ust, "Copiar al portapapeles", function() SetClipboardText(e:GetValue()) Not("Copiado.") end)
      kop:Dock(LEFT)
      kop:SetWide(O(160))
      kop:DockMargin(O(8), 0, 0, 0)
@@ -452,7 +452,7 @@ function PENCERE:Init()
      ust.Paint = function(_, w, h)
           G.Yaz("TALLER DE MISIONES", F(12, "kalin"), O(24), O(22), R.altin, 0, O(4))
           local ad = E.def and ((E.def.ad or "") .. "  ·  " .. (E.def.id or "")) or "Elige una misión o crea una nueva"
-          G.Yaz(ad .. (E.kirli and "   ●  kaydedilmedi" or ""), F(20, "baslik"), O(24), O(46), E.kirli and R.altinAcik or R.fildisi)
+          G.Yaz(ad .. (E.kirli and "   ●  sin guardar" or ""), F(20, "baslik"), O(24), O(46), E.kirli and R.altinAcik or R.fildisi)
           G.AltinCizgi(0, h - 1, w, 120)
      end
      local function UstDugme(m, f, tur, w)
@@ -462,14 +462,14 @@ function PENCERE:Init()
           b:DockMargin(O(6), O(14), 0, O(14))
           return b
      end
-     UstDugme("Kapat", function() self:Kapat() end, "tehlike", O(90))
-     UstDugme("Gizle", function()
+     UstDugme("Cerrar", function() self:Kapat() end, "tehlike", O(90))
+     UstDugme("Ocultar", function()
           self:SetVisible(false)
-          notification.AddLegacy("Editör gizlendi. Geri açmak için: sardon_gorev_editor ya da /GorevEditor", NOTIFY_HINT, 6)
+          notification.AddLegacy("Editor oculto. Para reabrir: sardon_gorev_editor o /GorevEditor", NOTIFY_HINT, 6)
      end, nil, O(90))
-     UstDugme("Jugadorlar", function() G.EditorIste("jugadorlar") end, nil, O(110))
-     UstDugme("Dünya actorleri", function() if G.DunyaPenceresi then G.DunyaPenceresi() end end, nil, O(150))
-     UstDugme("Yerler", function() if G.YerPenceresi then G.YerPenceresi() end end, nil, O(100))
+     UstDugme("Jugadores", function() G.EditorIste("jugadorlar") end, nil, O(110))
+     UstDugme("Actores del mundo", function() if G.DunyaPenceresi then G.DunyaPenceresi() end end, nil, O(150))
+     UstDugme("Lugares", function() if G.YerPenceresi then G.YerPenceresi() end end, nil, O(100))
 
      -- sol: misión listesi
      local sol = vgui.Create("EditablePanel", self)
@@ -480,21 +480,21 @@ function PENCERE:Init()
      self.ara:Dock(TOP)
      self.ara:SetTall(O(30))
      self.ara:SetPlaceholderText("Buscar misión…")
-     self.filtre = K.Secim(sol, { { id = "", ad = "Bütün türler" }, unpack(TUR_SECENEK) }, "", function(v) self.turFiltre = v self:ListeYenile() end)
+     self.filtre = K.Secim(sol, { { id = "", ad = "Todos los tipos" }, unpack(TUR_SECENEK) }, "", function(v) self.turFiltre = v self:ListeYenile() end)
      self.filtre:Dock(TOP)
      self.filtre:SetTall(O(28))
      self.filtre:DockMargin(0, O(6), 0, O(6))
      local alt = vgui.Create("EditablePanel", sol)
      alt:Dock(BOTTOM)
      alt:SetTall(O(34))
-     local yeni = K.Dugme(alt, "+ Yeni", function() self:YeniGorev() end, "ana")
+     local yeni = K.Dugme(alt, "+ Nueva", function() self:YeniGorev() end, "ana")
      yeni:Dock(LEFT)
      yeni:SetWide(O(96))
-     local kopya = K.Dugme(alt, "Kopyala", function()
+     local kopya = K.Dugme(alt, "Copiar", function()
           if not E.def then return end
           local k = table.Copy(E.def)
           k.id = (E.def.id or "gorev") .. "_kopya"
-          k.ad = (E.def.ad or "") .. " (kopya)"
+          k.ad = (E.def.ad or "") .. " (copia)"
           k.surum = 0
           E.def, E.eskiId, E.kirli = k, nil, true
           self:Yenile()
@@ -502,9 +502,9 @@ function PENCERE:Init()
      kopya:Dock(LEFT)
      kopya:SetWide(O(90))
      kopya:DockMargin(O(6), 0, 0, 0)
-     local sil = K.Dugme(alt, "Sil", function()
+     local sil = K.Dugme(alt, "Eliminar", function()
           if not E.def or not E.eskiId then return end
-          Derma_Query("“" .. (E.def.ad or E.eskiId) .. "” silinsin mi? Süren örnekleri de kapanır.", "Misióni sil", "Sil", function()
+          Derma_Query("¿Eliminar “" .. (E.def.ad or E.eskiId) .. "”? También se cerrarán las instancias en curso.", "Eliminar misión", "Eliminar", function()
                G.EditorIste("sil", { id = E.eskiId })
                E.def, E.eskiId, E.kirli = nil, nil, false
                self:Yenile()
@@ -522,12 +522,12 @@ function PENCERE:Init()
      ayak:DockPadding(O(16), O(10), O(16), O(10))
      ayak.Paint = function(_, w) G.AltinCizgi(0, 0, w, 120) end
      self.ayak = ayak
-     local kaydet = K.Dugme(ayak, "Kaydet  (Ctrl+S)", function() self:Kaydet() end, "ana")
+     local kaydet = K.Dugme(ayak, "Guardar  (Ctrl+S)", function() self:Kaydet() end, "ana")
      kaydet:Dock(LEFT)
      kaydet:SetWide(O(170))
      local function Test(m, islem, w, tur)
           local b = K.Dugme(ayak, m, function()
-               if not E.def or not E.eskiId then Not("Önce kaydedin.", "hata") return end
+               if not E.def or not E.eskiId then Not("Guarda primero.", "hata") return end
                local function Yap()
                     local adim = islem == "baslat" and self.testAdim or (islem == "adim" and self.testAdim) or nil
                     G.EditorIste("test", { islem = islem, id = E.eskiId, adim = adim, hedef = "ben" })
@@ -544,16 +544,16 @@ function PENCERE:Init()
           b:DockMargin(O(8), 0, 0, 0)
           return b
      end
-     Test("▶ Bana başlat", "baslat", O(140))
+     Test("▶ Iniciar en mí", "baslat", O(140))
      self.adimSecim = vgui.Create("EditablePanel", ayak)
      self.adimSecim:Dock(LEFT)
      self.adimSecim:SetWide(O(220))
      self.adimSecim:DockMargin(O(6), 0, 0, 0)
-     Test("Pasoa atla", "adim", O(110))
-     Test("Bitir ✓", "bitir", O(90))
-     Test("İptal", "iptal", O(70))
-     Test("İlerlememi sıfırla", "sifirla", O(150), "tehlike")
-     local karsi = Test("Karşılaşmayı kur", "karsilasma", O(150))
+     Test("Saltar al paso", "adim", O(110))
+     Test("Terminar ✓", "bitir", O(90))
+     Test("Cancelar", "iptal", O(70))
+     Test("Resetear mi progreso", "sifirla", O(150), "tehlike")
+     local karsi = Test("Montar encuentro", "karsilasma", O(150))
      karsi.Think = function(s) s:SetVisible(E.def ~= nil and E.def.tur == "karsilasma") end
 
      -- orta
@@ -601,7 +601,7 @@ end
 function PENCERE:Kaydet()
      if not E.def then return end
      E.def.id = G.Kimlik(E.def.id)
-     if E.def.id == "" then Not("Misión kimliği boş olamaz.", "hata") return end
+     if E.def.id == "" then Not("El ID de la misión no puede estar vacío.", "hata") return end
      G.EditorIste("kaydet", { def = E.def, eskiId = E.eskiId })
 end
 
@@ -621,7 +621,7 @@ function PENCERE:YeniGorev()
           E.eskiId, E.kirli, E.sekme, E.adimNo = nil, true, "genel", 1
           self:Yenile()
      end
-     if E.kirli then Derma_Query("Kaydedilmemiş değişiklikler kaybolacak.", "Nueva misión", "Continuar", Yap, "Cancelar") else Yap() end
+     if E.kirli then Derma_Query("Se perderán los cambios sin guardar.", "Nueva misión", "Continuar", Yap, "Cancelar") else Yap() end
 end
 
 function PENCERE:ListeYenile()
@@ -647,16 +647,16 @@ function PENCERE:ListeYenile()
                     local renk = G.TurRenk(g.tur)
                     G.Kutu(0, 0, w, h, sec and Color(34, 46, 36, 240) or Color(16, 24, 20, s:IsHovered() and 240 or 195))
                     G.Kutu(0, 0, O(3), h, sec and R.altin or G.Renk(renk, 160))
-                    G.Yaz(G.Tur(g.tur).kisa .. (g.aktif and "" or "  ·  TASLAK"), F(10, "kalin"), O(12), O(13), g.aktif and renk or R.soluk, 0, O(2))
+                    G.Yaz(G.Tur(g.tur).kisa .. (g.aktif and "" or "  ·  BORRADOR"), F(10, "kalin"), O(12), O(13), g.aktif and renk or R.soluk, 0, O(2))
                     G.Yaz(G.Kisalt(g.ad or g.id, 30), F(14, "kalin"), O(12), O(31), R.fildisi)
-                    G.Yaz(g.id .. "  ·  " .. (g.adim or 0) .. " paso  ·  s" .. (g.surum or 0), F(11, "govde"), O(12), O(46), R.soluk)
+                    G.Yaz(g.id .. "  ·  " .. (g.adim or 0) .. " pasos  ·  v" .. (g.surum or 0), F(11, "govde"), O(12), O(46), R.soluk)
                end
                b.DoClick = function()
                     local function Ac()
                          G.EditorIste("al", { id = g.id })
                          E.istenen = g.id
                     end
-                    if E.kirli then Derma_Query("Kaydedilmemiş değişiklikler kaybolacak.", "Misión aç", "Continuar", Ac, "Cancelar") else Ac() end
+                    if E.kirli then Derma_Query("Se perderán los cambios sin guardar.", "Abrir misión", "Continuar", Ac, "Cancelar") else Ac() end
                end
           end
      end
@@ -667,7 +667,7 @@ function PENCERE:SekmeAc(id)
      self.icerik:Clear()
      self.sekmeler:Clear()
      if not E.def then
-          local l = K.Etiket(self.icerik, "Soldan bir misión seçin ya da “+ Yeni” ile başlayın.", R.soluk, F(18, "italik"))
+          local l = K.Etiket(self.icerik, "Elige una misión a la izquierda o empieza con “+ Nueva”.", R.soluk, F(18, "italik"))
           l:Dock(FILL)
           l:SetContentAlignment(5)
           return
@@ -688,8 +688,8 @@ function PENCERE:SekmeAc(id)
      if f then
           local ok, hata = pcall(f, self.icerik)
           if not ok then
-               ErrorNoHalt("[Sardon Misión] editör: " .. tostring(hata) .. "\n")
-               local l = K.Etiket(self.icerik, "Sekme açılamadı: " .. tostring(hata), R.kirmizi, F(14, "govde"))
+               ErrorNoHalt("[Sardon Misión] editor: " .. tostring(hata) .. "\n")
+               local l = K.Etiket(self.icerik, "No se pudo abrir la pestaña: " .. tostring(hata), R.kirmizi, F(14, "govde"))
                l:Dock(TOP)
           end
      end
@@ -699,7 +699,7 @@ function PENCERE:AdimSecimYenile()
      if not IsValid(self.adimSecim) then return end
      self.adimSecim:Clear()
      if not E.def then return end
-     local sec = { { id = "", ad = "— ilk pasodan —" } }
+     local sec = { { id = "", ad = "— desde el primer paso —" } }
      for i, a in ipairs(E.def.adimlar or {}) do sec[#sec + 1] = { id = a.id, ad = i .. ". " .. a.id } end
      self.testAdim = nil
      local c = K.Secim(self.adimSecim, sec, "", function(v) self.testAdim = v ~= "" and v or nil end)
@@ -715,7 +715,7 @@ vgui.Register("SardonGorev.Editor", PENCERE, "EditablePanel")
 
 function G.EditorAc()
      if not G.Editor(LocalPlayer()) then
-          notification.AddLegacy("Misión editörü yetkin yok.", NOTIFY_ERROR, 4)
+          notification.AddLegacy("No tienes permiso para el editor de misiones.", NOTIFY_ERROR, 4)
           return
      end
      if IsValid(G.EditorPencere) then
@@ -760,11 +760,11 @@ YANIT.kaydedildi = function(t)
           E.def.surum = t.surum
           E.def.id = t.id
      end
-     Not("Kaydedildi: " .. t.id .. " (sürüm " .. (t.surum or "?") .. ")")
+     Not("Guardado: " .. t.id .. " (versión " .. (t.surum or "?") .. ")")
      if IsValid(G.EditorPencere) then G.EditorPencere:AdimSecimYenile() G.EditorPencere:ListeYenile() end
 end
 
-YANIT.hata = function(t) Not(t.metin or "Hata", "hata") end
+YANIT.hata = function(t) Not(t.metin or "Error", "hata") end
 
 YANIT.sesler = function(t)
      G.SesListe = t.liste or {}
@@ -772,14 +772,14 @@ YANIT.sesler = function(t)
 end
 
 YANIT.jugadorlar = function(t)
-     local p = K.Pencere("Jugadorların misiónleri", O(720), O(600))
+     local p = K.Pencere("Misiones de los jugadores", O(720), O(600))
      local kay = K.Kaydir(p.govde)
      kay:Dock(FILL)
      for _, o in ipairs(t.liste or {}) do
           local satir = kay:Add("EditablePanel")
           satir:Dock(TOP)
           local metinler = {}
-          for _, g in ipairs(o.gorevler or {}) do metinler[#metinler + 1] = g.id .. " · " .. g.adim .. (g.gizli and " (pusu)" or "") end
+          for _, g in ipairs(o.gorevler or {}) do metinler[#metinler + 1] = g.id .. " · " .. g.adim .. (g.gizli and " (emboscada)" or "") end
           local h = O(30) + #metinler * O(18)
           satir:SetTall(h)
           satir:DockMargin(0, 0, O(6), O(4))

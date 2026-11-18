@@ -96,10 +96,10 @@ end
 
 -- Yeni yer: ad sor → dünyadan seç → kaydet → cb(ad)
 function G.YerYeniAkisi(tur, cb)
-     Derma_StringRequest("Yeni yer", "Yer adı (küçük harf, rakam, alt çizgi):", "", function(ad)
+     Derma_StringRequest("Nuevo lugar", "Nombre del lugar (minúsculas, números, guion bajo):", "", function(ad)
           ad = G.Kimlik(ad)
           if ad == "" then return end
-          G.DunyadanSec("“" .. ad .. "” yerini seç", function(pos, yaw)
+          G.DunyadanSec("“" .. ad .. "” — elige el lugar", function(pos, yaw)
                local yer = { tur = tur or "nokta", pos = pos, ang = Angle(0, yaw, 0), yaricap = 150, fov = 60, noktalar = {} }
                if tur == "kamera" then
                     local lp = LocalPlayer()
@@ -130,7 +130,7 @@ G.YolDuzenlenen = G.YolDuzenlenen or nil
 function G.YerPenceresi(sec)
      if IsValid(G.YerPencere) then G.YerPencere:Remove() end
      seciliYer = sec or seciliYer
-     local p = K.Pencere("Yerler · " .. (E.harita or ""), O(980), O(720))
+     local p = K.Pencere("Lugares · " .. (E.harita or ""), O(980), O(720))
      G.YerPencere = p
 
      local sol = vgui.Create("EditablePanel", p.govde)
@@ -139,7 +139,7 @@ function G.YerPenceresi(sec)
      local ara = K.Giris(sol, "", false)
      ara:Dock(TOP)
      ara:SetTall(O(30))
-     ara:SetPlaceholderText("Yer ara…")
+     ara:SetPlaceholderText("Buscar lugar…")
      local liste = K.Kaydir(sol)
      liste:Dock(FILL)
      liste:DockMargin(0, O(6), 0, 0)
@@ -154,9 +154,9 @@ function G.YerPenceresi(sec)
           b:SetWide(O(112))
           b:DockMargin(0, 0, O(6), 0)
      end
-     YeniDugme("+ Nokta", "nokta")
-     YeniDugme("+ Yol", "yol")
-     YeniDugme("+ Kamera", "kamera")
+     YeniDugme("+ Punto", "nokta")
+     YeniDugme("+ Ruta", "yol")
+     YeniDugme("+ Cámara", "kamera")
 
      local sag = K.Kaydir(p.govde)
      sag:Dock(FILL)
@@ -182,7 +182,7 @@ function G.YerPenceresi(sec)
                     G.Kutu(0, 0, w, h, sec and Color(34, 46, 36, 240) or Color(16, 24, 20, s:IsHovered() and 240 or 200))
                     if sec then G.Kutu(0, 0, O(3), h, R.altin) end
                     G.Yaz(x.ad, F(14, "kalin"), O(12), O(14), R.fildisi)
-                    G.Yaz((x.y.tur or "nokta") .. ((x.y.tur == "yol") and (" · " .. #(x.y.noktalar or {}) .. " nokta") or ""), F(11, "govde"), O(12), O(30), R.soluk)
+                    G.Yaz((x.y.tur or "punto") .. ((x.y.tur == "yol") and (" · " .. #(x.y.noktalar or {}) .. " pts") or ""), F(11, "govde"), O(12), O(30), R.soluk)
                     G.Yaz(math.Round(x.d * 0.01905) .. " m", F(12, "govde"), w - O(10), h / 2, R.soluk, 2)
                end
                b.DoClick = function() G.YerPenceresi(x.ad) end
@@ -193,7 +193,7 @@ function G.YerPenceresi(sec)
 
      local y = seciliYer and E.yerler[seciliYer]
      if not y then
-          local l = K.Etiket(sag, "Soldan bir yer seçin ya da yeni yer ekleyin. Misiónler yerlere adlarıyla başvurur; misióni başka haritaya taşırken yalnız yerleri yeniden koymak yeter.", R.soluk, F(14, "italik"))
+          local l = K.Etiket(sag, "Elige un lugar a la izquierda o añade uno nuevo. Las misiones referencian lugares por nombre; al mover la misión a otro mapa solo hay que recolocar los lugares.", R.soluk, F(14, "italik"))
           l:Dock(TOP)
           l:SetWrap(true)
           l:SetTall(O(80))
@@ -203,11 +203,11 @@ function G.YerPenceresi(sec)
      local kopya = table.Copy(y)
      kopya.ad = seciliYer
      local form = K.Form(sag, {
-          { k = "ad", ad = "Ad", tip = "metin" },
-          { k = "tur", ad = "Tür", tip = "secim", secenekler = { { id = "nokta", ad = "Nokta" }, { id = "yol", ad = "Yol (noktalar)" }, { id = "kamera", ad = "Kamera" } } },
-          { k = "yaricap", ad = "Yarıçap", tip = "sayi", min = 10, max = 10000 },
-          { k = "fov", ad = "Görüş açısı (kamera)", tip = "sayi", min = 10, max = 120, goster = function(d) return d.tur == "kamera" end },
-          { k = "not", ad = "Not", tip = "yazi" },
+          { k = "ad", ad = "Nombre", tip = "metin" },
+          { k = "tur", ad = "Tipo", tip = "secim", secenekler = { { id = "nokta", ad = "Punto" }, { id = "yol", ad = "Ruta (puntos)" }, { id = "kamera", ad = "Cámara" } } },
+          { k = "yaricap", ad = "Radio", tip = "sayi", min = 10, max = 10000 },
+          { k = "fov", ad = "Ángulo de visión (cámara)", tip = "sayi", min = 10, max = 120, goster = function(d) return d.tur == "kamera" end },
+          { k = "not", ad = "Nota", tip = "yazi" },
      }, kopya, {})
      form:DockMargin(0, 0, O(10), 0)
 
@@ -231,50 +231,50 @@ function G.YerPenceresi(sec)
           local b = K.Dugme(dugmeler, m, f, tur)
           b:SetSize(G.Genislik(m, F(13, "kalin")) + O(30), O(32))
      end
-     D("Kaydet", Kaydet, "ana")
-     D("Durduğum yere taşı", function()
+     D("Guardar", Kaydet, "ana")
+     D("Mover a donde estoy", function()
           local lp = LocalPlayer()
           if kopya.tur == "kamera" then kopya.pos, kopya.ang = lp:EyePos(), lp:EyeAngles()
           else kopya.pos, kopya.ang = lp:GetPos(), Angle(0, lp:EyeAngles().y, 0) end
           Kaydet()
      end)
-     D("Dünyadan seç…", function()
-          G.DunyadanSec("“" .. seciliYer .. "” için yeni konum", function(pos, yaw)
+     D("Elegir en el mundo…", function()
+          G.DunyadanSec("“" .. seciliYer .. "” — nueva posición", function(pos, yaw)
                kopya.pos, kopya.ang = pos, Angle(0, yaw, 0)
                Kaydet()
           end)
      end)
      if kopya.tur == "kamera" then
-          D("Şu anki görüşümü kaydet", function()
+          D("Guardar mi vista actual", function()
                local lp = LocalPlayer()
                kopya.pos, kopya.ang, kopya.fov = lp:EyePos(), lp:EyeAngles(), math.Round(lp:GetFOV())
                Kaydet()
           end)
      end
      if kopya.tur == "yol" then
-          D(G.YolDuzenlenen == seciliYer and "Yol çizimini bitir" or "Yolu araçla çiz", function()
+          D(G.YolDuzenlenen == seciliYer and "Terminar dibujo de ruta" or "Dibujar ruta con la herramienta", function()
                G.YolDuzenlenen = G.YolDuzenlenen ~= seciliYer and seciliYer or nil
                if G.YolDuzenlenen then
-                    notification.AddLegacy("Misión aracı: sol tık nokta ekler, sağ tık son noktayı siler (" .. seciliYer .. ")", NOTIFY_HINT, 8)
+                    notification.AddLegacy("Herramienta de misión: clic izq. añade punto, clic der. borra el último (" .. seciliYer .. ")", NOTIFY_HINT, 8)
                     RunConsoleCommand("gmod_tool", "sardon_gorev")
                     p:Remove()
                else
                     G.YerPenceresi(seciliYer)
                end
           end)
-          D("Noktaları temizle", function() kopya.noktalar = {} Kaydet() end, "tehlike")
+          D("Vaciar puntos", function() kopya.noktalar = {} Kaydet() end, "tehlike")
      end
-     D("Işınlan", function() G.EditorIste("isinla", { ad = seciliYer }) end)
+     D("Teletransportar", function() G.EditorIste("isinla", { ad = seciliYer }) end)
      D("Mostrar", function() G.YerVurgula(seciliYer) end)
-     D("Sil", function()
-          Derma_Query("“" .. seciliYer .. "” silinsin mi? Bu yeri kullanan misiónler bozulur.", "Yeri sil", "Sil", function()
+     D("Eliminar", function()
+          Derma_Query("¿Eliminar “" .. seciliYer .. "”? También se romperán las misiones que usen este lugar.", "Eliminar lugar", "Eliminar", function()
                G.EditorIste("yer_sil", { ad = seciliYer })
                seciliYer = nil
                timer.Simple(0.3, function() if IsValid(G.YerPencere) then G.YerPenceresi() end end)
           end, "Cancelar")
      end, "tehlike")
 
-     local bilgi = K.Etiket(sag, string.format("Konum: %.0f, %.0f, %.0f   ·   Yön: %.0f°", kopya.pos.x, kopya.pos.y, kopya.pos.z, kopya.ang.y), R.soluk, F(12, "govde"))
+     local bilgi = K.Etiket(sag, string.format("Posición: %.0f, %.0f, %.0f   ·   Orientación: %.0f°", kopya.pos.x, kopya.pos.y, kopya.pos.z, kopya.ang.y), R.soluk, F(12, "govde"))
      bilgi:Dock(TOP)
      bilgi:DockMargin(0, O(10), 0, 0)
      bilgi:SetTall(O(24))
@@ -295,7 +295,7 @@ function G.AracSol(iz)
           return
      end
      -- yeni nokta yeri
-     Derma_StringRequest("Yeni yer", "Yer adı:", "", function(ad)
+     Derma_StringRequest("Nuevo lugar", "Nombre del lugar:", "", function(ad)
           ad = G.Kimlik(ad)
           if ad == "" then return end
           YerGonder(ad, { tur = "nokta", pos = iz.HitPos, ang = Angle(0, LocalPlayer():EyeAngles().y + 180, 0), yaricap = 150, fov = 60, noktalar = {} })
@@ -319,7 +319,7 @@ function G.AracSag(iz)
           local d = y.pos:Distance(iz.HitPos)
           if d < enD then enYakin, enD = ad, d end
      end
-     if enYakin then G.YerPenceresi(enYakin) else notification.AddLegacy("Yakında yer yok.", NOTIFY_HINT, 3) end
+     if enYakin then G.YerPenceresi(enYakin) else notification.AddLegacy("No hay un lugar cerca.", NOTIFY_HINT, 3) end
 end
 
 /*
@@ -377,8 +377,8 @@ hook.Add("PostDrawTranslucentRenderables", "SardonGorev.Yerler", function(_, gok
                end
                if d < 1600 or vurgulu then
                     cam.Start3D2D(y.pos + OPT_V_0_0_84, aci, 0.12)
-                         draw.SimpleTextOutlined(ad, "SardonGorev.D_Ad", 0, 0, renk, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, OPT_R_0_0_0_200)
-                         draw.SimpleTextOutlined((y.tur or "nokta") .. (G.YolDuzenlenen == ad and "  · ÇİZİLİYOR" or ""), "SardonGorev.D_Unvan", 0, 4, OPT_R_220_220_220, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1, OPT_R_0_0_0_200)
+                         draw.SimpleTextOutlined(ad, "SardonGorev.D_Nombre", 0, 0, renk, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, OPT_R_0_0_0_200)
+                         draw.SimpleTextOutlined((y.tur or "punto") .. (G.YolDuzenlenen == ad and "  · DIBUJANDO" or ""), "SardonGorev.D_Título", 0, 4, OPT_R_220_220_220, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1, OPT_R_0_0_0_200)
                     cam.End3D2D()
                end
           end
@@ -390,29 +390,29 @@ end)
 *   Dünya actorleri (misión verenler)
 */
 local SATIR = {
-     { k = "metin", ad = "Söz", tip = "yazi", v = "" },
-     { k = "ses", ad = "Ses dosyası", tip = "ses", v = "" },
-     { k = "anim", ad = "Hareket", tip = "anim", v = "" },
+     { k = "metin", ad = "Frase", tip = "yazi", v = "" },
+     { k = "ses", ad = "Archivo de sonido", tip = "ses", v = "" },
+     { k = "anim", ad = "Movimiento", tip = "anim", v = "" },
 }
 local function SatirOzet(s) return "“" .. G.Kisalt(s.metin or "", 50) .. "”" .. ((s.ses or "") ~= "" and "  ♪" or "") end
 
 local DUNYA_ALANLARI = {
-     { k = "id", ad = "Kimlik", tip = "metin", v = "" },
-     { k = "ad", ad = "Görünen ad", tip = "metin", v = "" },
-     { k = "unvan", ad = "Unvan", tip = "metin", v = "" },
-     { k = "yer", ad = "Yer", tip = "yer", v = "" },
-     { k = "model", ad = "Model", tip = "model", v = "models/player/group01/male_07.mdl" },
+     { k = "id", ad = "ID", tip = "metin", v = "" },
+     { k = "ad", ad = "Nombre visible", tip = "metin", v = "" },
+     { k = "unvan", ad = "Título", tip = "metin", v = "" },
+     { k = "yer", ad = "Lugar", tip = "yer", v = "" },
+     { k = "model", ad = "Modelo", tip = "model", v = "models/player/group01/male_07.mdl" },
      { k = "skin", ad = "Skin", tip = "sayi", v = 0, min = 0, max = 32 },
-     { k = "bg", ad = "Bodygroup (no=değer, virgülle)", tip = "metin", v = "" },
-     { k = "boy", ad = "Boy ölçeği", tip = "sayi", v = 1, min = 0.5, max = 1.6 },
-     { k = "bekleAnim", ad = "Bekleme animasyonu", tip = "anim", v = "" },
-     { k = "isimRenk", ad = "İsim rengi", tip = "renk", v = { 232, 219, 182 } },
-     { k = "isimGoster", ad = "Baş üstünde ad", tip = "bool", v = true },
-     { k = "gorevler", ad = "Verdiği misiónler", tip = "liste", v = {}, alanlar = { { k = "gorev", ad = "Misión", tip = "gorev", v = "" } }, ozet = function(s) return s.gorev or "?" end },
-     { k = "cagri", ad = "Yaklaşana seslenme", tip = "liste", v = {}, alanlar = SATIR, ozet = SatirOzet },
-     { k = "selam", ad = "Konuşunca (misión varken)", tip = "liste", v = {}, alanlar = SATIR, ozet = SatirOzet },
-     { k = "bos", ad = "Konuşunca (misión yokken)", tip = "liste", v = {}, alanlar = SATIR, ozet = SatirOzet },
-     { k = "menu", ad = "Konuşunca açılan menü", tip = "secim", v = "", secenekler = { { id = "", ad = "Yok (misión verir)" }, { id = "aksesuar", ad = "Madam Malkin aksesuar dükkânı" }, { id = "berber", ad = "Kuaför (saç, kaş ve makyaj; ücretli)" } } },
+     { k = "bg", ad = "Bodygroup (nº=valor, separados por coma)", tip = "metin", v = "" },
+     { k = "boy", ad = "Escala de altura", tip = "sayi", v = 1, min = 0.5, max = 1.6 },
+     { k = "bekleAnim", ad = "Animación de espera", tip = "anim", v = "" },
+     { k = "isimRenk", ad = "Color del nombre", tip = "renk", v = { 232, 219, 182 } },
+     { k = "isimGoster", ad = "Nombre sobre la cabeza", tip = "bool", v = true },
+     { k = "gorevler", ad = "Misiones que da", tip = "liste", v = {}, alanlar = { { k = "gorev", ad = "Misión", tip = "gorev", v = "" } }, ozet = function(s) return s.gorev or "?" end },
+     { k = "cagri", ad = "Llamada al acercarse", tip = "liste", v = {}, alanlar = SATIR, ozet = SatirOzet },
+     { k = "selam", ad = "Al hablar (con misión)", tip = "liste", v = {}, alanlar = SATIR, ozet = SatirOzet },
+     { k = "bos", ad = "Al hablar (sin misión)", tip = "liste", v = {}, alanlar = SATIR, ozet = SatirOzet },
+     { k = "menu", ad = "Menú al hablar", tip = "secim", v = "", secenekler = { { id = "", ad = "Ninguno (da misión)" }, { id = "aksesuar", ad = "Tienda de accesorios Madam Malkin" }, { id = "berber", ad = "Peluquería (pelo, cejas y maquillaje; de pago)" } } },
 }
 
 local dunyaSecili = 1
@@ -424,7 +424,7 @@ function G.DunyaPenceresi()
      for _, d in ipairs(liste) do
           for i, x in ipairs(d.gorevler or {}) do if isstring(x) then d.gorevler[i] = { gorev = x } end end
      end
-     local p = K.Pencere("Dünya actorleri (misión verenler) · " .. (E.harita or ""), O(1100), O(760))
+     local p = K.Pencere("Actores del mundo (dadores de misión) · " .. (E.harita or ""), O(1100), O(760))
      G.DunyaPencere = p
      dunyaSecili = math.Clamp(dunyaSecili, 1, math.max(1, #liste))
 
@@ -444,7 +444,7 @@ function G.DunyaPenceresi()
                G.Kutu(0, 0, w, h, sec and Color(34, 46, 36, 240) or Color(16, 24, 20, s:IsHovered() and 240 or 200))
                if sec then G.Kutu(0, 0, O(3), h, R.altin) end
                G.Yaz(d.ad or d.id or "?", F(14, "kalin"), O(12), O(14), R.fildisi)
-               G.Yaz((d.yer or "yer yok") .. " · " .. #(d.gorevler or {}) .. " misión", F(11, "govde"), O(12), O(31), R.soluk)
+               G.Yaz((d.yer or "sin lugar") .. " · " .. #(d.gorevler or {}) .. " misiones", F(11, "govde"), O(12), O(31), R.soluk)
           end
           b.DoClick = function() dunyaSecili = i G.DunyaPenceresiYenile(liste) end
      end
@@ -455,14 +455,14 @@ function G.DunyaPenceresi()
           local yeni = {}
           for _, a in ipairs(DUNYA_ALANLARI) do yeni[a.k] = istable(a.v) and table.Copy(a.v) or a.v end
           yeni.id = "veren" .. (#liste + 1)
-          yeni.ad = "Nueva misión veren"
+          yeni.ad = "Nuevo dador de misión"
           liste[#liste + 1] = yeni
           dunyaSecili = #liste
           G.DunyaPenceresiYenile(liste)
      end, "ana")
      ekle:Dock(LEFT)
      ekle:SetWide(O(110))
-     local sil = K.Dugme(alt, "Sil", function()
+     local sil = K.Dugme(alt, "Eliminar", function()
           table.remove(liste, dunyaSecili)
           G.DunyaPenceresiYenile(liste)
      end, "tehlike")
@@ -477,15 +477,15 @@ function G.DunyaPenceresi()
           local form = K.Form(sag, DUNYA_ALANLARI, d, { def = { aktorler = {} }, model = d.model })
           form:DockMargin(0, 0, O(10), 0)
      else
-          local l = K.Etiket(sag, "Misión verenler haritada sürekli duran figürlerdir; başlarında “!” belirir, E ile misión teklif ederler.", R.soluk, F(14, "italik"))
+          local l = K.Etiket(sag, "Los dadores de misión son figuras fijas en el mapa; aparece “!” sobre ellos y con E ofrecen la misión.", R.soluk, F(14, "italik"))
           l:Dock(TOP)
           l:SetWrap(true)
           l:SetTall(O(60))
      end
 
-     local kaydet = K.Dugme(p, "Kaydet ve dünyaya uygula", function()
+     local kaydet = K.Dugme(p, "Guardar y aplicar al mundo", function()
           G.EditorIste("dunya_kaydet", { dunya = liste })
-          notification.AddLegacy("Dünya actorleri kaydedildi.", NOTIFY_GENERIC, 3)
+          notification.AddLegacy("Actores del mundo guardados.", NOTIFY_GENERIC, 3)
      end, "ana")
      kaydet:SetSize(O(240), O(36))
      kaydet:SetPos(p:GetWide() - O(256), p:GetTall() - O(50))
@@ -506,12 +506,12 @@ function G.SinemaRotaSec(cb)
      local ogeler = {}
      for _, d in ipairs(dosyalar) do
           local veri = util.JSONToTable(file.Read(klasor .. "/" .. d, "DATA") or "") or {}
-          ogeler[#ogeler + 1] = { ad = string.StripExtension(d), alt = #(veri.anahtarlar or {}) .. " anahtar · " .. #(veri.aktorler or {}) .. " actor · " .. ((veri.ayar or {}).rotaSure or "?") .. " sn", deger = d }
+          ogeler[#ogeler + 1] = { ad = string.StripExtension(d), alt = #(veri.anahtarlar or {}) .. " claves · " .. #(veri.aktorler or {}) .. " actores · " .. ((veri.ayar or {}).rotaSure or "?") .. " s", deger = d }
      end
      if #ogeler == 0 then
-          ogeler[1] = { ad = "(guardarlı rota yok)", alt = "Sinema Kamerası (F9) ile rota kurup kaydedin", deger = "" }
+          ogeler[1] = { ad = "(no hay rutas guardadas)", alt = "Crea y guarda una ruta con Cámara de Cine (F9)", deger = "" }
      end
-     K.AramaListesi("Sinema rotası seç", ogeler, function(d)
+     K.AramaListesi("Elegir ruta de cine", ogeler, function(d)
           if d == "" then return end
           local veri = util.JSONToTable(file.Read(klasor .. "/" .. d, "DATA") or "")
           if not istable(veri) then return end
@@ -525,8 +525,8 @@ end
 local function ShineKaydet()
      if not ShineAdmin or not ShineAdmin.RegisterPage then return end
      ShineAdmin:RegisterPage("gorev", {
-          label = "Misiónler", icon = "book", group = "systems", order = 40,
-          title = "Misión Sistemi", subtitle = "Taller de misiones, yerler ve misión verenler",
+          label = "Misiones", icon = "book", group = "systems", order = 40,
+          title = "Sistema de misiones", subtitle = "Taller de misiones, lugares y dadores de misión",
           access = function(ply) return G.Editor(ply) end,
           build = function(ctx)
                local N = ShineAdmin.GetN and ShineAdmin.GetN()
@@ -541,14 +541,14 @@ local function ShineKaydet()
                          b:SetSize(u(320), u(40))
                     end
                end
-               Dugme("Taller de misionesni aç", u(30), function()
+               Dugme("Abrir Taller de misiones", u(30), function()
                     if IsValid(ShineAdmin.Frame) then ShineAdmin.Frame:Remove() end
                     G.EditorAc()
                end)
                Dugme("Yerler", u(84), function() G.EditorAc() timer.Simple(0.3, G.YerPenceresi) end)
-               Dugme("Dünya actorleri", u(138), function() G.EditorAc() timer.Simple(0.3, G.DunyaPenceresi) end)
+               Dugme("Actores del mundo", u(138), function() G.EditorAc() timer.Simple(0.3, G.DunyaPenceresi) end)
           end,
      })
 end
 ShineKaydet()
-timer.Simple(5, ShineKaydet)
+timer.Simple(5, ShineKaydet)'

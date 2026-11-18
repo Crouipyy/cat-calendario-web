@@ -159,7 +159,7 @@ function K.AramaListesi(baslik, ogeler, sec, onizle)
      local ara = K.Giris(p.govde, "", false)
      ara:Dock(TOP)
      ara:SetTall(O(30))
-     ara:SetPlaceholderText("Ara…")
+     ara:SetPlaceholderText("Buscar…")
      local liste = K.Kaydir(p.govde)
      liste:Dock(FILL)
      liste:DockMargin(0, O(8), 0, 0)
@@ -245,7 +245,7 @@ function K.AnimSec(model, sec)
           ent:Remove()
      end
      table.sort(ogeler, function(a, b) return a.ad < b.ad end)
-     K.AramaListesi("Animasyon seç · " .. string.GetFileFromFilename(model), ogeler, sec)
+     K.AramaListesi("Elegir animación · " .. string.GetFileFromFilename(model), ogeler, sec)
 end
 
 G.SesListe = G.SesListe or {}
@@ -253,7 +253,7 @@ G.SesListe = G.SesListe or {}
 function K.SesSec(sec)
      local ogeler = {}
      for _, s in ipairs(G.SesListe) do
-          ogeler[#ogeler + 1] = { ad = s.yol, alt = string.format("%.1f sn  ·  %d KB", s.sure or 0, math.ceil((s.boyut or 0) / 1024)), deger = s.yol }
+          ogeler[#ogeler + 1] = { ad = s.yol, alt = string.format("%.1f s  ·  %d KB", s.sure or 0, math.ceil((s.boyut or 0) / 1024)), deger = s.yol }
      end
      if #ogeler == 0 then
           ogeler[1] = { ad = "(no hay archivo de sonido en el servidor)", alt = "coloca mp3/ogg/wav en garrysmod/data/sardon_gorev/sesler/", deger = "" }
@@ -268,8 +268,8 @@ end
 local SATIR_H = 30
 
 local function YerSecenekleri(filtre)
-     local liste = { { id = "", ad = "— yok —" }, { id = "@jugador", ad = "@jugador (jugadornun yeri)" }, { id = "@jugador_on", ad = "@jugador_on (jugadornun önü)" },
-          { id = "@jugador_yakin", ad = "@jugador_yakin (jugadornun görebileceği 4-12 m)" }, { id = "@karsilasma", ad = "@karsilasma (karşılaşma yeri)" } }
+     local liste = { { id = "", ad = "— ninguno —" }, { id = "@jugador", ad = "@jugador (posición del jugador)" }, { id = "@jugador_on", ad = "@jugador_on (delante del jugador)" },
+          { id = "@jugador_yakin", ad = "@jugador_yakin (visible al jugador, 4-12 m)" }, { id = "@karsilasma", ad = "@karsilasma (lugar del encuentro)" } }
      for ad, y in SortedPairs(G.E and G.E.yerler or {}) do
           if not filtre or y.tur == filtre or (filtre == "nokta" and y.tur ~= "kamera") then
                liste[#liste + 1] = { id = ad, ad = ad .. "  ·  " .. (y.tur or "nokta") }
@@ -279,23 +279,23 @@ local function YerSecenekleri(filtre)
 end
 
 local function AktorSecenekleri(ctx, ekler)
-     local liste = { { id = "", ad = "— yok —" } }
+     local liste = { { id = "", ad = "— ninguno —" } }
      for _, e in ipairs(ekler or {}) do liste[#liste + 1] = e end
      for _, a in ipairs(ctx.def and ctx.def.aktorler or {}) do liste[#liste + 1] = { id = a.id, ad = a.id .. "  ·  " .. (a.ad or "") } end
      for _, d in ipairs(G.E and G.E.dunya or {}) do
-          if d.id and d.id ~= "" then liste[#liste + 1] = { id = d.id, ad = d.id .. "  ·  " .. (d.ad or "") .. "  (dünya)" } end
+          if d.id and d.id ~= "" then liste[#liste + 1] = { id = d.id, ad = d.id .. "  ·  " .. (d.ad or "") .. "  (mundo)" } end
      end
      return liste
 end
 
 local function AdimSecenekleri(ctx)
-     local liste = { { id = "", ad = "— (sıradaki paso) —" }, { id = "_bitir", ad = "◆ Misióni bitir (başarılı)" }, { id = "_basarisiz", ad = "◆ Misióni bitir (başarısız)" } }
+     local liste = { { id = "", ad = "— (siguiente paso) —" }, { id = "_bitir", ad = "◆ Terminar misión (éxito)" }, { id = "_basarisiz", ad = "◆ Terminar misión (fracaso)" } }
      for i, a in ipairs(ctx.def and ctx.def.adimlar or {}) do liste[#liste + 1] = { id = a.id, ad = i .. ". " .. a.id .. "  ·  " .. (a.ad or "") } end
      return liste
 end
 
 local function GorevSecenekleri()
-     local liste = { { id = "", ad = "— yok —" } }
+     local liste = { { id = "", ad = "— ninguna —" } }
      for _, g in ipairs(G.E and G.E.liste or {}) do liste[#liste + 1] = { id = g.id, ad = g.id .. "  ·  " .. (g.ad or "") } end
      return liste
 end
@@ -378,7 +378,7 @@ function K.Form(parent, alanlar, veri, ctx, degisti)
                               local y = G.E and G.E.yerler[veri[a.k] or ""]
                               if y and G.YerVurgula then G.YerVurgula(veri[a.k]) end
                          end)
-                         Yan(satir, "Yeni…", function()
+                         Yan(satir, "Nueva…", function()
                               if G.YerYeniAkisi then
                                    G.YerYeniAkisi(nil, function(ad)
                                         Ayarla(ad)
@@ -459,7 +459,7 @@ function K.Form(parent, alanlar, veri, ctx, degisti)
                          h = K.ListeAlani(satir, a, veri, ctx, degisti)
                          etiket:SetContentAlignment(7)
                     elseif t == "sahne" then
-                         Yan(satir, "Temizle", function() Ayarla({}) if IsValid(kok) then Kur() end end)
+                         Yan(satir, "Vaciar", function() Ayarla({}) if IsValid(kok) then Kur() end end)
                          Yan(satir, "Desde ruta de cine…", function()
                               if G.SinemaRotaSec then
                                    G.SinemaRotaSec(function(v)
@@ -508,7 +508,7 @@ local function OgeOzet(a, o)
           local ok, r = pcall(a.ozet, o)
           if ok and r then return r end
      end
-     return "guardar"
+     return "entrada"
 end
 
 function K.OgeDuzenle(baslik, alanlar, o, ctx, bitti)
@@ -518,7 +518,7 @@ function K.OgeDuzenle(baslik, alanlar, o, ctx, bitti)
      kay:Dock(FILL)
      local form = K.Form(kay, alanlar, kopya, ctx)
      form:DockMargin(0, 0, O(10), 0)
-     local tamam = K.Dugme(p, "Tamam", function()
+     local tamam = K.Dugme(p, "Aceptar", function()
           for k in pairs(o) do o[k] = nil end
           for k, v in pairs(kopya) do o[k] = v end
           p:Remove()
@@ -594,7 +594,7 @@ function K.ListeAlani(parent, a, veri, ctx, degisti)
           y = y + O(30)
      end
 
-     local ekle = K.Dugme(kutu, "+ Ekle", function()
+     local ekle = K.Dugme(kutu, "+ Añadir", function()
           if tur then
                K.TurMenu(tur, function(id)
                     local yeni = G.SemaYeni(tur, id)
@@ -606,7 +606,7 @@ function K.ListeAlani(parent, a, veri, ctx, degisti)
                local yeni = {}
                for _, b in ipairs(a.alanlar or {}) do if b.v ~= nil then yeni[b.k] = istable(b.v) and table.Copy(b.v) or b.v end end
                liste[#liste + 1] = yeni
-               K.OgeDuzenle(a.ad .. " · yeni", a.alanlar or {}, yeni, ctx, Yeniden)
+               K.OgeDuzenle(a.ad .. " · nueva", a.alanlar or {}, yeni, ctx, Yeniden)
                Yeniden()
           end
      end)
