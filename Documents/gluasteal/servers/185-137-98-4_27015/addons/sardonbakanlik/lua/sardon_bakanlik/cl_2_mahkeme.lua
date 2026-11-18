@@ -9,13 +9,13 @@ local R = U.R
 local alinma = 0
 local hukum = {hapis = 0, para = 0, men = 0, dosya = nil}
 
-local ASAMA = {acik = "Vista en curso", oylama = "Oylama", hukum = "Sentencia pendiente"}
+local ASAMA = {acik = "Vista en curso", oylama = "Votación", hukum = "Sentencia pendiente"}
 
 local function SiraCiz(x, y, w, h, v)
-     U.Bolum("Expedientes en espera de vista", x, y + 10, w, #v.bekleyen > 0 and (#v.bekleyen .. " dosya") or nil)
+     U.Bolum("Expedientes en espera de vista", x, y + 10, w, #v.bekleyen > 0 and (#v.bekleyen .. " expedientes") or nil)
      local ly = y + 30
      if #v.bekleyen == 0 then
-          U.Bos(x, ly, w, 220, "No hay expedientes en cola", "Bir dosya \"Remitir al Wizengamot\" ile buraya düşer.")
+          U.Bos(x, ly, w, 220, "No hay expedientes en cola", "Un expediente llega aquí con «Remitir al Wizengamot».")
      end
      for i, d in ipairs(v.bekleyen) do
           if i <= 6 then
@@ -99,12 +99,12 @@ local function DurusmaCiz(x, y, w, h, v)
           if hy.oy then U.Baklava(x + 10, cy + 17, 5, R.altinAcik, 1) else U.BaklavaCizgi(x + 10, cy + 17, 5, R.pirinc, 0.8) end
           U.Yazi(U.Kisalt(hy.ad, 13, 600, solW - 150), 13, 600, x + 26, cy + 17, R.fildisi)
           if hy.id == d.baskan then U.Etiket("Presidente", x + solW, cy + 17, R.ust, 2, 9)
-          elseif d.asama ~= "acik" then U.Yazi(hy.oy and "oyunu verdi" or "bekleniyor", 11, 700, x + solW, cy + 17, hy.oy and R.yesil or R.soluk, 2) end
+          elseif d.asama ~= "acik" then U.Yazi(hy.oy and "voto emitido" or "pendiente", 11, 700, x + solW, cy + 17, hy.oy and R.yesil or R.soluk, 2) end
           cy = cy + 34
      end
 
      -- orta: deliller
-     U.Bolum("Pruebas", ortaX, gy + 10, ortaW, d.sunulan > 0 and (d.sunulan .. " kez sunuldu") or nil)
+     U.Bolum("Pruebas", ortaX, gy + 10, ortaW, d.sunulan > 0 and (d.sunulan .. " veces presentadas") or nil)
      local ly, lh = gy + 30, gh - 30
      if #d.deliller == 0 then
           U.Bos(ortaX, ly, ortaW, lh, "No hay pruebas en el archivo")
@@ -145,7 +145,7 @@ local function DurusmaCiz(x, y, w, h, v)
           end
      elseif d.asama == "oylama" then
           local kalan = math.max(0, d.oylamaRestante - gecen)
-          U.Etiket("Oylama", px, gy + 26, R.mor)
+          U.Etiket("Votación", px, gy + 26, R.mor)
           U.Yazi(B.Sure(kalan), 44, 600, px, gy + 76, R.fildisiAcik)
           U.Cubuk(px, gy + 112, pw, 4, kalan / B.Ayar.OylamaSure, R.mor)
           if d.benTribunal then
@@ -158,7 +158,7 @@ local function DurusmaCiz(x, y, w, h, v)
                     U.Yazi("Esperando al resto de miembros.", 12, 700, px, gy + 186, R.soluk)
                end
           else
-               U.Paragraf("Tribunal oyluyor. Oy hakkı salondaki, mesaideki 3. kademe ve üstü agentelerde.", 12, 700, px, gy + 140, pw, R.ada, 18)
+               U.Paragraf("El tribunal está votando. Pueden votar los agentes en sala y en el mostrador de 3.ª categoría o superior.", 12, 700, px, gy + 140, pw, R.ada, 18)
           end
      elseif d.asama == "hukum" then
           U.Etiket("Karar: culpable", px, gy + 26, R.kizil)
@@ -169,7 +169,7 @@ local function DurusmaCiz(x, y, w, h, v)
                U.Yazi("La sentencia no puede superar el total del código penal.", 12, 700, px, gy + 52, R.soluk)
 
                U.Etiket("Azkaban", px, gy + 88, R.soluk, 0, 10)
-               hukum.hapis = U.Adim(px, gy + 100, hukum.hapis, 0, d.hapis, 60, hukum.hapis > 0 and B.SureUzun(hukum.hapis) or "yok")
+               hukum.hapis = U.Adim(px, gy + 100, hukum.hapis, 0, d.hapis, 60, hukum.hapis > 0 and B.SureUzun(hukum.hapis) or "ninguna")
                U.Yazi("como máximo " .. B.SureUzun(d.hapis), 11, 700, px + 190, gy + 115, R.soluk)
 
                U.Etiket("Multa", px, gy + 152, R.soluk, 0, 10)
@@ -177,11 +177,11 @@ local function DurusmaCiz(x, y, w, h, v)
                U.Yazi("como máximo " .. B.Para(d.para), 11, 700, px + 190, gy + 179, R.soluk)
 
                U.Etiket("Prohibición de varita", px, gy + 216, R.soluk, 0, 10)
-               hukum.men = U.Adim(px, gy + 228, hukum.men, 0, v.sinir.men, 300, hukum.men > 0 and B.SureUzun(hukum.men) or "yok")
+               hukum.men = U.Adim(px, gy + 228, hukum.men, 0, v.sinir.men, 300, hukum.men > 0 and B.SureUzun(hukum.men) or "ninguna")
                U.Yazi("no puede usar magia", 11, 700, px + 190, gy + 243, R.soluk)
 
                if SardonOli then
-                    if U.Kutucuk(px, gy + 286, "Asasını kır (varita registrada en Ollivanders)", hukum.kir) then hukum.kir = not hukum.kir end
+                    if U.Kutucuk(px, gy + 286, "Romper varita (registrada en Ollivanders)", hukum.kir) then hukum.kir = not hukum.kir end
                end
 
                local bos = hukum.hapis == 0 and hukum.para == 0 and hukum.men == 0 and not hukum.kir

@@ -15,7 +15,7 @@ local function NuevoEmir(on)
      local ply = LocalPlayer()
      local tur = "tutuklama"
      local hedef, hedefAd = on and on.hedef, on and on.ad
-     local TURLER = {{id = "aranan", ad = "Se busca", izin = "aranan"}, {id = "tutuklama", ad = "Tutuklama"}, {id = "arama", ad = "Arama (ev)"}}
+     local TURLER = {{id = "aranan", ad = "Se busca", izin = "aranan"}, {id = "tutuklama", ad = "Detención"}, {id = "arama", ad = "Registro (vivienda)"}}
      if B.Yetkili(ply, "aranan") then tur = "aranan" end
 
      B.Kip({baslik = "Nueva orden", w = 620, ciz = function(x, y, w)
@@ -64,7 +64,7 @@ local function NuevoEmir(on)
           end
 
           U.Etiket("Motivo", x, cy + 6, R.soluk, 0, 10)
-          local gerekce = U.Girdi("kip.gerekce", x, cy + 18, w, 90, "Emir neden isteniyor?", {cokSatir = true, maks = 400})
+          local gerekce = U.Girdi("kip.gerekce", x, cy + 18, w, 90, "¿Motivo de la orden?", {cokSatir = true, maks = 400})
           cy = cy + 122
           hazir = hazir and #string.Trim(gerekce) >= 5
 
@@ -141,10 +141,10 @@ local function Ciz(x, y, w, h)
      local sagX = x + solW + 28
 
      -- sol: yürürlükte
-     U.Bolum("En vigor", x, y + 20, solW - 220, #v.etkin .. " emir")
+     U.Bolum("En vigor", x, y + 20, solW - 220, #v.etkin .. " órdenes")
      local ly, lh = y + 48, h - 48
      if #v.etkin == 0 then
-          U.Bos(x, ly, solW, lh, "En vigor emir yok")
+          U.Bos(x, ly, solW, lh, "No hay órdenes en vigor")
      else
           local kay = U.Kaydir("emir.etkin", x, ly, solW, lh, #v.etkin * 106)
           for i, e in ipairs(v.etkin) do
@@ -155,7 +155,7 @@ local function Ciz(x, y, w, h)
      end
 
      -- sağ: bekleyen + geçmiş
-     U.Bolum("Pendientes de aprobación", sagX, y + 20 + 34, solW, #v.bekleyen > 0 and (#v.bekleyen .. " istek") or nil)
+     U.Bolum("Pendientes de aprobación", sagX, y + 20 + 34, solW, #v.bekleyen > 0 and (#v.bekleyen .. " solicitudes") or nil)
      local by = y + 48 + 34
      local bekH = math.min(#v.bekleyen, 3) * 106
      if #v.bekleyen == 0 then

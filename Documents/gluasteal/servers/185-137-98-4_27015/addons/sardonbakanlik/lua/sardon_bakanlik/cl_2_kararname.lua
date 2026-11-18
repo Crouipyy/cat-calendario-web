@@ -12,9 +12,9 @@ local TURLER = {{id = "genel", ad = "Ministerio"}, {id = "guvenlik", ad = "Segur
 local ETKILER = {
      {id = "yok", ad = "Solo texto", alt = "Sin efecto mecánico; se anuncia y se cuelga en tablones."},
      {id = "tehdit", ad = "Nivel de amenaza", alt = "Mantiene el nivel mínimo hasta que se derogue el decreto.", adim = 1},
-     {id = "sansur", ad = "Censura de prensa", alt = "Gelecek Postası sayısı baskıdan yayına bu kadar bekler.", adim = 30},
+     {id = "sansur", ad = "Censura de prensa", alt = "Cada número de El Profeta tarda este tiempo entre imprenta y publicación.", adim = 30},
      {id = "carpan", ad = "Multiplicador de multas", alt = "Todas las multas del código se aplican con este factor.", adim = 25},
-     {id = "portkey", ad = "Cerrar red de tránsitos", alt = "Satıcılar yeni Geçit Anahtarı veremez."},
+     {id = "portkey", ad = "Cerrar red de tránsitos", alt = "Los vendedores no pueden entregar nuevos Trasladores."},
 }
 
 local function EtkiYazi(e)
@@ -34,7 +34,7 @@ end
 
 local function ListeCiz(x, y, w, h, v)
      local ply = LocalPlayer()
-     U.Bolum("En vigor", x, y + 10, w, #v.yururlukte .. " kararname")
+     U.Bolum("En vigor", x, y + 10, w, #v.yururlukte .. " decretos")
      local ly, lh = y + 30, h - 30
 
      local satirlar = {}
@@ -118,7 +118,7 @@ local function YazCiz(x, y, w, h, v)
 
      -- etki
      local ey = y + 346
-     U.Etiket("Etki", px, ey, R.soluk, 0, 10)
+     U.Etiket("Efecto", px, ey, R.soluk, 0, 10)
      ey = ey + 14
      for _, e in ipairs(ETKILER) do
           local sec = D.etki == e.id
@@ -135,7 +135,7 @@ local function YazCiz(x, y, w, h, v)
 
      local hazir = #string.Trim(baslik) >= 4 and #string.Trim(metin) >= 10
      if U.Dugme(px, y + h - 62, pw, 42, "Sellar y publicar", "ana", not hazir) then
-          B.Onay("Publicar decreto", "Decreto numaralanıp bütün büyücülere duyurulacak, panolara asılacak ve Gelecek Postası'na bildiri olarak gidecek.", "Publicar", function()
+          B.Onay("Publicar decreto", "El decreto se numerará, se anunciará a todos los magos, se colgará en los tablones y se enviará a El Profeta como comunicado oficial.", "Publicar", function()
                B.Iste("kararname.yaz", {baslik = baslik, metin = metin, tur = D.tur, etki = D.etki ~= "yok" and {tur = D.etki, deger = D.deger[D.etki]} or nil})
                U.MuhurBas(x + w / 2, y + 230)
                U.GirdiAyarla("kararname.baslik", "")
@@ -191,7 +191,7 @@ local function KanunCiz(x, y, w, h)
                               U.Etiket("Multa", kx, cy, R.soluk, 0, 10)
                               para = U.Adim(kx, cy + 12, para, 0, B.Ayar.CezaAzami, 5, B.Para(para))
                               U.Etiket("Azkaban", kx + 250, cy, R.soluk, 0, 10)
-                              hapis = U.Adim(kx + 250, cy + 12, hapis, 0, B.Ayar.AzamiHapis, 30, hapis > 0 and B.SureUzun(hapis) or "yok")
+                              hapis = U.Adim(kx + 250, cy + 12, hapis, 0, B.Ayar.AzamiHapis, 30, hapis > 0 and B.SureUzun(hapis) or "ninguna")
                               cy = cy + 70
                               if U.Dugme(kx + kw - 150, cy, 150, 38, "Guardar", "ana") then
                                    B.Iste("kanun.duzenle", {kod = m.kod, para = para, hapis = hapis})

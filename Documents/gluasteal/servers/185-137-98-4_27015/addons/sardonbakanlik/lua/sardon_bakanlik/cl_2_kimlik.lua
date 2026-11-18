@@ -1524,9 +1524,9 @@ local function SayfaCiz(x, y, w, h)
           cy = cy + hh + 12
      end
 
-     Islem("Denunciar pérdida o robo", "Belgen elinden çıktıysa bildir: o numara sorguda \"kayıp\" görünür, onu taşıyan yakalanır. Ücretsiz.",
+     Islem("Denunciar pérdida o robo", "Si te han quitado el documento, denúncialo: ese número aparecerá como «perdido» al verificarlo y quien lo lleve podrá ser detenido. Sin coste.",
           "Denunciar", "tehlike", elde or not gecerliVar, elde and "Lo llevas encima." or (not gecerliVar and "No tienes un documento válido." or nil),
-          function() B.Onay("Perdido bildir", "Tu documento válido quedará marcado como perdido. Aunque lo recuperes, no valdrá; necesitarás uno nuevo.", "Denunciar", function() B.Sor("kimlik.kayip", {}) end, true) end)
+          function() B.Onay("Denunciar pérdida", "Tu documento válido quedará marcado como perdido. Aunque lo recuperes, no valdrá; necesitarás uno nuevo.", "Denunciar", function() B.Sor("kimlik.kayip", {}) end, true) end)
 
      Islem("Emitir nueva identidad", "Se anulan los documentos válidos anteriores y se imprime uno nuevo con tu aspecto actual. La tarifa va al Tesoro del Ministerio.",
           "Emitir · " .. B.Para(v.ucret or A.Ucret), "ana", elde or not v.uygun or (v.para or 0) < (v.ucret or A.Ucret),

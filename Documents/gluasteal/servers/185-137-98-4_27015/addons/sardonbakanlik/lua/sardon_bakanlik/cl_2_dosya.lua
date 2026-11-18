@@ -44,8 +44,8 @@ local function ListeCiz(x, y, w, h)
      end
 
      if U.Dugme(x + w - 200, y - 2, 200, 34, "Nuevo archivo", "ana") then
-          B.MetinSor("Nuevo soruşturma dosyası", "Añadirás sospechoso, cargos y pruebas tras abrir el expediente.", "Título del archivo…",
-               function(metin) B.Iste("dosya.ac", {baslik = metin}) end, {maks = 80, enAz = 3, dugme = "Abrir archivo"})
+          B.MetinSor("Nuevo expediente de investigación", "Añadirás sospechoso, cargos y pruebas tras abrir el expediente.", "Título del expediente…",
+               function(metin) B.Iste("dosya.ac", {baslik = metin}) end, {maks = 80, enAz = 3, dugme = "Abrir expediente"})
      end
 
      local v = B.Veri["dosya.liste"]
@@ -54,10 +54,10 @@ local function ListeCiz(x, y, w, h)
      if #v.liste == 0 then return U.Bos(x, gy, w, gh, "No hay archivos en este estante", "Puedes convertir un incidente en expediente desde Incidentes o abrir uno nuevo.") end
 
      U.Etiket("No", x + 14, gy + 8, R.soluk, 0, 9)
-     U.Etiket("Dosya", x + 80, gy + 8, R.soluk, 0, 9)
+     U.Etiket("Expediente", x + 80, gy + 8, R.soluk, 0, 9)
      U.Etiket("Sospechoso", x + 560, gy + 8, R.soluk, 0, 9)
      U.Etiket("Responsable", x + 860, gy + 8, R.soluk, 0, 9)
-     U.Etiket("Delil", x + 1090, gy + 8, R.soluk, 0, 9)
+     U.Etiket("Prueba", x + 1090, gy + 8, R.soluk, 0, 9)
      U.Etiket("Actualización", x + w - 16, gy + 8, R.soluk, 2, 9)
 
      local ly, lh = gy + 24, gh - 24
@@ -131,7 +131,7 @@ local function DelilKipi(dosyaId)
                cy = cy + 160
           else
                local esyalar = EnvanterEsyalari(tur)
-               U.Etiket(tur == "ani" and "Envanterindeki dolu Recuerdo Şişeleri" or "Fotos en el inventario", x, cy + 6, R.soluk, 0, 9)
+               U.Etiket(tur == "ani" and "Frascos de recuerdo llenos en el inventario" or "Fotos en el inventario", x, cy + 6, R.soluk, 0, 9)
                cy = cy + 20
                if #esyalar == 0 then
                     U.Bos(x, cy, w, 130, "No tienes el objeto adecuado en el inventario", tur == "ani" and "Debes llevar una botella llena con Memoria Argentea." or "Debes llevar una foto hecha con polaroid.")
@@ -187,13 +187,13 @@ local function SolSutun(x, y, w, h, v)
 
      -- şüpheliler
      cy = cy + 8
-     U.Bolum("Sospechosoler", x, cy + 10, w)
-     if v.duzenler and U.Dugme(x + w - 130, cy - 2, 130, 24, "Sospechoso ekle", "duz") then
-          B.KisiSec("Sospechoso ekle", function(id) B.Iste("dosya.supheli", {id = v.id, kisi = id, ekle = true}) end)
+     U.Bolum("Sospechosos", x, cy + 10, w)
+     if v.duzenler and U.Dugme(x + w - 130, cy - 2, 130, 24, "Añadir sospechoso", "duz") then
+          B.KisiSec("Añadir sospechoso", function(id) B.Iste("dosya.supheli", {id = v.id, kisi = id, ekle = true}) end)
      end
      cy = cy + 28
      if #v.supheliler == 0 then
-          U.Yazi("Sospechoso eklenmemiş.", 13, 700, x, cy + 8, R.soluk)
+          U.Yazi("Ningún sospechoso añadido.", 13, 700, x, cy + 8, R.soluk)
           cy = cy + 30
      end
      local onayGerek = v.hapis > B.Ayar.DogrudanHapis and not B.Yetkili(ply, "hapis_onay")
@@ -207,22 +207,22 @@ local function SolSutun(x, y, w, h, v)
           local bx = x + w
           if v.duzenler then
                bx = bx - 30
-               if U.Dugme(bx, cy + 6, 28, 28, "×", "duz", false, "Sospechosoyi dosyadan çıkar") then B.Iste("dosya.supheli", {id = v.id, kisi = s.id, ekle = false}) end
+               if U.Dugme(bx, cy + 6, 28, 28, "×", "duz", false, "Quitar al sospechoso del expediente") then B.Iste("dosya.supheli", {id = v.id, kisi = s.id, ekle = false}) end
           end
           bx = bx - 78
           if U.Dugme(bx, cy + 6, 72, 28, "Expediente", "duz") then B.Git("sicil", {kisi = s.id}) end
           if v.durum ~= "kapali" and #v.suclamalar > 0 and B.Yetkili(ply, "hapis") then
                if onayGerek then
                     bx = bx - 124
-                    if U.Dugme(bx, cy + 6, 118, 28, "Solicitar aprobación", "ikincil", false, B.SureUzun(v.hapis) .. " hapis " .. B.SureUzun(B.Ayar.DogrudanHapis) .. " sınırını aşıyor: amir onayı ister.") then
+                    if U.Dugme(bx, cy + 6, 118, 28, "Solicitar aprobación", "ikincil", false, B.SureUzun(v.hapis) .. " de prisión superan el límite de " .. B.SureUzun(B.Ayar.DogrudanHapis) .. ": hace falta la aprobación de un superior.") then
                          B.Iste("ceza.onay_iste", {dosya = v.id, hedef = s.id})
                     end
                end
                bx = bx - 144
-               if U.Dugme(bx, cy + 6, 138, 28, "Aplicar sanción", "ana", false, "Sospechoso bağlı ve yanında olmalı. Multa kesilir, hapis varsa Azkaban'a gönderilir.") then
-                    B.Onay("Aplicar sanción", s.ad .. " için dosyadaki suçlamaların cezası uygulanacak:\n" ..
-                         (v.para > 0 and (B.Para(v.para) .. " para cezası") or "") .. ((v.para > 0 and v.hapis > 0) and " ve " or "") ..
-                         (v.hapis > 0 and (B.SureUzun(v.hapis) .. " Azkaban") or "") .. ".\nSospechoso bağlı ve yanında olmalı.", "Aplicar",
+               if U.Dugme(bx, cy + 6, 138, 28, "Aplicar sanción", "ana", false, "El sospechoso debe estar atado y a tu lado. Se aplica la multa; si hay prisión, se envía a Azkaban.") then
+                    B.Onay("Aplicar sanción", "Se aplicará al expediente la sanción por los cargos de " .. s.ad .. ":\n" ..
+                         (v.para > 0 and (B.Para(v.para) .. " de multa") or "") .. ((v.para > 0 and v.hapis > 0) and " y " or "") ..
+                         (v.hapis > 0 and (B.SureUzun(v.hapis) .. " en Azkaban") or "") .. ".\nEl sospechoso debe estar atado y a tu lado.", "Aplicar",
                          function() B.Iste("ceza.uygula", {dosya = v.id, hedef = s.id}) end, true)
                end
           end
@@ -231,13 +231,13 @@ local function SolSutun(x, y, w, h, v)
 
      -- deliller
      cy = cy + 14
-     U.Bolum("Pruebas", x, cy + 10, w, #v.deliller > 0 and (#v.deliller .. " kalem") or nil)
+     U.Bolum("Pruebas", x, cy + 10, w, #v.deliller > 0 and (#v.deliller .. " partidas") or nil)
      if v.duzenler and U.Dugme(x + w - 110 - (#v.deliller > 0 and 80 or 0), cy - 2, 110, 24, "Añadir prueba", "duz") then DelilKipi(v.id) end
      cy = cy + 28
 
      local lh = y + h - cy
      if #v.deliller == 0 then
-          return U.Bos(x, cy, w, lh, "Delil yok", "Examen de varita, anı şişesi, fotoğraf, el konan eşya ya da ifade ekle.")
+          return U.Bos(x, cy, w, lh, "Sin pruebas", "Añade examen de varita, frasco de recuerdo, fotografía, objeto confiscado o declaración.")
      end
 
      local ben = LocalPlayer():GetCharacter() and LocalPlayer():GetCharacter():GetID() or 0
@@ -261,7 +261,7 @@ local function SolSutun(x, y, w, h, v)
                U.Yazi(d.ekleyen_ad .. " · " .. B.Tarih(d.zaman), 10, 700, x + w - 24 - (v.duzenler and 30 or 0), sy + 16, R.soluk, 2)
                if d.metin ~= "" then U.Paragraf(d.metin, 12, 700, x + 14, sy + 32, w - 44, R.govde, 17, d.tur == "priori" and 10 or 3) end
                if v.duzenler and (d.ekleyen == ben or B.Kademe(ply) >= 4) and U.Icinde(x, sy, w - 12, dh) then
-                    if U.Dugme(x + w - 42, sy + 4, 24, 24, "×", "duz", false, "Delili dosyadan çıkar") then B.Iste("dosya.delil_sil", {id = d.id}) end
+                    if U.Dugme(x + w - 42, sy + 4, 24, 24, "×", "duz", false, "Quitar la prueba del expediente") then B.Iste("dosya.delil_sil", {id = d.id}) end
                end
           end
           sy = sy + dh + 8
@@ -275,7 +275,7 @@ local function SagSutun(x, y, w, h, v)
 
      U.Bolum("Cargos", x, y + 10, w)
      if v.duzenler and U.Dugme(x + w - 120, y - 2, 120, 24, "Añadir artículo", "duz") then
-          B.KanunSec("Ceza kanunundan madde ekle", function(kod)
+          B.KanunSec("Añadir artículo del código penal", function(kod)
                local adet = 1
                for _, s in ipairs((B.Veri["dosya.getir"] or v).suclamalar) do
                     if s.kod == kod then adet = s.adet + 1 end
@@ -288,7 +288,7 @@ local function SagSutun(x, y, w, h, v)
      local altH = 250
      local lh = h - 30 - altH
      if #v.suclamalar == 0 then
-          U.Bos(x, ly, w, lh, "Sin cargos", "Ceza kanunundan madde ekle; para ve hapis kendiliğinden toplanır.")
+          U.Bos(x, ly, w, lh, "Sin cargos", "Añade artículos del código penal; multa y prisión se totalizan solas.")
      else
           local kay = U.Kaydir("dosya.suc", x, ly, w, lh, #v.suclamalar * 54)
           for i, s in ipairs(v.suclamalar) do
@@ -326,15 +326,15 @@ local function SagSutun(x, y, w, h, v)
      U.Etiket("Azkaban", x + 250, ty + 84, R.soluk, 0, 9)
 
      local yol
-     if v.hapis <= 0 then yol = "Prisión yok: agente doğrudan uygular."
-     elseif v.hapis <= B.Ayar.DogrudanHapis then yol = "Kısa hapis: agente doğrudan uygular."
-     else yol = "Ağır ceza: amir onayı ya da Wizengamot hükmü gerekir." end
+     if v.hapis <= 0 then yol = "Sin prisión: el agente puede aplicar la sanción directamente."
+     elseif v.hapis <= B.Ayar.DogrudanHapis then yol = "Prisión breve: el agente puede aplicarla directamente."
+     else yol = "Pena grave: hace falta aprobación de un superior o sentencia del Wizengamot." end
      for i, s in ipairs(U.Sar(yol, 12, 700, w - 470)) do U.Yazi(s, 12, 700, x + 440, ty + 34 + i * 18, R.ada) end
-     if carpan ~= 1 then U.Yazi("Decreto çarpanı: %" .. math.Round(carpan * 100), 11, 700, x + 440, ty + 96, R.altinAcik) end
+     if carpan ~= 1 then U.Yazi("Factor del decreto: %" .. math.Round(carpan * 100), 11, 700, x + 440, ty + 96, R.altinAcik) end
 
      local hy = ty + 132
      if v.hukum ~= "" then
-          U.Etiket("Hüküm", x, hy + 6, R.ust)
+          U.Etiket("Sentencia", x, hy + 6, R.ust)
           U.Yazi(U.Kisalt(v.hukum, 13, 600, w - 80), 13, 600, x + 76, hy + 6, R.fildisi)
      elseif v.durusma and v.durusma.durum ~= "bitti" then
           U.Etiket("Vista en curso", x, hy + 6, R.mor)
@@ -343,12 +343,12 @@ local function SagSutun(x, y, w, h, v)
 
      local by = y + h - 42
      if v.durum == "acik" then
-          if U.Dugme(x, by, 230, 38, "Remitir al Wizengamot", "ana", #v.supheliler == 0 or #v.suclamalar == 0, "Sospechoso ve suçlama gerekir. Dosya duruşma sırasına girer.") then
-               B.Onay("Remisión al Wizengamot", "Dosya duruşma sırasına girecek. 4. kademe bir amir duruşmayı açana kadar dosya üzerinde ceza uygulanabilir.", "Remitir",
+          if U.Dugme(x, by, 230, 38, "Remitir al Wizengamot", "ana", #v.supheliler == 0 or #v.suclamalar == 0, "Hace falta al menos un sospechoso y un cargo. El expediente pasa a la cola de vista.") then
+               B.Onay("Remisión al Wizengamot", "El expediente entrará en la cola de vista. Hasta que un superior de 4.ª categoría abra la vista, aún se pueden aplicar sanciones sobre el expediente.", "Remitir",
                     function() B.Iste("dosya.durum", {id = v.id, durum = "mahkemede"}) end)
           end
-          if U.Dugme(x + w - 170, by, 170, 38, "Cerrar archivo", "tehlike") then
-               B.MetinSor("Cerrar archivo", "Sonuç dosyaya işlenir. Cerrado dosya değiştirilemez (yeniden açılabilir).", "Sonuç…",
+          if U.Dugme(x + w - 170, by, 170, 38, "Cerrar expediente", "tehlike") then
+               B.MetinSor("Cerrar expediente", "El resultado queda registrado en el expediente. Cerrado no se puede modificar (sí reabrir).", "Resultado…",
                     function(metin) B.Iste("dosya.durum", {id = v.id, durum = "kapali", sonuc = metin}) end, {maks = 400, enAz = 0, dugme = "Cerrar"})
           end
      elseif v.durum == "mahkemede" then
@@ -381,17 +381,17 @@ local function AyrintiCiz(x, y, w, h)
      if v.duzenler then
           sx = sx - 110
           if U.Dugme(sx, y, 110, 32, "Título", "duz") then
-               B.MetinSor("Dosya başlığı", nil, "Título…", function(metin) B.Iste("dosya.guncelle", {id = v.id, baslik = metin}) end, {deger = v.baslik, maks = 80, enAz = 3})
+               B.MetinSor("Título del expediente", nil, "Título…", function(metin) B.Iste("dosya.guncelle", {id = v.id, baslik = metin}) end, {deger = v.baslik, maks = 80, enAz = 3})
           end
           if B.Yetkili(ply, "dosya_gizli") then
                sx = sx - 140
-               if U.Dugme(sx, y, 132, 32, v.gizli and "Quitar sello" or "Sellar", "duz", false, "Archivo selladoyı yalnız sorumlusu ve 4. kademe amirler görür.") then
+               if U.Dugme(sx, y, 132, 32, v.gizli and "Quitar sello" or "Sellar", "duz", false, "El expediente sellado solo lo ven el responsable y superiores de 4.ª categoría.") then
                     B.Iste("dosya.guncelle", {id = v.id, gizli = not v.gizli})
                     if not v.gizli then U.MuhurBas(x + w - 200, y + 60) end
                end
           end
      end
-     U.Yazi("Responsable: " .. v.sorumlu_ad .. "  ·  açılış " .. B.Tarih(v.zaman, false), 12, 700, sx - 16, y + 16, R.soluk, 2)
+     U.Yazi("Responsable: " .. v.sorumlu_ad .. "  ·  apertura " .. B.Tarih(v.zaman, false), 12, 700, sx - 16, y + 16, R.soluk, 2)
 
      U.Gecis(x, y + 42, w, 1, R.cizgi, 0.6, "l")
      SolSutun(x, y + 56, 630, h - 56, v)
@@ -405,7 +405,7 @@ end
 
 B.Sayfa("dosya", {
      ad = "Archivos", sira = 4, izin = "dosya", rozet = "dosya", kanallar = {["dosya.getir"] = true, ["dosya.liste"] = true},
-     alt = "Soruşturma dosyaları: şüpheli, suçlama, delil.",
+     alt = "Expedientes de investigación: sospechoso, cargo, prueba.",
      ac = function(arg)
           if arg.id then DosyaAc(arg.id) else D.id = nil ListeIste() end
      end,

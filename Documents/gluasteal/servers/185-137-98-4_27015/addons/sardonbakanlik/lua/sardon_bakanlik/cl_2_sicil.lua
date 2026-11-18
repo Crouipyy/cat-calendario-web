@@ -133,7 +133,7 @@ local function SekmeIcerik(x, y, w, h, v)
           cy = cy + 14
           U.Bolum("Archivos", x, cy + 10, w)
           cy = cy + 28
-          if #v.dosyalar == 0 then U.Yazi("Sospechoso olduğu dosya yok.", 12, 700, x, cy + 8, R.soluk) end
+          if #v.dosyalar == 0 then U.Yazi("No figura como sospechoso en ningún expediente.", 12, 700, x, cy + 8, R.soluk) end
           for _, d in ipairs(v.dosyalar) do
                local tik = U.Satir(x, cy, w, 36)
                U.Yazi("#" .. d.id, 12, 600, x + 10, cy + 18, R.ust)
@@ -245,7 +245,7 @@ local function DosyaCiz(x, y, w, h)
           B.MetinSor("Añadir nota al expediente", v.ad .. " — observación, advertencia o información.", "Nota…", function(metin) B.Iste("sicil.not", {id = v.id, metin = metin}) end, {cokSatir = true, maks = 400, enAz = 3})
      end)
      Eylem("Abrir archivo", 110, "ikincil", "dosya", function()
-          B.MetinSor("Nuevo soruşturma dosyası", "Sospechoso: " .. v.ad, "Título del archivo…", function(metin) B.Iste("dosya.ac", {baslik = metin, supheli = v.id}) end, {maks = 80, enAz = 3, dugme = "Abrir archivo"})
+          B.MetinSor("Nuevo expediente de investigación", "Sospechoso: " .. v.ad, "Título del expediente…", function(metin) B.Iste("dosya.ac", {baslik = metin, supheli = v.id}) end, {maks = 80, enAz = 3, dugme = "Abrir expediente"})
      end)
      Eylem("Solicitar orden", 110, "ikincil", "emir_iste", function() B.Git("emir", {yeni = {hedef = v.id, ad = v.ad}}) end)
      -- tebligat: ikinci sıra (üst sıra dolu)

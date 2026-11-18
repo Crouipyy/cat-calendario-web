@@ -71,7 +71,7 @@ end
 
 B.Sayfa("azkaban", {
      ad = "Azkaban", sira = 6, izin = "olay", rozet = "tutuklu", kanallar = {["azkaban.liste"] = true},
-     alt = "Kuzey Denizi'ndeki kale: kim, neden, ne kadar.",
+     alt = "La fortaleza del Mar del Norte: quién, por qué y cuánto.",
      ac = function() B.Sor("azkaban.liste", {}) end,
      veri = function(anahtar) if anahtar == "azkaban.liste" then alinma = RealTime() end end,
      ciz = Ciz,

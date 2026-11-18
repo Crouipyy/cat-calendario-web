@@ -76,7 +76,7 @@ local function AyrintiCiz(x, y, w, h, o, ben)
      cy = cy + U.Bilgi("Zaman", B.Tarih(o.zaman) .. "  (" .. B.Once(o.zaman) .. ")", px, cy, pw)
      if o.kaynak_ad ~= "" then cy = cy + U.Bilgi("Denunciante", o.kaynak_ad, px, cy, pw) end
      cy = cy + U.Bilgi("Durum", B.OlayDurum[o.durum] or o.durum, px, cy, pw, B.DurumRenk[o.durum])
-     if o.dosya > 0 then cy = cy + U.Bilgi("Dosya", "#" .. o.dosya, px, cy, pw, R.altinAcik) end
+     if o.dosya > 0 then cy = cy + U.Bilgi("Expediente", "#" .. o.dosya, px, cy, pw, R.altinAcik) end
 
      if o.metin ~= "" then
           cy = cy + 14

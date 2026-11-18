@@ -109,7 +109,7 @@ local function SagCiz(x, y, w, h, v)
                12, 700, x + 22, y + 44, w - 44, R.ada, 18)
           if B.Yetkili(ply, "tabu") then
                local bekleme = math.max(0, t.bekleme - gecen)
-               local kelime = U.Girdi("iz.tabu", x + 22, y + 152, w - 44, 36, "Tek kelime ya da ad (en az " .. B.Ayar.TabuEnAz .. " harf)", {maks = 24})
+               local kelime = U.Girdi("iz.tabu", x + 22, y + 152, w - 44, 36, "Una palabra o nombre (mín. " .. B.Ayar.TabuEnAz .. " letras)", {maks = 24})
                local uygun = utf8.len(string.Trim(kelime)) >= B.Ayar.TabuEnAz and bekleme <= 0
                if U.Dugme(x + 22, y + 198, w - 44, 36, bekleme > 0 and ("Nuevo tabú en " .. B.Sure(bekleme)) or ("Imponer tabú · " .. B.Para(t.ucret)), "ana", not uygun) then
                     local k = string.Trim(kelime)
@@ -130,7 +130,7 @@ local function SagCiz(x, y, w, h, v)
      U.Etiket("Priori Incantatem", x + 22, py + 26, R.ust)
      local p = B.Veri.priori
      if not p then
-          U.Paragraf("Restringido şüphelinin yanındayken L menüsünden \"Asa Examinar\" de: asası son " .. B.Ayar.PrioriBoy .. " hechizos como eco fantasma. El resultado aparece aquí y en el expediente seleccionado.",
+          U.Paragraf("Con el sospechoso atado a tu lado, usa el menú L → «Examinar varita»: los últimos " .. B.Ayar.PrioriBoy .. " hechizos de su varita aparecen como eco fantasma. El resultado se muestra aquí y en el expediente seleccionado.",
                12, 700, x + 22, py + 46, w - 44, R.ada, 18)
           return
      end
