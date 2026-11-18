@@ -176,7 +176,7 @@ local function TebligatKipi(v)
      local secili = B.TebligatElle[1]
      U.GirdiAyarla("kip.tebligat", "")
      B.Kip({baslik = "Notificación oficial · " .. v.ad, w = 640, ciz = function(x, y, w)
-          local h = U.Paragraf("Ministerio baykuşu kızıl bir Çığırtkan zarfı götürür. Zarf açılınca belge alıcının önünde daktiloyla yazılır, damgalanır; çevresindekiler de okur. Notificación oficial personanin siciline not olarak düşer.", 13, 700, x, y, w, R.ada, 20) + 12
+          local h = U.Paragraf("Un búho del Ministerio lleva un sobre rojo de lechuza. Al abrirlo, el documento se escribe ante el destinatario y se sella; los cercanos pueden leerlo. Queda como nota en el expediente de la persona.", 13, 700, x, y, w, R.ada, 20) + 12
           local liste = {}
           for i, id in ipairs(B.TebligatElle) do liste[i] = {id = id, ad = B.TebligatTema[id].tur} end
           local sec = U.Sekmeler(x, y + h, liste, secili)
