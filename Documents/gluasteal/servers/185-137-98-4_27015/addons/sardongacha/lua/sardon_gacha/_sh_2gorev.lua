@@ -20,22 +20,22 @@ local function Kur()
      if G.Sema.Odul.adak and (CLIENT or (G.Odul and G.Odul.adak)) then return end
 
      Ekle(G, "adak", {
-          ad = "Adak (asa dileği)",
-          alanlar = { { k = "miktar", ad = "Adak", tip = "sayi", v = 160, min = 1, max = 100000 } },
-          ozet = function(e) return SG.Sayi(e.miktar or 0) .. " " .. (SG.Ayar.adakAd or "Adak") end,
+          ad = "Ofrenda (deseo de varita)",
+          alanlar = { { k = "miktar", ad = "Ofrenda", tip = "sayi", v = 160, min = 1, max = 100000 } },
+          ozet = function(e) return SG.Sayi(e.miktar or 0) .. " " .. (SG.Ayar.adakAd or "Ofrenda") end,
      })
      Ekle(G, "dilek_bileti", {
-          ad = "Dilek Bileti (asa dileği)",
-          alanlar = { { k = "miktar", ad = "Bilet", tip = "sayi", v = 1, min = 1, max = 100 } },
-          ozet = function(e) return SG.Sayi(e.miktar or 0) .. " " .. (SG.Ayar.biletAd or "Dilek Bileti") end,
+          ad = "Boleto de deseo (varita)",
+          alanlar = { { k = "miktar", ad = "Boleto", tip = "sayi", v = 1, min = 1, max = 100 } },
+          ozet = function(e) return SG.Sayi(e.miktar or 0) .. " " .. (SG.Ayar.biletAd or "Boleto de deseo") end,
      })
 
      if SERVER and G.Odul then
           G.Odul.adak = function(ply, od, o)
-               SG.CuzdanEkle(ply, "adak", math.floor(tonumber(od.miktar) or 0), "Görev: " .. (o and o.def and o.def.ad or "?"), true)
+               SG.CuzdanEkle(ply, "adak", math.floor(tonumber(od.miktar) or 0), "Misión: " .. (o and o.def and o.def.ad or "?"), true)
           end
           G.Odul.dilek_bileti = function(ply, od, o)
-               SG.CuzdanEkle(ply, "bilet", math.floor(tonumber(od.miktar) or 0), "Görev: " .. (o and o.def and o.def.ad or "?"), true)
+               SG.CuzdanEkle(ply, "bilet", math.floor(tonumber(od.miktar) or 0), "Misión: " .. (o and o.def and o.def.ad or "?"), true)
           end
      end
 end

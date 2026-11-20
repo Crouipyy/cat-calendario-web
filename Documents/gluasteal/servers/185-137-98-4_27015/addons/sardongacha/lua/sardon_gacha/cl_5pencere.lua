@@ -144,17 +144,17 @@ function SG.OnayAc(kok, baslik, metin, evetAd, evetFn, ikon)
                end
           end
           local bw, bh = 220 * S, 46 * S
-          SG.Dugme(ic, w / 2 - bw - 10 * S, h - bh, bw, bh, "Vazgeç", function() ort.Kapat() end)
+          SG.Dugme(ic, w / 2 - bw - 10 * S, h - bh, bw, bh, "Cancelar", function() ort.Kapat() end)
           SG.Dugme(ic, w / 2 + 10 * S, h - bh, bw, bh, evetAd, function() ort.Kapat() evetFn() end, "birincil")
      end)
 end
 
 /*
-*   Dükkân: Adak → bilet, Yıldız Tozu → bilet
+*   Tienda: Ofrenda → ticket, Polvo estelar → ticket
 */
 function SG.DukkanAc(kok)
      local ay = SG.Ayar
-     return SG.Pencere(kok, "Dükkân", 940, 610, function(ic, w, h, S)
+     return SG.Pencere(kok, "Tienda", 940, 610, function(ic, w, h, S)
           local kartlar = {
                { kaynak = "adak", ikon = "adak", ad = ay.adakAd, fiyat = math.max(1, ay.biletFiyat or 160) },
                { kaynak = "toz", ikon = "toz", ad = ay.tozAd, fiyat = math.max(1, ay.tozBilet or 75) },
@@ -184,18 +184,18 @@ function SG.DukkanAc(kok)
                     SG.Yazi(k.ad .. "  →  " .. ay.biletAd, SG.F(20 * S, "orta"), pw / 2, 146 * S, R.fildisiAcik, 1)
                     SG.Yazi("1 " .. ay.biletAd .. " = " .. SG.Sayi(k.fiyat) .. " " .. k.ad, SG.F(16 * S), pw / 2, 174 * S, R.soluk, 1)
                     SG.Kesik(30 * S, 206 * S, pw - 60 * S, R.cizgiSoluk)
-                    SG.Yazi("Sende: " .. SG.Sayi(Sahip()) .. " " .. k.ad, SG.F(16 * S, "orta"), pw / 2, 222 * S, R.govde, 1)
+                    SG.Yazi("Tienes: " .. SG.Sayi(Sahip()) .. " " .. k.ad, SG.F(16 * S, "orta"), pw / 2, 222 * S, R.govde, 1)
                     -- adet
                     SG.Yazi(tostring(k.adet), SG.F(38 * S, "orta"), pw / 2, 290 * S, R.fildisiAcik, 1, 1)
                     local tutar = k.adet * k.fiyat
-                    SG.Yazi("Tutar: " .. SG.Sayi(tutar) .. " " .. k.ad, SG.F(16 * S, "orta"), pw / 2, 326 * S, Sahip() >= tutar and R.altinAcik or R.hata, 1)
+                    SG.Yazi("Total: " .. SG.Sayi(tutar) .. " " .. k.ad, SG.F(16 * S, "orta"), pw / 2, 326 * S, Sahip() >= tutar and R.altinAcik or R.hata, 1)
                end
                local bw = 46 * S
                SG.Dugme(p, kw / 2 - 120 * S, 267 * S, bw, bw, "−", function() k.adet = math.max(1, k.adet - 1) end)
                SG.Dugme(p, kw / 2 + 74 * S, 267 * S, bw, bw, "+", function() k.adet = math.min(100, k.adet + 1) end)
-               SG.Dugme(p, kw / 2 + 128 * S, 267 * S, 70 * S, bw, "En çok", function() k.adet = En() end)
-               SG.Dugme(p, 30 * S, kh - 66 * S, kw - 60 * S, 48 * S, "Takas et", function()
-                    if Sahip() < k.adet * k.fiyat then SG.Bildirim("Yeterli " .. k.ad .. " yok.", "hata") return end
+               SG.Dugme(p, kw / 2 + 128 * S, 267 * S, 70 * S, bw, "Máx.", function() k.adet = En() end)
+               SG.Dugme(p, 30 * S, kh - 66 * S, kw - 60 * S, 48 * S, "Canjear", function()
+                    if Sahip() < k.adet * k.fiyat then SG.Bildirim("No tienes suficiente " .. k.ad .. ".", "hata") return end
                     SG.TakasIste(k.kaynak, k.adet)
                     k.adet = 1
                end, "birincil")
@@ -205,7 +205,7 @@ function SG.DukkanAc(kok)
           not_:SetSize(w, 58 * S)
           not_.Paint = function(_, pw)
                local yy = 0
-               for _, s in ipairs(SG.Sar((ay.adakNasil or "") .. "  Elinde olan bir asa tekrar çıkarsa " .. ay.tozAd .. " kazanırsın.", SG.F(15 * S), pw)) do
+               for _, s in ipairs(SG.Sar((ay.adakNasil or "") .. "  Si sale una varita que ya tienes, ganas " .. ay.tozAd .. ".", SG.F(15 * S), pw)) do
                     SG.Yazi(s, SG.F(15 * S), pw / 2, yy, SG.R.soluk, 1)
                     yy = yy + 21 * S
                end
@@ -217,19 +217,19 @@ end
 *   Ayrıntılar: oranlar, kurallar, havuz
 */
 function SG.AyrintiAc(kok, a)
-     return SG.Pencere(kok, "Ayrıntılar · " .. a.ad, 1000, 680, function(ic, w, h, S)
+     return SG.Pencere(kok, "Detalles · " .. a.ad, 1000, 680, function(ic, w, h, S)
           local oranlar, taban = SG.AsaOranlari(a)
           local ay = SG.Ayar
-          local k5 = "★5 asa en geç " .. a.h5 .. ". dilekte kesin gelir."
-          if (a.s5 or 0) > 0 and (a.a5 or 0) > 0 then k5 = k5 .. " " .. a.s5 .. ". dilekten itibaren her dilekte şansı " .. Yuzde(a.a5, 1) .. " artar." end
-          local kurallar = { k5, "Her " .. a.h4 .. " dilekte en az bir ★4 veya üstü asa gelir." }
+          local k5 = "Una varita ★5 llega como tarde en el deseo " .. a.h5 .. "."
+          if (a.s5 or 0) > 0 and (a.a5 or 0) > 0 then k5 = k5 .. " Desde el deseo " .. a.s5 .. " la tasa sube " .. Yuzde(a.a5, 1) .. " por deseo." end
+          local kurallar = { k5, "Cada " .. a.h4 .. " deseos sale al menos una varita ★4 o superior." }
           if a.tur ~= "standart" then
-               kurallar[#kurallar + 1] = "★5 çıktığında " .. Yuzde(a.up5, 0) .. " ihtimalle öne çıkan asa gelir." .. (a.garanti and " Gelmezse bir sonraki ★5 kesin öne çıkan asa olur." or "")
-               kurallar[#kurallar + 1] = "★4 çıktığında " .. Yuzde(a.up4, 0) .. " ihtimalle öne çıkan ★4 asalardan biri gelir." .. (a.garanti and " Gelmezse bir sonraki ★4 kesin öne çıkan olur." or "")
-               kurallar[#kurallar + 1] = "Pity sayaçları bütün etkinlik afişlerinde ortaktır; afiş değişse de sayaç sürer."
+               kurallar[#kurallar + 1] = "Al obtener ★5, " .. Yuzde(a.up5, 0) .. " de probabilidad de varita destacada." .. (a.garanti and " Si no toca, la siguiente ★5 será la destacada." or "")
+               kurallar[#kurallar + 1] = "Al obtener ★4, " .. Yuzde(a.up4, 0) .. " de ser una destacada." .. (a.garanti and " Si no toca, la siguiente ★4 será destacada." or "")
+               kurallar[#kurallar + 1] = "Los contadores pity son comunes a todos los pósters de evento; siguen aunque cambies de póster."
           end
-          kurallar[#kurallar + 1] = "Elinde olan bir asa tekrar çıkarsa ★3 " .. ay.toz3 .. ", ★4 " .. ay.toz4 .. ", ★5 " .. ay.toz5 .. " " .. ay.tozAd .. " verir."
-          kurallar[#kurallar + 1] = "Çıkan asa hesabına yazılır ve her karakterinde asa menüsünde görünür. Gacha asası ikinci asa cezası almaz."
+          kurallar[#kurallar + 1] = "Si repites una varita: ★3 " .. ay.toz3 .. ", ★4 " .. ay.toz4 .. ", ★5 " .. ay.toz5 .. " " .. ay.tozAd .. "."
+          kurallar[#kurallar + 1] = "La varita se guarda en la cuenta y aparece en el menú de varitas de cada personaje. Las de gacha no tienen penalización de segunda varita."
 
           local gruplar = { [5] = {}, [4] = {}, [3] = {} }
           for i, e in ipairs(a.havuz or {}) do
@@ -245,17 +245,17 @@ function SG.AyrintiAc(kok, a)
                     SG.Kutu(0, yy + 22 * S, tw, 1, R.cizgiSoluk)
                     yy = yy + 34 * S
                end
-               Bolum("Oranlar")
+               Bolum("Probabilidades")
                local ort = { [5] = SG.Ortalama5(a), [4] = SG.Ortalama4(a) }
                for y = 5, 3, -1 do
                     SG.Yildizlar(0, yy, y, 20 * S, SG.YildizIsik(y), 1, 0)
                     SG.Yazi(SG.Yildiz[y].ad, SG.F(17 * S, "orta"), 130 * S, yy + 1 * S, R.fildisiAcik)
-                    SG.Yazi("Taban " .. Yuzde(taban[y], 3), SG.F(17 * S, "orta"), 360 * S, yy + 1 * S, R.govde)
-                    if ort[y] then SG.Yazi("Pity dahil ortalama " .. Yuzde(ort[y], 1), SG.F(17 * S), 580 * S, yy + 1 * S, R.soluk) end
+                    SG.Yazi("Base " .. Yuzde(taban[y], 3), SG.F(17 * S, "orta"), 360 * S, yy + 1 * S, R.govde)
+                    if ort[y] then SG.Yazi("Media con pity " .. Yuzde(ort[y], 1), SG.F(17 * S), 580 * S, yy + 1 * S, R.soluk) end
                     yy = yy + 32 * S
                end
                yy = yy + 12 * S
-               Bolum("Kurallar")
+               Bolum("Reglas")
                for _, k in ipairs(kurallar) do
                     local satir = SG.Sar(k, SG.F(16 * S), tw - 30 * S)
                     SG.Baklava(6 * S, yy + 10 * S, 3 * S, R.altin, 1, true)
@@ -268,7 +268,7 @@ function SG.AyrintiAc(kok, a)
                yy = yy + 12 * S
                for y = 5, 3, -1 do
                     if #gruplar[y] > 0 then
-                         Bolum(SG.Yildiz[y].ad .. " asalar (" .. #gruplar[y] .. ")")
+                         Bolum("Varitas " .. SG.Yildiz[y].ad .. " (" .. #gruplar[y] .. ")")
                          for _, g in ipairs(gruplar[y]) do
                               local e = g.e
                               local renk = SG.YildizIsik(y)
@@ -279,7 +279,7 @@ function SG.AyrintiAc(kok, a)
                                    SG.Yazi("UP!", SG.F(14 * S, "kalin"), nx, yy + 13 * S, renk, 0, 1)
                                    nx = nx + 40 * S
                               end
-                              if SG.Elde(e.skin) then SG.Yazi("Sende var", SG.F(13 * S), nx, yy + 13 * S, R.iyi, 0, 1) end
+                              if SG.Elde(e.skin) then SG.Yazi("Ya la tienes", SG.F(13 * S), nx, yy + 13 * S, R.iyi, 0, 1) end
                               SG.Yazi(Yuzde(g.o, 3), SG.F(16 * S, "orta"), tw - 10 * S, yy + 13 * S, R.govde, 2, 1)
                               yy = yy + 32 * S
                          end
@@ -297,8 +297,8 @@ end
 function SG.GecmisAc(kok)
      SG.GecmisListe = nil
      SG.GecmisIste()
-     return SG.Pencere(kok, "Dilek Geçmişi", 1000, 680, function(ic, w, h, S)
-          local basliklar = { { "Nadirlik", 0 }, { "Asa", 150 }, { "Afiş", 470 }, { "Not", 700 }, { "Zaman", 860 } }
+     return SG.Pencere(kok, "Historial de deseos", 1000, 680, function(ic, w, h, S)
+          local basliklar = { { "Rareza", 0 }, { "Varita", 150 }, { "Póster", 470 }, { "Nota", 700 }, { "Hora", 860 } }
           local ust = ic:Add("DPanel")
           ust:SetPos(0, 0)
           ust:SetSize(w, 34 * S)
@@ -310,11 +310,11 @@ function SG.GecmisAc(kok)
                local R = SG.R
                local liste = SG.GecmisListe
                if not liste then
-                    SG.Yazi("Yükleniyor…", SG.F(17 * S), tw / 2, 40 * S, R.soluk, 1)
+                    SG.Yazi("Cargando…", SG.F(17 * S), tw / 2, 40 * S, R.soluk, 1)
                     return 100 * S
                end
                if #liste == 0 then
-                    SG.Yazi("Henüz hiç dilek tutmadın.", SG.F(17 * S), tw / 2, 40 * S, R.soluk, 1)
+                    SG.Yazi("Aún no has hecho ningún deseo.", SG.F(17 * S), tw / 2, 40 * S, R.soluk, 1)
                     return 100 * S
                end
                local k = tw / (940 * S)
@@ -325,7 +325,7 @@ function SG.GecmisAc(kok)
                     SG.Yildizlar(12 * S, yy + 8 * S, r.y, 17 * S, renk, 1, 0)
                     SG.Yazi(r.ad, SG.F(16 * S, r.y >= 4 and "orta" or "govde"), 12 * S + 150 * S * k, yy + 17 * S, r.y >= 4 and renk or R.fildisi, 0, 1)
                     SG.Yazi(r.afis or "", SG.F(14 * S), 12 * S + 470 * S * k, yy + 17 * S, R.soluk, 0, 1)
-                    SG.Yazi(r.yeni and "Yeni" or ("+" .. (r.toz or 0) .. " toz"), SG.F(14 * S, "orta"), 12 * S + 700 * S * k, yy + 17 * S, r.yeni and R.iyi or R.soluk, 0, 1)
+                    SG.Yazi(r.yeni and "Nueva" or ("+" .. (r.toz or 0) .. " polvo"), SG.F(14 * S, "orta"), 12 * S + 700 * S * k, yy + 17 * S, r.yeni and R.iyi or R.soluk, 0, 1)
                     SG.Yazi(os.date("%d.%m.%Y %H:%M", r.t or 0), SG.F(14 * S), 12 * S + 860 * S * k, yy + 17 * S, R.soluk, 0, 1)
                     yy = yy + 34 * S
                end

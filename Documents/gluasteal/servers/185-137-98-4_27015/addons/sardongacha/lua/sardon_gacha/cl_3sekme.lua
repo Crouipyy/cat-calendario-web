@@ -11,8 +11,8 @@
 local SG = SardonGacha
 
 local SAYFALAR = {
-     { id = "gacha", ad = "Gacha", alt = "Asa Dileği", ikon = "bilet", sinif = "SardonGacha.Afis" },
-     { id = "store", ad = "Shine Store", alt = "Mağaza", ikon = "adak", sinif = "SardonGacha.Store" },
+     { id = "gacha", ad = "Gacha", alt = "Deseo de varita", ikon = "bilet", sinif = "SardonGacha.Afis" },
+     { id = "store", ad = "Shine Store", alt = "Tienda", ikon = "adak", sinif = "SardonGacha.Store" },
 }
 
 -- Başka eklentiler sol menüye sayfa ekler: hook.Add("SardonShineStoreSayfalar", ad, function(liste)
@@ -119,7 +119,7 @@ function PANEL:MenuDugmeCiz(b, w, h)
      local tx = math.floor(66 * S)
      SG.Yazi(s.ad, SG.F(21 * S, "orta"), tx, h / 2 - 3 * S, secili and R.altinAcik or (ust and R.fildisiAcik or R.fildisi), TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
      local alt = s.alt
-     if s.id == "store" and not SG.StoreVar() then alt = "Yakında" end
+     if s.id == "store" and not SG.StoreVar() then alt = "Próximamente" end
      SG.Yazi(SG.Buyuk(alt), SG.F(11 * S, "orta"), tx, h / 2 + 4 * S, R.soluk)
 end
 
@@ -148,7 +148,7 @@ function PANEL:Paint(w, h)
      SG.Kutu(rw, math.floor(28 * S), 1, h - math.floor(56 * S), R.cizgiSoluk)
 
      SG.Yazi("S H I N E", SG.F(12 * S, "orta"), 22 * S, 34 * S, R.altin)
-     SG.Yazi("Mağaza", SG.F(34 * S, "baslik"), 20 * S, 52 * S, R.fildisiAcik)
+     SG.Yazi("Tienda", SG.F(34 * S, "baslik"), 20 * S, 52 * S, R.fildisiAcik)
      SG.Kesik(22 * S, 110 * S, rw - 44 * S, R.cizgi)
      SG.Baklava(rw - 22 * S, 110 * S, 3 * S, R.altin, 1, true)
 
@@ -157,7 +157,7 @@ function PANEL:Paint(w, h)
      local ay = SG.Ayar
      local satirlar = { { "adak", adak, ay.adakAd }, { "bilet", bilet, ay.biletAd }, { "toz", toz, ay.tozAd } }
      local y0 = h - 186 * S
-     SG.Yazi(SG.Buyuk("Cüzdan"), SG.F(11 * S, "orta"), 22 * S, y0, R.altin)
+     SG.Yazi(SG.Buyuk("Cartera"), SG.F(11 * S, "orta"), 22 * S, y0, R.altin)
      SG.Kutu(22 * S, y0 + 20 * S, rw - 44 * S, 1, R.cizgiSoluk)
      for i, s in ipairs(satirlar) do
           local yy = y0 + (30 + (i - 1) * 44) * S
@@ -190,7 +190,7 @@ function STORE:Init()
           local R = SG.R
           local var = SG.StoreVar()
           SG.Hap(0, 0, w, h, var and (b:IsHovered() and Color(250, 242, 220) or R.krem) or Color(60, 62, 56), var and R.altin or nil)
-          SG.Yazi(var and "Mağazayı aç" or "Henüz açılmadı", SG.F(h * 0.36, "orta"), w / 2, h / 2, var and R.kremKoyu or R.soluk, 1, 1)
+          SG.Yazi(var and "Abrir tienda" or "Aún no disponible", SG.F(h * 0.36, "orta"), w / 2, h / 2, var and R.kremKoyu or R.soluk, 1, 1)
      end
 end
 
@@ -213,8 +213,8 @@ function STORE:Paint(w, h)
      SG.Parilti(w / 2, y + 70 * S, 260 * S, 160 * S, R.altin, 50)
      SG.Ikon("adak", w / 2 - 34 * S, y + 36 * S, 68 * S)
      SG.Yazi("S H I N E   S T O R E", SG.F(13 * S, "orta"), w / 2, y + 124 * S, R.altin, 1)
-     SG.Yazi("Yakında", SG.F(46 * S, "baslik"), w / 2, y + 146 * S, R.fildisiAcik, 1)
-     local satir = SG.Sar("Shine Store mağazası bu sekmeye eklenecek. O zamana kadar asa dileği için soldaki Gacha sayfasını kullanabilirsin.", SG.F(17 * S), kw - 120 * S)
+     SG.Yazi("Próximamente", SG.F(46 * S, "baslik"), w / 2, y + 146 * S, R.fildisiAcik, 1)
+     local satir = SG.Sar("La tienda Shine Store se añadirá aquí. Hasta entonces usa Gacha a la izquierda para el deseo de varita.", SG.F(17 * S), kw - 120 * S)
      for i, s in ipairs(satir) do
           SG.Yazi(s, SG.F(17 * S), w / 2, y + (214 + (i - 1) * 24) * S, R.govde, 1)
      end
@@ -256,4 +256,4 @@ concommand.Add("sardon_gacha", function()
                if b.name == "!!shinestore" then b:OnMousePressed(MOUSE_LEFT) break end
           end
      end)
-end, nil, "Asa Dileği (TAB › Shine Store) sekmesini açar.")
+end, nil, "Abre la pestaña Deseo de varita (TAB › Shine Store).")

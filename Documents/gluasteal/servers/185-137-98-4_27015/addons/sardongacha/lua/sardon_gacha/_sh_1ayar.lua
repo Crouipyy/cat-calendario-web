@@ -24,16 +24,16 @@ local SG = SardonGacha
 *   Yönetimden değişen ekonomi ayarları (sunucu data/sardon_gacha/ayar.json, istemciye gider)
 */
 SG.AyarVarsayilan = {
-     adakAd = "Adak",
-     biletAd = "Dilek Bileti",
-     tozAd = "Yıldız Tozu",
+     adakAd = "Ofrenda",
+     biletAd = "Boleto de deseo",
+     tozAd = "Polvo de estrellas",
      biletFiyat = 160,          -- 1 bilet = bu kadar Adak
      tozBilet = 75,             -- 1 bilet = bu kadar Yıldız Tozu
      toz3 = 15,                 -- tekrar çıkan ★3 asanın tozu
      toz4 = 30,
      toz5 = 150,
      pityGoster = true,         -- afişte "★5 garantisine N dilek" yazısı
-     adakNasil = "Adak; görevlerden, etkinliklerden ve sunucudaki diğer işlerden kazanılır.",
+     adakNasil = "La ofrenda se gana con misiones, eventos y otras actividades del servidor.",
      storeKomut = "pulsarstore_open",   -- Shine Store eklentisi gelince sayfadaki düğmenin çalıştıracağı komut
 }
 
@@ -46,8 +46,8 @@ end
 *   Afiş (banner) alanları. havuz: { skin, ad, y (3/4/5), w (ağırlık), up (öne çıkan) }
 */
 SG.AfisVarsayilan = {
-     ad = "Yeni Afiş",
-     etiket = "Asa Dileği · Etkinlik",
+     ad = "Póster nuevo",
+     etiket = "Deseo de varita · Evento",
      aciklama = "",
      gorsel = "",               -- afiş görseli URL (png/jpg)
      arkaplan = "",             -- sayfa arka planı URL (boşsa Celestial gök)
@@ -66,9 +66,9 @@ SG.AfisVarsayilan = {
 }
 
 SG.Yildiz = {
-     [3] = { ad = "Nadir", renk = Color(98, 152, 228), isik = Color(126, 182, 255) },
-     [4] = { ad = "Destansı", renk = Color(166, 108, 230), isik = Color(200, 150, 255) },
-     [5] = { ad = "Efsanevi", renk = Color(226, 172, 74), isik = Color(255, 210, 120) },
+     [3] = { ad = "Poco común", renk = Color(98, 152, 228), isik = Color(126, 182, 255) },
+     [4] = { ad = "Épico", renk = Color(166, 108, 230), isik = Color(200, 150, 255) },
+     [5] = { ad = "Legendario", renk = Color(226, 172, 74), isik = Color(255, 210, 120) },
 }
 
 function SG.YildizRenk(y) return (SG.Yildiz[y] or SG.Yildiz[3]).renk end
@@ -97,7 +97,7 @@ SG.ISTEK = { DURUM = 1, CEK = 2, TAKAS = 3, GECMIS = 4 }
 */
 SG.Yetki = "Sardon - Gacha Yönetimi"
 if CAMI and CAMI.RegisterPrivilege then
-     CAMI.RegisterPrivilege({ Name = SG.Yetki, MinAccess = "superadmin", Description = "Asa Dileği afişlerini, oranlarını ve oyuncu cüzdanlarını (Adak, bilet, toz) yönetir." })
+     CAMI.RegisterPrivilege({ Name = SG.Yetki, MinAccess = "superadmin", Description = "Gestiona pósters, probabilidades y monederos del deseo de varita (ofrenda, boletos, polvo)." })
 end
 
 function SG.Yonetici(ply)
@@ -124,9 +124,9 @@ end
 function SG.SureYazi(s)
      s = math.max(0, math.floor(tonumber(s) or 0))
      local g, sa, dk = math.floor(s / 86400), math.floor(s % 86400 / 3600), math.floor(s % 3600 / 60)
-     if g > 0 then return g .. " gün " .. sa .. " saat " .. dk .. " dakika" end
-     if sa > 0 then return sa .. " saat " .. dk .. " dakika" end
-     return math.max(1, dk) .. " dakika"
+     if g > 0 then return g .. " días " .. sa .. " h " .. dk .. " min" end
+     if sa > 0 then return sa .. " h " .. dk .. " min" end
+     return math.max(1, dk) .. " min"
 end
 
 -- Havuzdaki asanın görünen adı: yönetimin verdiği ad, yoksa kaplama adı sadeleştirilir

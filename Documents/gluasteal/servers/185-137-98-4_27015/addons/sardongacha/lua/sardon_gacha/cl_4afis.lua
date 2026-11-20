@@ -32,8 +32,8 @@ function PANEL:Init()
      self.cek1 = Dugme(function(b, w, h) self:DilekCiz(b, w, h, 1) end, function() self:Dile(1) end)
      self.cek10 = Dugme(function(b, w, h) self:DilekCiz(b, w, h, 10) end, function() self:Dile(10) end)
 
-     local alt = { { "Dükkân", function() SG.DukkanAc(SG.Magaza) end }, { "Ayrıntılar", function() local a = self:SeciliAfis() if a then SG.AyrintiAc(SG.Magaza, a) end end },
-          { "Geçmiş", function() SG.GecmisAc(SG.Magaza) end } }
+     local alt = { { "Tienda", function() SG.DukkanAc(SG.Magaza) end }, { "Detalles", function() local a = self:SeciliAfis() if a then SG.AyrintiAc(SG.Magaza, a) end end },
+          { "Historial", function() SG.GecmisAc(SG.Magaza) end } }
      self.alt = {}
      for i, d in ipairs(alt) do
           self.alt[i] = Dugme(function(b, w, h) self:AltDugmeCiz(b, w, h, d[1]) end, function() SG.Cal("tik") d[2]() end)
@@ -156,7 +156,7 @@ function PANEL:Paint(w, h)
 
      -- sol üst başlık
      SG.Ikon("bilet", self:X(40), self:Y(24), 36 * S, gecis)
-     SG.Yazi("Asa Dileği", SG.F(26 * S, "baslik"), self:X(86), self:Y(42), R.fildisiAcik, 0, 1, gecis)
+     SG.Yazi("Deseo de varita", SG.F(26 * S, "baslik"), self:X(86), self:Y(42), R.fildisiAcik, 0, 1, gecis)
 
      -- cüzdan
      local adak, bilet = SG.Cuzdan()
@@ -177,8 +177,8 @@ function PANEL:Paint(w, h)
      local p = SG.Durum and SG.Durum.p and SG.Durum.p[a.tur == "standart" and "standart" or "etkinlik"]
      if ay.pityGoster and p then
           local k5, k4 = math.max(1, (a.h5 or 90) - (p.p5 or 0)), math.max(1, (a.h4 or 10) - (p.p4 or 0))
-          local metin = "★5 garantisine " .. k5 .. " dilek   ·   ★4 garantisine " .. k4 .. " dilek"
-          if a.tur ~= "standart" and a.garanti and p.g5 == 1 then metin = metin .. "   ·   Sıradaki ★5 öne çıkan asa" end
+          local metin = "★5 garantizado en " .. k5 .. " deseos   ·   ★4 en " .. k4 .. " deseos"
+          if a.tur ~= "standart" and a.garanti and p.g5 == 1 then metin = metin .. "   ·   Próximo ★5 destacado garantizado" end
           SG.Yazi(metin, SG.F(15 * S, "orta"), self:X(40), self:Y(724), R.soluk, 0, 0, gecis)
      end
      SG.Ikon("toz", self:X(36), self:Y(748), 34 * S, gecis)
@@ -205,8 +205,8 @@ function PANEL:BosCiz(alfa)
      SG.Koseler(x - 5 * S, y - 5 * S, w + 10 * S, h + 10 * S, 22 * S, R.altin, alfa)
      SG.Parilti(x + w / 2, y + h * 0.42, w * 0.5, h * 0.6, R.altin, 40 * alfa)
      SG.Ikon("bilet", x + w / 2 - 40 * S, y + h * 0.3, 80 * S, alfa * 0.8)
-     SG.Yazi(SG.Durum and "Şu an açık bir asa afişi yok" or "Yükleniyor…", SG.F(34 * S, "baslik"), x + w / 2, y + h * 0.56, R.fildisiAcik, 1, 1, alfa)
-     SG.Yazi("Yeni dönemin afişi açıldığında burada görünecek. Adak biriktirmeye devam et.", SG.F(17 * S), x + w / 2, y + h * 0.64, R.govde, 1, 1, alfa)
+     SG.Yazi(SG.Durum and "No hay ningún póster de varita abierto" or "Cargando…", SG.F(34 * S, "baslik"), x + w / 2, y + h * 0.56, R.fildisiAcik, 1, 1, alfa)
+     SG.Yazi("Cuando se abra el póster del nuevo periodo, aparecerá aquí. Sigue acumulando ofrendas.", SG.F(17 * S), x + w / 2, y + h * 0.64, R.govde, 1, 1, alfa)
 end
 
 function PANEL:KartCiz(a, x, y, w, h, S, alfa)
@@ -223,7 +223,7 @@ function PANEL:KartCiz(a, x, y, w, h, S, alfa)
           SG.Parilti(x + w * 0.72, y + h * 0.45, w * 0.8, h * 1.1, isik5, 70 * alfa)
           SG.Parilti(x + w * 0.2, y + h * 0.8, w * 0.6, h * 0.6, SG.YildizIsik(4), 40 * alfa)
           SG.Yildizli(x, y, w, h, 0.8 * alfa, S)
-          if durum == "iniyor" then SG.Yazi("Görsel yükleniyor…", SG.F(14 * S), x + w - 18 * S, y + 14 * S, R.soluk, 2, 0, alfa) end
+          if durum == "iniyor" then SG.Yazi("Cargando imagen…", SG.F(14 * S), x + w - 18 * S, y + 14 * S, R.soluk, 2, 0, alfa) end
      end
 
      -- okunurluk perdesi (sol) ve ad levhası gölgesi (sağ alt)
@@ -249,7 +249,7 @@ function PANEL:KartCiz(a, x, y, w, h, S, alfa)
      SG.Koseler(x - 5 * S, y - 5 * S, w + 10 * S, h + 10 * S, 22 * S, R.altin, alfa)
 
      -- etiket hapı (çerçeveye taşar)
-     local et = SG.Buyuk(a.etiket ~= "" and a.etiket or (a.tur == "standart" and "Asa Dileği · Standart" or "Asa Dileği · Etkinlik"))
+     local et = SG.Buyuk(a.etiket ~= "" and a.etiket or (a.tur == "standart" and "Deseo · Estándar" or "Deseo · Evento"))
      local ef = SG.F(15 * S, "kalin")
      local ew = SG.Genislik(et, ef) + 44 * S
      draw.RoundedBoxEx(17 * S, x - 12 * S, y - 16 * S, ew, 34 * S, Color(R.altin.r, R.altin.g, R.altin.b, 255 * alfa), true, true, false, true)
@@ -271,11 +271,11 @@ function PANEL:KartCiz(a, x, y, w, h, S, alfa)
      -- olasılık kutusu
      local upVar = bes ~= nil and a.tur ~= "standart" or #dort > 0
      if upVar then
-          SG.Yazi("Olasılık arttı!", SG.F(28 * S, "orta"), lx, ty, R.fildisiAcik, 0, 0, alfa)
+          SG.Yazi("¡Probabilidad aumentada!", SG.F(28 * S, "orta"), lx, ty, R.fildisiAcik, 0, 0, alfa)
           ty = ty + 42 * S
      end
      local kf = SG.F(18 * S, "orta")
-     local kutuSatir = SG.Sar("Her " .. (a.h4 or 10) .. " dilekte en az bir ★4 veya üstü asa garanti.", kf, 480 * S)
+     local kutuSatir = SG.Sar("Cada " .. (a.h4 or 10) .. " deseos, al menos una varita ★4 o superior.", kf, 480 * S)
      local kh = (#kutuSatir * 25 + 20) * S
      SG.Kutu(lx, ty, 540 * S, kh, Color(190, 162, 104, 46), alfa)
      SG.Kutu(lx, ty, 3 * S, kh, R.altinAcik, alfa)
@@ -286,8 +286,8 @@ function PANEL:KartCiz(a, x, y, w, h, S, alfa)
      ty = ty + kh + 16 * S
 
      -- açıklama
-     local ac = a.aciklama ~= "" and a.aciklama or (a.tur == "standart" and "Bu afiş süresiz açıktır; havuzdaki bütün asalar standart oranlarla çıkar." or
-          "Öne çıkan ★5 asa bu afiş süresince yükseltilmiş oranla çıkar. Oranlar ve havuz için Ayrıntılar'a bak.")
+     local ac = a.aciklama ~= "" and a.aciklama or (a.tur == "standart" and "Este póster no tiene fecha de cierre; todas las varitas salen con tasas estándar." or
+          "La varita ★5 destacada sale con tasa aumentada durante este póster. Consulta Detalles para tasas y pool.")
      local af = SG.F(17 * S)
      local alanSon = y + h - 110 * S
      for _, s in ipairs(SG.Sar(ac, af, 530 * S)) do
@@ -298,8 +298,8 @@ function PANEL:KartCiz(a, x, y, w, h, S, alfa)
 
      -- kalan süre
      local sy = y + h - 92 * S
-     SG.Yazi("Kalan süre", SG.F(17 * S, "orta"), lx, sy, R.altin, 0, 0, alfa)
-     local kalan = (a.bit or 0) > 0 and SG.SureYazi(a.bit - SG.Simdi()) or "Süresiz"
+     SG.Yazi("Tiempo restante", SG.F(17 * S, "orta"), lx, sy, R.altin, 0, 0, alfa)
+     local kalan = (a.bit or 0) > 0 and SG.SureYazi(a.bit - SG.Simdi()) or "Sin límite"
      SG.Yazi(kalan, SG.F(22 * S, "orta"), lx, sy + 26 * S, R.fildisiAcik, 0, 0, alfa)
 
      -- ad levhası
@@ -319,7 +319,7 @@ function PANEL:KartCiz(a, x, y, w, h, S, alfa)
      if #dort > 0 then
           local adlar = {}
           for i, e in ipairs(dort) do if i <= 3 then adlar[#adlar + 1] = e.ad end end
-          SG.Yazi("Öne çıkan ★4:  " .. table.concat(adlar, "  ·  "), SG.F(16 * S, "orta"), x + w - 40 * S, y + h - 30 * S, SG.YildizIsik(4), 2, 1, alfa)
+          SG.Yazi("★4 destacadas:  " .. table.concat(adlar, "  ·  "), SG.F(16 * S, "orta"), x + w - 40 * S, y + h - 30 * S, SG.YildizIsik(4), 2, 1, alfa)
      end
 end
 
@@ -361,7 +361,7 @@ function PANEL:DilekCiz(b, w, h, adet)
      SG.Baklava(w - r * 0.7, h / 2, 6 * S, R.altinKoyu, 0.7, false)
 
      local koyu = Color(84, 70, 48)
-     SG.Yazi("Dilek ×" .. adet, SG.F(27 * S, "orta"), w / 2, h * 0.36, koyu, 1, 1)
+     SG.Yazi("Deseo ×" .. adet, SG.F(27 * S, "orta"), w / 2, h * 0.36, koyu, 1, 1)
      local yf = SG.F(21 * S, "orta")
      local metin = "× " .. adet
      local tw = SG.Genislik(metin, yf)
@@ -392,13 +392,13 @@ function PANEL:Dile(adet)
      local eksik = adet - bilet
      local fiyat = eksik * math.max(1, ay.biletFiyat or 160)
      if adak >= fiyat then
-          SG.OnayAc(SG.Magaza, "Yeterli " .. ay.biletAd .. " yok",
-               eksik .. " " .. ay.biletAd .. " için " .. SG.Sayi(fiyat) .. " " .. ay.adakAd .. " harcansın mı? (Sende " .. SG.Sayi(adak) .. " var.)",
-               "Harca ve dile", function() self:Gonder(a, adet, true) end, "adak")
+          SG.OnayAc(SG.Magaza, "No tienes suficientes " .. ay.biletAd,
+               "¿Gastar " .. SG.Sayi(fiyat) .. " " .. ay.adakAd .. " por " .. eksik .. " " .. ay.biletAd .. "? (Tienes " .. SG.Sayi(adak) .. ".)",
+               "Gastar y desear", function() self:Gonder(a, adet, true) end, "adak")
      else
-          SG.OnayAc(SG.Magaza, "Yeterli " .. ay.adakAd .. " yok",
-               eksik .. " " .. ay.biletAd .. " için " .. SG.Sayi(fiyat) .. " " .. ay.adakAd .. " gerekiyor; sende " .. SG.Sayi(adak) .. " var. " .. (ay.adakNasil or ""),
-               "Dükkân", function() SG.DukkanAc(SG.Magaza) end, "adak")
+          SG.OnayAc(SG.Magaza, "No tienes suficiente " .. ay.adakAd,
+               "Necesitas " .. SG.Sayi(fiyat) .. " " .. ay.adakAd .. " para " .. eksik .. " " .. ay.biletAd .. "; tienes " .. SG.Sayi(adak) .. ". " .. (ay.adakNasil or ""),
+               "Tienda", function() SG.DukkanAc(SG.Magaza) end, "adak")
      end
 end
 

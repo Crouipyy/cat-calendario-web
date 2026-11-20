@@ -142,7 +142,7 @@ function SG.CekilisAc(sonuc, afisId)
           local a = p.evre == "ozet" and 0 or 1
           if a <= 0 then return end
           draw.RoundedBox(h / 2, 0, 0, w, h, s:IsHovered() and Color(255, 255, 255, 40) or Color(255, 255, 255, 16))
-          SG.Yazi("Atla  ›", SG.F(18 * olc, "orta"), w / 2, h / 2, s:IsHovered() and R.fildisiAcik or R.govde, 1, 1)
+          SG.Yazi("Saltar  ›", SG.F(18 * olc, "orta"), w / 2, h / 2, s:IsHovered() and R.fildisiAcik or R.govde, 1, 1)
      end
 
      p.Think = function(s)
@@ -276,13 +276,13 @@ function SG.CekilisAc(sonuc, afisId)
           local na = SG.Kolay((g - 0.55 - s.y * 0.14) / 0.3)
           if s.yeni then
                local nf = SG.F(17 * olc, "kalin")
-               local nw = SG.Genislik("YENİ", nf) + 34 * olc
+               local nw = SG.Genislik("NUEVA", nf) + 34 * olc
                draw.RoundedBox(15 * olc, tx, ny, nw, 30 * olc, ColorAlpha(R.altin, 255 * na))
-               SG.Yazi("YENİ", nf, tx + nw / 2, ny + 15 * olc, Color(28, 22, 12), 1, 1, na)
-               SG.Yazi("Asa hesabına eklendi; asa menüsünden kuşanabilirsin.", SG.F(17 * olc), tx + nw + 14 * olc, ny + 15 * olc, R.govde, 0, 1, na)
+               SG.Yazi("NUEVA", nf, tx + nw / 2, ny + 15 * olc, Color(28, 22, 12), 1, 1, na)
+               SG.Yazi("Varita añadida a tu cuenta; equípala desde el menú de varitas.", SG.F(17 * olc), tx + nw + 14 * olc, ny + 15 * olc, R.govde, 0, 1, na)
           else
                SG.Ikon("toz", tx - 4 * olc, ny - 4 * olc, 38 * olc, na)
-               SG.Yazi("Tekrar  ·  +" .. SG.Sayi(s.toz or 0) .. " " .. SG.Ayar.tozAd, SG.F(19 * olc, "orta"), tx + 42 * olc, ny + 15 * olc, R.govde, 0, 1, na)
+               SG.Yazi("Duplicado  ·  +" .. SG.Sayi(s.toz or 0) .. " " .. SG.Ayar.tozAd, SG.F(19 * olc, "orta"), tx + 42 * olc, ny + 15 * olc, R.govde, 0, 1, na)
           end
 
           -- sayaç ve ipucu
@@ -290,7 +290,7 @@ function SG.CekilisAc(sonuc, afisId)
                SG.Yazi(self.sira .. " / " .. #self.liste, SG.F(18 * olc, "orta"), 48 * olc, 50 * olc, R.soluk, 0, 0)
           end
           local ia = math.Clamp((g - 1.5) / 0.4, 0, 1) * (0.55 + 0.45 * math.sin(RealTime() * 3))
-          SG.Yazi("Devam etmek için tıkla", SG.F(16 * olc, "orta"), w / 2, h - 46 * olc, R.soluk, 1, 1, ia)
+          SG.Yazi("Pulsa para continuar", SG.F(16 * olc, "orta"), w / 2, h - 46 * olc, R.soluk, 1, 1, ia)
 
           -- girişte parlamanın sönmesi
           local beyaz = 1 - SG.Kolay(g / 0.4)
@@ -326,7 +326,7 @@ function SG.CekilisAc(sonuc, afisId)
           SG.Yildizli(0, 0, w, h, 0.6, olc)
 
           local ba = SG.Kolay(g / 0.4)
-          SG.Yazi("Dilek Sonuçları", SG.F(44 * olc, "baslik"), w / 2, h * 0.09, R.fildisiAcik, 1, 1, ba)
+          SG.Yazi("Resultados del deseo", SG.F(44 * olc, "baslik"), w / 2, h * 0.09, R.fildisiAcik, 1, 1, ba)
           SG.Kesik(w / 2 - 220 * olc, h * 0.09 + 34 * olc, 440 * olc, R.cizgi, ba)
 
           local n = #self.liste
@@ -349,9 +349,9 @@ function SG.CekilisAc(sonuc, afisId)
                     SG.Yildizlar(x + kw / 2, y0 + kh * 0.83, s.y, math.min(kw * 0.17, 24 * olc), isik, ka, 1)
                     if s.yeni then
                          local nf = SG.F(12 * olc, "kalin")
-                         local nw = SG.Genislik("YENİ", nf) + 16 * olc
+                         local nw = SG.Genislik("NUEVA", nf) + 16 * olc
                          draw.RoundedBox(9 * olc, x + kw / 2 - nw / 2, y0 + 10 * olc, nw, 18 * olc, ColorAlpha(R.altin, 255 * ka))
-                         SG.Yazi("YENİ", nf, x + kw / 2, y0 + 19 * olc, Color(28, 22, 12), 1, 1, ka)
+                         SG.Yazi("NUEVA", nf, x + kw / 2, y0 + 19 * olc, Color(28, 22, 12), 1, 1, ka)
                     else
                          SG.Yazi("+" .. SG.Sayi(s.toz or 0), SG.F(14 * olc, "orta"), x + kw / 2, y0 + kh * 0.93, R.govde, 1, 1, ka)
                     end
@@ -372,7 +372,7 @@ function SG.CekilisAc(sonuc, afisId)
                SG.Yazi(m, mf, w / 2 - mw / 2 + 44 * olc, h * 0.86, R.fildisiAcik, 0, 1, ta)
           end
           local ia = ta * (0.55 + 0.45 * math.sin(RealTime() * 3))
-          SG.Yazi("Kapatmak için tıkla", SG.F(16 * olc, "orta"), w / 2, h - 46 * olc, R.soluk, 1, 1, ia)
+          SG.Yazi("Pulsa para cerrar", SG.F(16 * olc, "orta"), w / 2, h - 46 * olc, R.soluk, 1, 1, ia)
      end
 
      return p
@@ -400,4 +400,4 @@ concommand.Add("sardon_gacha_dene", function(_, _, args)
           sonuc[i] = { skin = e.skin, ad = SG.AsaAd(e.skin), model = e.model, y = y, yeni = math.random() < 0.5, toz = 15, up = y == 5 }
      end
      SG.CekilisAc(sonuc)
-end, nil, "Asa dileği animasyonunu sahte sonuçla oynatır (yalnız görüntü).")
+end, nil, "Reproduce la animación del deseo con resultados falsos (solo cliente).")

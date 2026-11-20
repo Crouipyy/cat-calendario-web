@@ -548,7 +548,7 @@ KURUCU.oyuncular = function(N, kok, W, H)
           N.Text(a.ad or a.sid, "small", u(14), u(12), N.Clr.goldAccent)
           N.Text(a.sid, "tiny", u(14), u(34), N.Clr.rowDesc)
           N.Text(SG.Sayi(a.adak) .. " Ofrenda  ·  " .. SG.Sayi(a.bilet) .. " bilet  ·  " .. SG.Sayi(a.toz) .. " toz", "small", u(14), u(56), N.Clr.text)
-          N.Text("Ofrendas totales ganadas " .. SG.Sayi(a.kazanilan) .. "  ·  contador ★5 " .. a.p5 .. (a.g5 == 1 and " (garantizado)" or "") .. "  ·  ★4 sayacı " .. a.p4 .. "  ·  " .. a.kol .. " varitas", "tiny", u(14), u(80), N.Clr.rowDesc)
+          N.Text("Ofrendas totales ganadas " .. SG.Sayi(a.kazanilan) .. "  ·  contador ★5 " .. a.p5 .. (a.g5 == 1 and " (garantizado)" or "") .. "  ·  contador ★4 " .. a.p4 .. "  ·  " .. a.kol .. " varitas", "tiny", u(14), u(80), N.Clr.rowDesc)
           N.Box(u(14), u(140), w - u(28), 1, N.Clr.headLine)
           N.Text("ÚLTIMAS TIRADAS", "micro", u(14), u(148), N.Clr.gold)
      end
