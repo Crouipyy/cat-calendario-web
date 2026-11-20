@@ -54,5 +54,6 @@ function E.SonrakiSifirlama(t)
 end
 
 function E.Para(n)
-     return string.Comma(math.floor(tonumber(n) or 0)) .. " Galleon"
+     local v = math.floor(tonumber(n) or 0)
+     return string.Comma(v) .. (math.abs(v) == 1 and " Galeón" or " Galeones")
 end

@@ -5,7 +5,7 @@ AddCSLuaFile()
 
 ENT.Base = "base_anim"
 ENT.Type = "anim"
-ENT.PrintName = "Sipariş Panosu"
+ENT.PrintName = "Tablón de encargos"
 ENT.Category = "!! Sardon"
 ENT.Spawnable = false
 ENT.Model = "models/blackboard/blackboard.mdl"
@@ -42,7 +42,7 @@ function ENT:Draw()
      local ang = Angle(0, (lp:EyePos() - pos):Angle().y + 90, 90)
      cam.Start3D2D(pos, ang, 0.08)
           draw.RoundedBox(8, -150, -6, 300, 70, Color(20, 16, 12, 215))
-          draw.SimpleText("Sipariş Panosu", "SardonEko.Etiket", 0, 2, Color(232, 204, 140), TEXT_ALIGN_CENTER)
-          draw.SimpleText("Günlük ve haftalık işler", "SardonEko.EtiketKucuk", 0, 36, Color(206, 196, 176), TEXT_ALIGN_CENTER)
+          draw.SimpleText("Tablón de encargos", "SardonEko.Etiket", 0, 2, Color(232, 204, 140), TEXT_ALIGN_CENTER)
+          draw.SimpleText("Encargos diarios y semanales", "SardonEko.EtiketKucuk", 0, 36, Color(206, 196, 176), TEXT_ALIGN_CENTER)
      cam.End3D2D()
 end

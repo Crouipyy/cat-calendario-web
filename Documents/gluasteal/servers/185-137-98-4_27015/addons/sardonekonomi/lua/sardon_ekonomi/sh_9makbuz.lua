@@ -3,15 +3,15 @@
 -- [sardon] ekonomi: Gringotts Takas Makbuzu (masa takası ve emanet sözleşmesi sonunda iki tarafa verilir).
 -- Veri: no, tarih, a, b, aKalem {..}, bKalem {..}, aPara, bPara, ucret, tur ("takas"|"emanet"), notu
 local ITEM = ix.item.Register("ekonomi_makbuz", nil, false, nil, true)
-ITEM.name = "Gringotts Takas Makbuzu"
-ITEM.description = "Goblin noterin mühürlediği takas belgesi. Kimin neyi, ne zaman verdiğini kanıtlar."
+ITEM.name = "Recibo de intercambio de Gringotts"
+ITEM.description = "Documento sellado por el notario goblin. Prueba quién entregó qué y cuándo."
 ITEM.model = "models/props_c17/paper01.mdl"
-ITEM.category = "Belgeler"
+ITEM.category = "NUEVO · Documentos"
 ITEM.width = 1
 ITEM.height = 1
 
 function ITEM:GetName()
-     return "Gringotts Makbuzu " .. (self:GetData("no") or "")
+     return "Recibo Gringotts " .. (self:GetData("no") or "")
 end
 
 function ITEM:PopulateTooltip(tooltip)
@@ -22,7 +22,7 @@ function ITEM:PopulateTooltip(tooltip)
 end
 
 ITEM.functions.Oku = {
-     name = "Oku",
+     name = "Leer",
      icon = "icon16/page_white_text.png",
      OnRun = function(item)
           if SERVER and IsValid(item.player) then

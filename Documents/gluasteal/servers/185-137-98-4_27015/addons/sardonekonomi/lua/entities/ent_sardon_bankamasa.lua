@@ -9,7 +9,7 @@ AddCSLuaFile()
 
 ENT.Base = "base_anim"
 ENT.Type = "anim"
-ENT.PrintName = "Gringotts Takas Masası"
+ENT.PrintName = "Mesa Gringotts"
 ENT.Category = "!! Sardon"
 ENT.Spawnable = false
 ENT.Model = "models/konnie/diagonalley/leakycauldron/diningtable.mdl"
@@ -66,7 +66,7 @@ if SERVER then
      function ENT:OnRemove()
           local M = SardonEkonomi.Masa
           if not M then return end
-          for ply, y in pairs(M.Yan) do if y.ent == self then M.Kalk(ply, "Masa kaldırıldı.") end end
+          for ply, y in pairs(M.Yan) do if y.ent == self then M.Kalk(ply, "La mesa fue retirada.") end end
      end
      return
 end
@@ -77,10 +77,10 @@ SardonEkonomi.MasaGorsel = SardonEkonomi.MasaGorsel or {}
 local KESE = "models/items/jewels/purses/big_purse.mdl"
 local KAGIT = "models/props_c17/paper01.mdl"
 local SOZ = {
-     bekler = "Gringotts Noteri · takas için bana bak, E",
-     selam = "Hoş geldiniz. Tekliflerinizi koyun.",
-     inceler = "İnceliyorum… kimse dokunmasın.",
-     muhur = "Mühürlendi. Gringotts güvencesiyle.",
+     bekler = "Notario Gringotts · mírame y pulsa E para intercambiar",
+     selam = "Bienvenidos. Coloquen sus ofertas.",
+     inceler = "Revisando… nadie toque nada.",
+     muhur = "Sellado. Garantía Gringotts.",
 }
 
 function ENT:Initialize()

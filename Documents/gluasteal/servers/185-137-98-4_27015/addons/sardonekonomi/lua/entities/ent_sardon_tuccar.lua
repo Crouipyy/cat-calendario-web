@@ -8,7 +8,7 @@ AddCSLuaFile()
 ENT.Base = "base_ai"
 ENT.Type = "ai"
 ENT.AutomaticFrameAdvance = true
-ENT.PrintName = "Tüccar"
+ENT.PrintName = "Comerciante"
 ENT.Category = "!! Sardon"
 ENT.Spawnable = false
 
@@ -68,10 +68,10 @@ if SERVER then
 end
 
 local ADLAR = {
-     botanik = {"Botanik Tüccarı", "Bitki ve tohum alır"}, yaratik = {"Yaratık Tüccarı", "Tüy, kıl, salgı alır"},
-     iksir = {"İksir Tüccarı", "Kaynatılmış iksir alır"}, balik = {"Balık Tüccarı", "Taze balık alır"},
-     karaborsa = {"Karaborsacı", "Soru sormaz, ucuza alır"},
-     avci = {"Avcı Tüccarı", "Av parçası alır ve satar"},
+     botanik = {"Botánico", "Compra plantas y semillas"}, yaratik = {"Criaturas", "Plumas, pelo y productos"},
+     iksir = {"Pociones", "Compra pociones e ingredientes"}, balik = {"Pescadero", "Compra pescado fresco"},
+     karaborsa = {"Mercado negro", "Sin preguntas, paga poco"},
+     avci = {"Cazador", "Compra y vende piezas de caza"},
 }
 
 -- etiket Madam Malkin gibi ([sardon] gorev cl_3aktor aktör yazısı): kutusuz, Cinzel ad + altın büyük harf unvan,
@@ -122,7 +122,7 @@ function ENT:Draw()
 end
 
 function ENT:DrawTranslucent()
-     local ad = ADLAR[self:GetTur()] or {"Tüccar", ""}
+     local ad = ADLAR[self:GetTur()] or {"Comerciante", ""}
      if self:Bagli() then
           local govde = self:GetNWEntity("GovdeEnt")
           if IsValid(govde) then Etiket(govde, ad[1], ad[2]) end

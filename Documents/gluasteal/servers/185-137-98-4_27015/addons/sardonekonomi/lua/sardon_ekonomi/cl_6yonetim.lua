@@ -20,11 +20,11 @@ local function Sayi(n) return string.Comma(math.floor(tonumber(n) or 0)) end
 local function SayfaKaydet()
      if not (ShineAdmin and ShineAdmin.RegisterPage) then return false end
      ShineAdmin:RegisterPage("ekonomi", {
-          label = "Ekonomi",
+          label = "Economía",
           icon = "star",
           group = "systems",
           order = 5,
-          title = "Ekonomi",
+          title = "Economía",
           subtitle = "Oferta de galeones, ingresos/gastos diarios, Tesoro, demanda de comerciantes y ajustes.",
           access = function(ply) return ply:IsAdmin() end,
           available = function() return SardonEkonomi ~= nil end,
@@ -49,10 +49,10 @@ local function SayfaKaydet()
                     local fark = 0
                     for _, r in ipairs(v and v.bugun or {}) do fark = fark + r.giris - r.cikis end
                     local kutular = {
-                         {"Arz (gün başı)", son and Sayi(son.cep + son.banka) .. " G" or "—"},
-                         {"Hazine", v and Sayi(v.hazine) .. " G" or "—"},
-                         {"Bugün net değişim", v and ((fark >= 0 and "+" or "") .. Sayi(fark) .. " G") or "—"},
-                         {"İlan · sözleşme · alacak", v and (v.ilan .. " · " .. v.sozlesme .. " · " .. Sayi(v.alacak) .. " G") or "—"},
+                         {"Oferta (inicio día)", son and Sayi(son.cep + son.banka) .. " G" or "—"},
+                         {"Tesorería", v and Sayi(v.hazine) .. " G" or "—"},
+                         {"Neto de hoy", v and ((fark >= 0 and "+" or "") .. Sayi(fark) .. " G") or "—"},
+                         {"Anuncios · contratos · aplazado", v and (v.ilan .. " · " .. v.sozlesme .. " · " .. Sayi(v.alacak) .. " G") or "—"},
                     }
                     local cw = (w - u(12) * 3) / 4
                     for i, k in ipairs(kutular) do
@@ -72,7 +72,7 @@ local function SayfaKaydet()
                grafik.Paint = function(_, w, h)
                     N.Box(0, 0, w, h, N.Clr.toolBg)
                     N.Outline(0, 0, w, h, N.Clr.toolLine, 1)
-                    N.TextSpaced("ARZ (CEP + BANKA), SON 14 GÜN", "micro", u(14), u(10), N.Clr.thText, u(2))
+                    N.TextSpaced("OFERTA (BOLSILLO + BANCO), ÚLTIMOS 14 DÍAS", "micro", u(14), u(10), N.Clr.thText, u(2))
                     local g = V() and V().gunluk or {}
                     if #g == 0 then return end
                     local enCok = 1
@@ -108,16 +108,16 @@ local function SayfaKaydet()
                     local v = V()
                     N.Box(0, 0, w, h, N.Clr.toolBg)
                     N.Outline(0, 0, w, h, N.Clr.toolLine, 1)
-                    N.TextSpaced("TÜCCAR TALEBİ (BUGÜN)", "micro", u(12), u(10), N.Clr.thText, u(2))
+                    N.TextSpaced("DEMANDA COMERCIANTES (HOY)", "micro", u(12), u(10), N.Clr.thText, u(2))
                     local y = u(30)
                     for i, t in ipairs(v and v.talep or {}) do
                          if i > 7 then break end
                          N.Text(N.Clip(t.ad, "tiny", w * 0.55), "tiny", u(12), y, N.Clr.thText)
-                         N.Text(t.adet .. " adet · %" .. t.oran, "tiny", w * 0.62, y, t.oran >= 80 and N.Clr.ok or N.Clr.rowDesc)
+                         N.Text(t.adet .. " uds · %" .. t.oran, "tiny", w * 0.62, y, t.oran >= 80 and N.Clr.ok or N.Clr.rowDesc)
                          y = y + u(20)
                     end
                     y = math.max(y, u(30) + u(20) * 2) + u(14)
-                    N.TextSpaced("EN ZENGİNLER (CEP + BANKA)", "micro", u(12), y, N.Clr.thText, u(2))
+                    N.TextSpaced("MÁS RICOS (BOLSILLO + BANCO)", "micro", u(12), y, N.Clr.thText, u(2))
                     y = y + u(20)
                     for i, z in ipairs(v and v.zengin or {}) do
                          if y > h - u(20) then break end
@@ -130,33 +130,33 @@ local function SayfaKaydet()
                -- ayarlar (süperadmin)
                local bar = N.StickyBar(P, 0, u(H - 52), u(W), function()
                     local a = V() and V().ayar
-                    if not a then return "Veri bekleniyor…" end
-                    return string.format("Tavan %d G · vergi %%%d · ölüm %%%d (seviye %d altı muaf)", a.tavan, math.floor(a.vergi * 100 + 0.5), math.floor(a.olumOran * 100 + 0.5), a.olumMuafSeviye)
+                    if not a then return "Esperando datos…" end
+                    return string.format("Techo %d G · impuesto %%%d · muerte %%%d (exento bajo niv. %d)", a.tavan, math.floor(a.vergi * 100 + 0.5), math.floor(a.olumOran * 100 + 0.5), a.olumMuafSeviye)
                end)
                local tavan = vgui.Create("DTextEntry", bar)
                tavan:SetPos(u(W) - u(470), u(10))
                tavan:SetSize(u(80), u(32))
                tavan:SetNumeric(true)
-               tavan:SetPlaceholderText("tavan")
+               tavan:SetPlaceholderText("techo")
                local vergi = vgui.Create("DTextEntry", bar)
                vergi:SetPos(u(W) - u(380), u(10))
                vergi:SetSize(u(80), u(32))
                vergi:SetNumeric(true)
-               vergi:SetPlaceholderText("vergi %")
-               local kaydet = N.Button(bar, u(W) - u(290), u(8), u(130), u(36), "Kaydet", function()
+               vergi:SetPlaceholderText("imp. %")
+               local kaydet = N.Button(bar, u(W) - u(290), u(8), u(130), u(36), "Guardar", function()
                     local a = {}
                     if tonumber(tavan:GetValue()) then a.tavan = tonumber(tavan:GetValue()) end
                     if tonumber(vergi:GetValue()) then a.vergi = tonumber(vergi:GetValue()) / 100 end
                     Iste("ayar", a)
-                    ctx.Flash("Ekonomi ayarları gönderildi.")
+                    ctx.Flash("Ajustes de economía enviados.")
                end, "primary")
                kaydet.Think = function(s) s:SetEnabled(LocalPlayer():IsSuperAdmin()) end
-               N.Button(bar, u(W) - u(150), u(8), u(150), u(36), "Yenile", function() Iste("yenile") end)
+               N.Button(bar, u(W) - u(150), u(8), u(150), u(36), "Actualizar", function() Iste("yenile") end)
 
                local function Yenile()
                     local v = V()
                     if v and IsValid(liste) and liste.SetItems then liste:SetItems(v.bugun or {}) end
-                    if v then ctx.SetHead({count = #(v.bugun or {}), note = "KAYNAK"}) end
+                    if v then ctx.SetHead({count = #(v.bugun or {}), note = "FUENTE"}) end
                end
                E.YonetimYenile = Yenile
                Yenile()

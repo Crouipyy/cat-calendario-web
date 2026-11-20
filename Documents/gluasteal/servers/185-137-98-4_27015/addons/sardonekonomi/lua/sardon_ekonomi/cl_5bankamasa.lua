@@ -1,7 +1,7 @@
 -- "addons\\sardonekonomi\\lua\\sardon_ekonomi\\cl_5bankamasa.lua"
 -- Retrieved by https://github.com/lewisclark/glua-steal
 --[[
-     Sardon Ekonomi :: Gringotts Takas Masası penceresi + makbuz okuma (istemci). Fontlar cl_3pencere.lua'da.
+     Sardon Ekonomi :: Mesa de intercambio Gringotts penceresi + makbuz okuma (istemci). Fontlar cl_3pencere.lua'da.
      Sunucu: SardonEko.MasaDurum (oturan oyuncuya durum) · SardonEko.Makbuz (makbuz "Oku").
 ]]
 
@@ -80,18 +80,18 @@ local function TakasKur(f, v, govde)
      local w, h = govde:GetWide(), govde:GetTall()
      if not v.karsiAd then
           govde.Paint = function(_, pw, ph)
-               draw.SimpleText("Karşı yandaki oyuncuyu bekliyorsun…", "SardonEko.Kalin", pw / 2, ph / 2 - 14, R.yazi, TEXT_ALIGN_CENTER)
-               draw.SimpleText("Masanın öbür yanına biri oturunca takas başlar. Bu arada Emanet sekmesinden sözleşme bırakabilirsin.", "SardonEko.Kucuk", pw / 2, ph / 2 + 14, R.soluk, TEXT_ALIGN_CENTER)
+               draw.SimpleText("Esperando a alguien en el otro lado…", "SardonEko.Kalin", pw / 2, ph / 2 - 14, R.yazi, TEXT_ALIGN_CENTER)
+               draw.SimpleText("Cuando alguien se siente al otro lado empieza el intercambio. Mientras, puedes dejar un contrato en Depósito.", "SardonEko.Kucuk", pw / 2, ph / 2 + 14, R.soluk, TEXT_ALIGN_CENTER)
           end
           return
      end
      local yarim = (w - 20) / 2
      local kilit = v.inceleme ~= nil
      govde.Paint = function(_, pw, ph)
-          draw.SimpleText("Senin teklifin", "SardonEko.Kalin", 0, 0, R.yazi)
-          draw.SimpleText(v.karsiAd .. " veriyor", "SardonEko.Kalin", yarim + 20, 0, R.yazi)
-          draw.SimpleText(v.benOnay and "Sen onayladın" or "Onaylamadın", "SardonEko.Kucuk", 0, ph - 26, v.benOnay and R.yesil or R.soluk)
-          draw.SimpleText(v.oOnay and (v.karsiAd .. " onayladı") or (v.karsiAd .. " onaylamadı"), "SardonEko.Kucuk", 190, ph - 26, v.oOnay and R.yesil or R.soluk)
+          draw.SimpleText("Tu oferta", "SardonEko.Kalin", 0, 0, R.yazi)
+          draw.SimpleText(v.karsiAd .. " ofrece", "SardonEko.Kalin", yarim + 20, 0, R.yazi)
+          draw.SimpleText(v.benOnay and "Confirmaste" or "Sin confirmar", "SardonEko.Kucuk", 0, ph - 26, v.benOnay and R.yesil or R.soluk)
+          draw.SimpleText(v.oOnay and (v.karsiAd .. " confirmó") or (v.karsiAd .. " sin confirmar"), "SardonEko.Kucuk", 190, ph - 26, v.oOnay and R.yesil or R.soluk)
      end
 
      local sol = Kaydirma(govde)
@@ -116,12 +116,12 @@ local function TakasKur(f, v, govde)
      etiket:SetSize(yarim, 20)
      etiket:SetFont("SardonEko.Kucuk")
      etiket:SetTextColor(R.soluk)
-     etiket:SetText(string.format("Cepten (sende %d)        Hesaptan (hesapta %d)", v.cep, v.hesap))
+     etiket:SetText(string.format("Bolsillo (%d)        Cuenta (%d)", v.cep, v.hesap))
      local cep = Giris(govde, v.benCep, true, 110)
      cep:SetPos(0, y0 + 20)
      local hesap = Giris(govde, v.benHesap, true, 110)
      hesap:SetPos(150, y0 + 20)
-     local ayarla = Dugme(govde, "Galleon ayarla", not kilit, function()
+     local ayarla = Dugme(govde, "Ajustar galeones", not kilit, function()
           Gonder("para", {cep = tonumber(cep:GetValue()) or 0, hesap = tonumber(hesap:GetValue()) or 0})
      end, 130, 30)
      ayarla:SetPos(300, y0 + 20)
@@ -130,7 +130,7 @@ local function TakasKur(f, v, govde)
      sag:SetPos(yarim + 20, 28)
      sag:SetSize(yarim, h - 150)
      if #v.onunEsya == 0 then
-          Satir(sag, 32, function(_, pw, ph) draw.SimpleText("Eşya koymadı.", "SardonEko.Kucuk", 10, ph / 2, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER) end)
+          Satir(sag, 32, function(_, pw, ph) draw.SimpleText("Sin objetos.", "SardonEko.Kucuk", 10, ph / 2, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER) end)
      end
      for _, ad in ipairs(v.onunEsya) do
           Satir(sag, 32, function(_, pw, ph)
@@ -143,9 +143,9 @@ local function TakasKur(f, v, govde)
      onunPara:SetSize(yarim, 30)
      onunPara:SetFont("SardonEko.Kalin")
      onunPara:SetTextColor(R.altin)
-     onunPara:SetText("+ " .. v.onunPara .. " Galleon  (alırken %" .. v.oran .. " noter ücreti düşülür)")
+     onunPara:SetText("+ " .. v.onunPara .. " Galleon  (al recibir %" .. v.oran .. " tasa notarial)")
 
-     local onay = Dugme(govde, v.benOnay and "Onaylandı" or "Onayla", not v.benOnay and not kilit, function() Gonder("onay") end, 120, 32)
+     local onay = Dugme(govde, v.benOnay and "Confirmado" or "Confirmar", not v.benOnay and not kilit, function() Gonder("onay") end, 120, 32)
      onay:SetPos(w - 120, h - 34)
 
      -- inceleme katmanı
@@ -156,10 +156,10 @@ local function TakasKur(f, v, govde)
           kat:SetSize(w, h - 44)
           kat.Paint = function(_, pw, ph)
                draw.RoundedBox(8, pw / 2 - 220, ph / 2 - 70, 440, 140, Color(16, 14, 10, 235))
-               draw.SimpleText("Goblin noter inceliyor", "SardonEko.Baslik", pw / 2, ph / 2 - 56, R.altin, TEXT_ALIGN_CENTER)
-               draw.SimpleText(math.max(0, math.ceil(bitis - CurTime())) .. " sn · teklifler kilitli", "SardonEko.Kalin", pw / 2, ph / 2 - 10, R.yazi, TEXT_ALIGN_CENTER)
+               draw.SimpleText("El notario goblin revisa", "SardonEko.Baslik", pw / 2, ph / 2 - 56, R.altin, TEXT_ALIGN_CENTER)
+               draw.SimpleText(math.max(0, math.ceil(bitis - CurTime())) .. " s · ofertas bloqueadas", "SardonEko.Kalin", pw / 2, ph / 2 - 10, R.yazi, TEXT_ALIGN_CENTER)
           end
-          local dur = Dugme(kat, "İncelemeyi durdur", true, function() Gonder("iptal") end, 180, 32)
+          local dur = Dugme(kat, "Detener revisión", true, function() Gonder("iptal") end, 180, 32)
           dur:SetPos(w / 2 - 90, (h - 44) / 2 + 26)
      end
 end
@@ -172,41 +172,41 @@ local function EmanetKur(f, v, govde)
      s:Dock(FILL)
      f.emanetSecim = f.emanetSecim or {}
 
-     Baslik(s, "Sana bırakılan sözleşmeler")
+     Baslik(s, "Contratos que te dejaron")
      if #v.bana == 0 then
-          Satir(s, 30, function(_, pw, ph) draw.SimpleText("Yok.", "SardonEko.Kucuk", 10, ph / 2, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER) end)
+          Satir(s, 30, function(_, pw, ph) draw.SimpleText("Ninguno.", "SardonEko.Kucuk", 10, ph / 2, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER) end)
      end
      for _, so in ipairs(v.bana) do
           local p = Satir(s, 74, function(_, pw, ph)
                draw.RoundedBox(6, 0, 0, pw, ph, R.kartAcik)
-               draw.SimpleText(so.a .. " bıraktı: " .. (#so.esya > 0 and table.concat(so.esya, ", ") or "eşya yok") .. (so.para > 0 and (" + " .. so.para .. " G") or ""), "SardonEko.Kucuk", 12, 8, R.yazi)
-               draw.SimpleText("İstediği karşılık: " .. so.karsilik .. " G" .. (so.notu ~= "" and ("  ·  Not: " .. so.notu) or ""), "SardonEko.Kucuk", 12, 30, R.soluk)
-               draw.SimpleText(math.max(0, math.floor(so.kalan / 3600)) .. " saat kaldı", "SardonEko.Kucuk", 12, 50, R.soluk)
+               draw.SimpleText(so.a .. " dejó: " .. (#so.esya > 0 and table.concat(so.esya, ", ") or "sin objetos") .. (so.para > 0 and (" + " .. so.para .. " G") or ""), "SardonEko.Kucuk", 12, 8, R.yazi)
+               draw.SimpleText("Contraprestación: " .. so.karsilik .. " G" .. (so.notu ~= "" and ("  ·  Nota: " .. so.notu) or ""), "SardonEko.Kucuk", 12, 30, R.soluk)
+               draw.SimpleText(math.max(0, math.floor(so.kalan / 3600)) .. " saat restante", "SardonEko.Kucuk", 12, 50, R.soluk)
           end)
-          local b = Dugme(p, "Kabul et (" .. so.karsilik .. " G öde)", true, function() Gonder("emanet_kabul", {id = so.id}) end, 190, 32)
+          local b = Dugme(p, "Aceptar (" .. so.karsilik .. " G pagar)", true, function() Gonder("emanet_kabul", {id = so.id}) end, 190, 32)
           p.PerformLayout = function(_, pw, ph) b:SetPos(pw - 202, (ph - 32) / 2) end
      end
 
-     Baslik(s, "Bıraktığın sözleşmeler (" .. #v.benimSozlesme .. "/" .. v.sozlesmeSiniri .. ")")
+     Baslik(s, "Contratos que dejaste (" .. #v.benimSozlesme .. "/" .. v.sozlesmeSiniri .. ")")
      for _, so in ipairs(v.benimSozlesme) do
           local p = Satir(s, 54, function(_, pw, ph)
                draw.RoundedBox(6, 0, 0, pw, ph, R.kart)
-               draw.SimpleText("→ " .. so.b .. ": " .. (#so.esya > 0 and table.concat(so.esya, ", ") or "eşya yok") .. (so.para > 0 and (" + " .. so.para .. " G") or ""), "SardonEko.Kucuk", 12, 8, R.yazi)
-               draw.SimpleText(so.durum == 2 and "Süresi doldu — geri al" or ("Karşılık " .. so.karsilik .. " G · " .. math.max(0, math.floor(so.kalan / 3600)) .. " saat kaldı"),
+               draw.SimpleText("→ " .. so.b .. ": " .. (#so.esya > 0 and table.concat(so.esya, ", ") or "sin objetos") .. (so.para > 0 and (" + " .. so.para .. " G") or ""), "SardonEko.Kucuk", 12, 8, R.yazi)
+               draw.SimpleText(so.durum == 2 and "Caducado — recuperar" or ("Contraprestación " .. so.karsilik .. " G · " .. math.max(0, math.floor(so.kalan / 3600)) .. " saat restante"),
                     "SardonEko.Kucuk", 12, 30, so.durum == 2 and R.kirmizi or R.soluk)
           end)
-          local b = Dugme(p, so.durum == 2 and "Geri al" or "Geri çek", true, function() Gonder("emanet_geri", {id = so.id}) end, 110, 32)
+          local b = Dugme(p, so.durum == 2 and "Recuperar" or "Retirar", true, function() Gonder("emanet_geri", {id = so.id}) end, 110, 32)
           p.PerformLayout = function(_, pw, ph) b:SetPos(pw - 122, (ph - 32) / 2) end
      end
 
-     Baslik(s, "Yeni emanet sözleşmesi (harç " .. v.harc .. " G, kabulde %" .. v.oran .. " noter ücreti)")
+     Baslik(s, "Nuevo contrato de depósito (tasa " .. v.harc .. " G, al aceptar %" .. v.oran .. " tasa notarial)")
      local form = Satir(s, 120, function(_, pw, ph)
           draw.RoundedBox(6, 0, 0, pw, ph, R.kart)
-          draw.SimpleText("Kime (karakter adı)", "SardonEko.Kucuk", 12, 8, R.soluk)
-          draw.SimpleText("Cepten", "SardonEko.Kucuk", 232, 8, R.soluk)
-          draw.SimpleText("Hesaptan", "SardonEko.Kucuk", 332, 8, R.soluk)
-          draw.SimpleText("İstenen karşılık (G)", "SardonEko.Kucuk", 432, 8, R.soluk)
-          draw.SimpleText("Not (zorlanmaz)", "SardonEko.Kucuk", 12, 64, R.soluk)
+          draw.SimpleText("Para quién (nombre del personaje)", "SardonEko.Kucuk", 12, 8, R.soluk)
+          draw.SimpleText("Bolsillo", "SardonEko.Kucuk", 232, 8, R.soluk)
+          draw.SimpleText("Cuenta", "SardonEko.Kucuk", 332, 8, R.soluk)
+          draw.SimpleText("Contraprestación (G)", "SardonEko.Kucuk", 432, 8, R.soluk)
+          draw.SimpleText("Nota (opcional)", "SardonEko.Kucuk", 12, 64, R.soluk)
      end)
      local hedef = Giris(form, f.emanetHedef or "", false, 210) hedef:SetPos(12, 28)
      local cep = Giris(form, 0, true, 90) cep:SetPos(232, 28)
@@ -214,7 +214,7 @@ local function EmanetKur(f, v, govde)
      local karsilik = Giris(form, 0, true, 120) karsilik:SetPos(432, 28)
      local notu = Giris(form, "", false, 410) notu:SetPos(12, 84)
      hedef.OnChange = function(g) f.emanetHedef = g:GetValue() end
-     local birak = Dugme(form, "Emanete bırak", #v.benimSozlesme < v.sozlesmeSiniri, function()
+     local birak = Dugme(form, "Registrar depósito", #v.benimSozlesme < v.sozlesmeSiniri, function()
           local secim = {}
           for id, ok in pairs(f.emanetSecim) do if ok then secim[#secim + 1] = id end end
           Gonder("emanet_ver", {hedef = hedef:GetValue(), esyalar = secim, cep = tonumber(cep:GetValue()) or 0,
@@ -223,7 +223,7 @@ local function EmanetKur(f, v, govde)
      end, 150, 32)
      form.PerformLayout = function(_, pw, ph) birak:SetPos(pw - 162, ph - 44) end
 
-     Baslik(s, "Emanete konacak eşyalar (en çok 8)")
+     Baslik(s, "Objetos para el depósito (máx. 8)")
      for _, es in ipairs(v.envanter) do
           local b = s:Add("DButton")
           b:Dock(TOP)
@@ -271,18 +271,18 @@ local function Kur(v)
           draw.RoundedBox(10, 0, 0, pw, ph, R.zemin)
           surface.SetDrawColor(R.cizgi)
           surface.DrawOutlinedRect(0, 0, pw, ph, 1)
-          draw.SimpleText("Gringotts Takas Masası", "SardonEko.Baslik", 24, 14, R.altin)
-          draw.SimpleText("Goblin noter güvencesi · Galleon cepten ve hesaptan · alınan Galleon hesaba yatar · %" .. v.oran .. " noter ücreti (Hazine)",
+          draw.SimpleText("Mesa de intercambio Gringotts", "SardonEko.Baslik", 24, 14, R.altin)
+          draw.SimpleText("Notario goblin · galeones del bolsillo y cuenta · recibidos van al banco · %" .. v.oran .. " tasa notarial (Tesoro)",
                "SardonEko.Kucuk", 26, 54, R.soluk)
      end
 
-     for i, s in ipairs({{"takas", "Takas"}, {"emanet", "Emanet (" .. #v.bana .. ")"}}) do
+     for i, s in ipairs({{"takas", "Intercambio"}, {"emanet", "Depósito (" .. #v.bana .. ")"}}) do
           local b = Dugme(kok, (f.sekme == s[1] and "• " or "") .. s[2], true, function() f.sekme = s[1] Kur(v) end, 150, 32)
           b:SetPos(24 + (i - 1) * 158, 82)
      end
-     local kalk = Dugme(kok, "Masadan kalk", true, function() Gonder("kalk") end, 130, 32)
+     local kalk = Dugme(kok, "Levantarse", true, function() Gonder("kalk") end, 130, 32)
      kalk:SetPos(w - 154, 20)
-     local kapat = Dugme(kok, "Pencereyi kapat", true, function() f:Remove() end, 150, 32)
+     local kapat = Dugme(kok, "Cerrar ventana", true, function() f:Remove() end, 150, 32)
      kapat:SetPos(w - 154 - 158, 20)
 
      local govde = vgui.Create("DPanel", kok)
@@ -304,13 +304,13 @@ end)
 net.Receive("SardonEko.Makbuz", function()
      local d = net.ReadTable()
      local satirlar = {
-          "Mühür: " .. tostring(d.no or "?") .. "   ·   " .. os.date("%d.%m.%Y %H:%M", d.tarih or 0),
+          "Sello: " .. tostring(d.no or "?") .. "   ·   " .. os.date("%d.%m.%Y %H:%M", d.tarih or 0),
           "",
-          tostring(d.a or "?") .. " verdi: " .. (istable(d.aKalem) and #d.aKalem > 0 and table.concat(d.aKalem, ", ") or "eşya yok") .. ((d.aPara or 0) > 0 and (" + " .. d.aPara .. " Galleon") or ""),
-          tostring(d.b or "?") .. " verdi: " .. (istable(d.bKalem) and #d.bKalem > 0 and table.concat(d.bKalem, ", ") or "eşya yok") .. ((d.bPara or 0) > 0 and (" + " .. d.bPara .. " Galleon") or ""),
+          tostring(d.a or "?") .. " entregó: " .. (istable(d.aKalem) and #d.aKalem > 0 and table.concat(d.aKalem, ", ") or "sin objetos") .. ((d.aPara or 0) > 0 and (" + " .. d.aPara .. " Galleon") or ""),
+          tostring(d.b or "?") .. " entregó: " .. (istable(d.bKalem) and #d.bKalem > 0 and table.concat(d.bKalem, ", ") or "sin objetos") .. ((d.bPara or 0) > 0 and (" + " .. d.bPara .. " Galleon") or ""),
           "",
-          "Noter ücreti: " .. (d.ucret or 0) .. " Galleon" .. (d.tur == "emanet" and "   (emanet sözleşmesi)" or ""),
+          "Tasa notarial: " .. (d.ucret or 0) .. " Galleon" .. (d.tur == "emanet" and "   (contrato de depósito)" or ""),
      }
-     if d.notu and d.notu ~= "" then satirlar[#satirlar + 1] = "Not: " .. d.notu end
-     Derma_Message(table.concat(satirlar, "\n"), "Gringotts Takas Makbuzu", "Kapat")
+     if d.notu and d.notu ~= "" then satirlar[#satirlar + 1] = "Nota: " .. d.notu end
+     Derma_Message(table.concat(satirlar, "\n"), "Recibo Gringotts", "Cerrar")
 end)

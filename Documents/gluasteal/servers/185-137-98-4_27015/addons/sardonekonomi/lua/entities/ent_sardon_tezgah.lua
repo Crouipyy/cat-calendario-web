@@ -5,7 +5,7 @@ AddCSLuaFile()
 
 ENT.Base = "base_anim"
 ENT.Type = "anim"
-ENT.PrintName = "İlan Tezgâhı"
+ENT.PrintName = "Puesto de anuncios"
 ENT.Category = "!! Sardon"
 ENT.Spawnable = false
 ENT.Model = "models/props_c17/FurnitureTable001a.mdl"
@@ -42,7 +42,7 @@ function ENT:Draw()
      local ang = Angle(0, (lp:EyePos() - pos):Angle().y + 90, 90)
      cam.Start3D2D(pos, ang, 0.08)
           draw.RoundedBox(8, -150, -6, 300, 70, Color(20, 16, 12, 215))
-          draw.SimpleText("İlan Tezgâhı", "SardonEko.Etiket", 0, 2, Color(232, 204, 140), TEXT_ALIGN_CENTER)
-          draw.SimpleText("Oyuncular arası alım satım", "SardonEko.EtiketKucuk", 0, 36, Color(206, 196, 176), TEXT_ALIGN_CENTER)
+          draw.SimpleText("Puesto de anuncios", "SardonEko.Etiket", 0, 2, Color(232, 204, 140), TEXT_ALIGN_CENTER)
+          draw.SimpleText("Mercado entre jugadores", "SardonEko.EtiketKucuk", 0, 36, Color(206, 196, 176), TEXT_ALIGN_CENTER)
      cam.End3D2D()
 end
