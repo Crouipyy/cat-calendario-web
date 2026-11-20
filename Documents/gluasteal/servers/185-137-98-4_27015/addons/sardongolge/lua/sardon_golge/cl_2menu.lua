@@ -6,11 +6,11 @@ local S = SardonGolge
 local R = S.Renk
 
 local HANELER = {
-     { "slytherin", "Slytherin Öğrencisi", Color(28, 104, 66) },
-     { "gryffindor", "Gryffindor Öğrencisi", Color(124, 34, 28) },
-     { "ravenclaw", "Ravenclaw Öğrencisi", Color(30, 62, 120) },
-     { "hufflepuff", "Hufflepuff Öğrencisi", Color(150, 112, 30) },
-     { "genelprof", "Profesör", Color(150, 92, 40) },
+     { "slytherin", "Estudiante Slytherin", Color(28, 104, 66) },
+     { "gryffindor", "Estudiante Gryffindor", Color(124, 34, 28) },
+     { "ravenclaw", "Estudiante Ravenclaw", Color(30, 62, 120) },
+     { "hufflepuff", "Estudiante Hufflepuff", Color(150, 112, 30) },
+     { "genelprof", "Profesor", Color(150, 92, 40) },
 }
 
 local function HaneIzni(ply)
@@ -112,8 +112,8 @@ function S.MenuAc()
           surface.DrawOutlinedRect(0, 0, w, h, 1)
           surface.SetDrawColor(R.cerceve.r, R.cerceve.g, R.cerceve.b, 70)
           surface.DrawOutlinedRect(4, 4, w - 8, h - 8, 1)
-          draw.SimpleText("GERÇEKLİK HANÇERİ", "SardonGolge.Baslik", 24, 26, R.altin, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-          draw.SimpleText("Hançer: " .. S.HancerSay(char), "SardonGolge.Kucuk", w - 60, 26, R.soluk, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+          draw.SimpleText("CUCHILLO DE LA REALIDAD", "SardonGolge.Baslik", 24, 26, R.altin, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+          draw.SimpleText("Cuchillos: " .. S.HancerSay(char), "SardonGolge.Kucuk", w - 60, 26, R.soluk, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
      end
      f.OnKeyCodePressed = function(s, tus) if tus == KEY_ESCAPE then s:Remove() end end
 
@@ -131,40 +131,40 @@ function S.MenuAc()
           draw.RoundedBox(6, 0, 0, w, h, R.zeminAcik)
           local x = k and 210 or 20
           if not k then
-               draw.SimpleText("Hançerde bir görünüm yok.", "SardonGolge.Baslik", w / 2, h / 2 - 14, R.kagit, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-               draw.SimpleText("Birine sapladığında görünüşü hançere geçer; yenisi eskisini siler.", "SardonGolge.Kucuk", w / 2, h / 2 + 14, R.soluk, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+               draw.SimpleText("No hay aspecto en el cuchillo.", "SardonGolge.Baslik", w / 2, h / 2 - 14, R.kagit, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+               draw.SimpleText("Al clavar a alguien su apariencia pasa al cuchillo; la nueva borra la anterior.", "SardonGolge.Kucuk", w / 2, h / 2 + 14, R.soluk, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                return
           end
           local fr = ix.faction.Get(k.fraksiyon or "")
           draw.SimpleText(k.ad or "?", "SardonGolge.Baslik", x, 28, R.kagit, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-          draw.SimpleText(fr and L(fr.name) or "Bilinmeyen", "SardonGolge.Yazi", x, 54, fr and fr.color or R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-          draw.SimpleText("Saplandı: " .. os.date("%d.%m.%Y %H:%M", k.zaman or os.time()), "SardonGolge.Kucuk", x, 80, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+          draw.SimpleText(fr and L(fr.name) or "Desconocido", "SardonGolge.Yazi", x, 54, fr and fr.color or R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+          draw.SimpleText("Clavado: " .. os.date("%d.%m.%Y %H:%M", k.zaman or os.time()), "SardonGolge.Kucuk", x, 80, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 
           local d = S.Durum
           local yazi, renk
           if d.aktif and ply:GetNW2Bool("GolgeKilik", false) then
-               yazi, renk = "Kılıktasın  ·  kalan " .. S.Sure(S.Kalan("kalan")), R.mor
+               yazi, renk = "Disfrazado  ·  quedan " .. S.Sure(S.Kalan("kalan")), R.mor
           elseif S.Kalan("bekle") > 0 then
-               yazi, renk = "Hançer güç topluyor  ·  " .. S.Sure(S.Kalan("bekle")), R.kirmizi
+               yazi, renk = "El cuchillo se recarga  ·  " .. S.Sure(S.Kalan("bekle")), R.kirmizi
           else
-               yazi, renk = "Kılığa hazır  ·  süre " .. S.Sure(S.Kalan("kalan") > 0 and S.Kalan("kalan") or S.Ayar.KilikSure), R.yesil
+               yazi, renk = "Listo para disfrazarte  ·  duración " .. S.Sure(S.Kalan("kalan") > 0 and S.Kalan("kalan") or S.Ayar.KilikSure), R.yesil
           end
           draw.SimpleText(yazi, "SardonGolge.Yazi", x, 112, renk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-          local not1 = "Ölünce, Finite ya da Homenum Revelio ile kılık düşer."
+          local not1 = "Al morir, con Finite o Homenum Revelio el disfraz cae."
           draw.SimpleText(not1, "SardonGolge.Kucuk", x, 140, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-          draw.SimpleText("Sesin kendi sesin olarak kalır.", "SardonGolge.Kucuk", x, 160, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+          draw.SimpleText("Tu voz sigue siendo la tuya.", "SardonGolge.Kucuk", x, 160, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
      end
      if k then
           local m = Onizleme(kart, k)
           m:SetPos(10, 10)
           m:SetSize(180, 250)
 
-          local bur = Dugme(kart, "Kılığa bürün", Color(96, 64, 150), function() S.Iste(S.ISTEK.DONUS) f:Remove() end)
+          local bur = Dugme(kart, "Disfrazarse", Color(96, 64, 150), function() S.Iste(S.ISTEK.DONUS) f:Remove() end)
           bur:SetPos(210, 206)
           bur:SetSize(180, 40)
           bur.Think = function(s) s:SetEnabled(not ply:GetNW2Bool("GolgeKilik", false) and S.Kalan("bekle") <= 0) end
      end
-     local geri = Dugme(kart, "Eski hâline dön", Color(110, 84, 54), function() S.Iste(S.ISTEK.GERI) f:Remove() end)
+     local geri = Dugme(kart, "Volver a tu forma", Color(110, 84, 54), function() S.Iste(S.ISTEK.GERI) f:Remove() end)
      geri:SetPos(k and 400 or (W - 32) / 2 - 90, k and 206 or 210)
      geri:SetSize(180, 40)
      geri.Think = function(s) s:SetEnabled(ply:GetNWString("FakeFaction", "") ~= "") end
@@ -177,13 +177,13 @@ function S.MenuAc()
      alt:SetSize(W - 32, H - 334 - 16)
      alt.Paint = function(_, w, h)
           draw.RoundedBox(6, 0, 0, w, h, R.zeminAcik)
-          draw.SimpleText("Hane kılığı", "SardonGolge.Yazi", 14, 18, R.altin, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-          draw.SimpleText("Hazır bir öğrenci ya da profesör görünümü; adını ve açıklamanı sen yazarsın.", "SardonGolge.Kucuk", 14, 38, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+          draw.SimpleText("Disfraz de casa", "SardonGolge.Yazi", 14, 18, R.altin, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+          draw.SimpleText("Aspecto de estudiante o profesor; tú eliges el nombre y la descripción.", "SardonGolge.Kucuk", 14, 38, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
      end
-     local ad = Giris(alt, "Görünecek ad", ply:GetData("Gerceklik.Name", ""))
+     local ad = Giris(alt, "Nombre visible", ply:GetData("Gerceklik.Name", ""))
      ad:SetPos(14, 54)
      ad:SetSize(alt:GetWide() - 28, 30)
-     local acik = Giris(alt, "Görünecek açıklama", ply:GetData("Gerceklik.Desc", ""), true)
+     local acik = Giris(alt, "Descripción visible", ply:GetData("Gerceklik.Desc", ""), true)
      acik:SetPos(14, 90)
      acik:SetSize(alt:GetWide() - 28, 52)
 
@@ -199,7 +199,7 @@ function S.MenuAc()
           end)
           b:SetPos(14 + (i - 1) * (bw + 6), 152)
           b:SetSize(bw, 34)
-          b.metin = string.gsub(h[2], " Öğrencisi", "")
+          b.metin = string.gsub(h[2], "Estudiante ", "")
      end
      return f
 end
@@ -239,8 +239,8 @@ local function MalKart(ust, m, para, w)
           local yaziW = pw - 96 - 150
           draw.SimpleText(Kisalt(ad, "SardonGolge.Baslik", yaziW), "SardonGolge.Baslik", 96, 22, R.kagit, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
           draw.SimpleText(Kisalt(string.gsub(acik, "\n", " "), "SardonGolge.Kucuk", yaziW), "SardonGolge.Kucuk", 96, 48, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-          local stok = m.stok < 0 and "Stok bol" or (m.stok > 0 and ("Bu hafta kalan: " .. m.stok) or "Bu hafta kalmadı")
-          local kisi = m.kisi < 0 and "" or ("   ·   senin hakkın: " .. m.kisi)
+          local stok = m.stok < 0 and "Stock amplio" or (m.stok > 0 and ("Quedan esta semana: " .. m.stok) or "Agotado esta semana")
+          local kisi = m.kisi < 0 and "" or ("   ·   tu cupo: " .. m.kisi)
           draw.SimpleText(stok .. kisi, "SardonGolge.Kucuk", 96, 74, m.stok == 0 and R.kirmizi or R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
           draw.SimpleText(string.Comma(m.fiyat) .. " G", "SardonGolge.Baslik", pw - 140, 26, para >= m.fiyat and R.altin or R.kirmizi, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
      end
@@ -250,19 +250,19 @@ local function MalKart(ust, m, para, w)
      ikon:SetModel(it and it.model or "models/props_junk/cardboard_box004a.mdl", it and it.skin or 0)
      ikon:SetMouseInputEnabled(false)
 
-     local al = Dugme(kart, "Satın al", Color(96, 64, 150), function(s)
+     local al = Dugme(kart, "Comprar", Color(96, 64, 150), function(s)
           if s.onay and RealTime() < s.onay then
-               s.onay, s.metin = nil, "Satın al"
+               s.onay, s.metin = nil, "Comprar"
                MalIste({ islem = "al", id = m.id })
           else
-               s.onay, s.metin = RealTime() + 3, "Emin misin?"
+               s.onay, s.metin = RealTime() + 3, "¿Seguro?"
           end
      end)
      al:SetPos(w - 132, 50)
      al:SetSize(120, 38)
      al.Think = function(s)
           s:SetEnabled(m.stok ~= 0 and m.kisi ~= 0 and para >= m.fiyat)
-          if s.onay and RealTime() > s.onay then s.onay, s.metin = nil, "Satın al" end
+          if s.onay and RealTime() > s.onay then s.onay, s.metin = nil, "Comprar" end
      end
      return kart
 end
@@ -291,11 +291,11 @@ function S.MalPanel(t)
           surface.DrawOutlinedRect(0, 0, w, h, 1)
           surface.SetDrawColor(R.cerceve.r, R.cerceve.g, R.cerceve.b, 70)
           surface.DrawOutlinedRect(4, 4, w - 8, h - 8, 1)
-          draw.SimpleText("GÖLGE'NİN TEZGÂHI", "SardonGolge.Baslik", 24, 28, R.altin, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-          draw.SimpleText("Kesende: " .. string.Comma(para) .. " G", "SardonGolge.Yazi", w - 60, 28, R.kagit, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
-          draw.SimpleText("Satın almak için iki kez tıkla. Burada uzun durma; birileri bakıyor olabilir.", "SardonGolge.Kucuk", 24, 56, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+          draw.SimpleText("MOSTRADOR DE SOMBRA", "SardonGolge.Baslik", 24, 28, R.altin, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+          draw.SimpleText("En tu bolsa: " .. string.Comma(para) .. " G", "SardonGolge.Yazi", w - 60, 28, R.kagit, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+          draw.SimpleText("Haz doble clic para comprar. No te quedes mucho; alguien puede estar mirando.", "SardonGolge.Kucuk", 24, 56, R.soluk, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
           if #mallar == 0 then
-               draw.SimpleText("Tezgâhta şu an sana göre bir şey yok.", "SardonGolge.Yazi", w / 2, h / 2 + 20, R.soluk, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+               draw.SimpleText("Ahora mismo no hay nada para ti en el mostrador.", "SardonGolge.Yazi", w / 2, h / 2 + 20, R.soluk, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
           end
      end
      f.OnRemove = function(s)

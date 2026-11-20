@@ -137,7 +137,7 @@ local function Bildir(metin, hata)
      if ix and ix.util and ix.util.Notify then
           ix.util.Notify(metin)
      else
-          chat.AddText(hata and R.kirmizi or R.altin, "[Gölge] ", color_white, metin)
+          chat.AddText(hata and R.kirmizi or R.altin, "[Sombra] ", color_white, metin)
      end
 end
 S.Bildir = Bildir
@@ -164,7 +164,7 @@ net.Receive(S.NET, function()
      elseif op == S.OP.SIZI then
           siziBitis = RealTime() + 0.8
           util.ScreenShake(LocalPlayer():GetPos(), 6, 12, 0.6, 64)
-          Bildir("Keskin bir sızı! Bir şey tenine battı.", true)
+          Bildir("¡Un dolor agudo! Algo te ha atravesado la piel.", true)
      elseif op == S.OP.DUMAN then
           Duman(net.ReadVector(), net.ReadBool())
      elseif op == S.OP.DURUM then
@@ -215,17 +215,17 @@ function S.SilahHUD(wep)
      local d = S.Durum
 
      local satirlar = {}
-     satirlar[#satirlar + 1] = { "Gerçeklik Hançeri  ·  " .. n, "SardonGolge.Baslik", n > 0 and R.altin or R.kirmizi }
-     satirlar[#satirlar + 1] = { k and ("Görünüm: " .. (k.ad or "?")) or "Hançerde görünüm yok", "SardonGolge.Yazi", k and R.kagit or R.soluk }
+     satirlar[#satirlar + 1] = { "Cuchillo de la Realidad  ·  " .. n, "SardonGolge.Baslik", n > 0 and R.altin or R.kirmizi }
+     satirlar[#satirlar + 1] = { k and ("Aspecto: " .. (k.ad or "?")) or "Sin aspecto en el cuchillo", "SardonGolge.Yazi", k and R.kagit or R.soluk }
      local durum
      if d.aktif and ply:GetNW2Bool("GolgeKilik", false) then
-          durum = { "Kılıkta  ·  kalan " .. S.Sure(S.Kalan("kalan")), R.mor }
+          durum = { "Disfrazado  ·  quedan " .. S.Sure(S.Kalan("kalan")), R.mor }
      elseif S.Kalan("bekle") > 0 then
-          durum = { "Hançer güç topluyor  ·  " .. S.Sure(S.Kalan("bekle")), R.soluk }
+          durum = { "El cuchillo se recarga  ·  " .. S.Sure(S.Kalan("bekle")), R.soluk }
      elseif S.Kalan("sapla") > 0 then
-          durum = { "Hançer soğuyor  ·  " .. math.ceil(S.Kalan("sapla")) .. " sn", R.soluk }
+          durum = { "El cuchillo se enfría  ·  " .. math.ceil(S.Kalan("sapla")) .. " s", R.soluk }
      else
-          durum = { "Sol tık: sapla   ·   Sağ tık: kılık menüsü", R.soluk }
+          durum = { "Clic izq.: clavar   ·   Clic der.: menú de disfraz", R.soluk }
      end
      satirlar[#satirlar + 1] = { durum[1], "SardonGolge.Kucuk", durum[2] }
 
@@ -382,7 +382,7 @@ hook.Add("PostDrawTranslucentRenderables", "SardonGolge.Isim", function(_, gok)
      local alfa = math.Clamp((1100 - d) / 300, 0, 1) * c.alfa
 
      cam.Start3D2D(bas, Angle(0, EyeAngles().y - 90, 90), 0.075)
-          draw.SimpleTextOutlined(v.ad or "Gölge", "SardonGorev.D_Ad", 0, 0, Color(ETIKET_SIYAH.r, ETIKET_SIYAH.g, ETIKET_SIYAH.b, 255 * alfa),
+          draw.SimpleTextOutlined(v.ad or "Sombra", "SardonGorev.D_Ad", 0, 0, Color(ETIKET_SIYAH.r, ETIKET_SIYAH.g, ETIKET_SIYAH.b, 255 * alfa),
                TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, Color(ETIKET_BEYAZ.r, ETIKET_BEYAZ.g, ETIKET_BEYAZ.b, 210 * alfa))
           if v.unvan and v.unvan ~= "" then
                draw.SimpleTextOutlined(G and G.Buyuk and G.Buyuk(v.unvan) or v.unvan, "SardonGorev.D_Unvan", 0, 4, Color(ETIKET_BEYAZ.r, ETIKET_BEYAZ.g, ETIKET_BEYAZ.b, 245 * alfa),

@@ -55,6 +55,7 @@ table.Merge(S.Ayar, {
      GezintiSure = 45 * 60,     -- kimse konuşmasa da bu sürede bir yer değiştirir
      KilitZamanAsimi = 240,     -- tek muhatap kilidi en çok (sn)
      GunDonumSaat = 7,          -- TR saati; hafta Pazartesi bu saatte döner
+     Kapali = false,            -- mostrador Sombra cerrado
 })
 
 -- fraksiyon uniqueID → diyalog grubu (gerisi "diger")

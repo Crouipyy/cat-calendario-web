@@ -14,13 +14,13 @@ S.AdminSurum = S.AdminSurum or 0
 S.KayitSurum = S.KayitSurum or 0
 
 local TURLER = {
-     saplama = "Saplama", satin = "Satın alma", donus = "Kılığa büründü", kilik_bitti = "Kılık bitti",
-     isinlanma = "Gölge ışınlandı", hak_sifirla = "Hak sıfırlandı", ayar = "Ayar değişti", nokta = "Nokta",
-     mal = "Mal satışı", mal_ayar = "Mal ayarı", dolandirma = "Dolandırma",
+     saplama = "Clavada", satin = "Compra", donus = "Asumió disfraz", kilik_bitti = "Disfraz terminado",
+     isinlanma = "Sombra teletransportada", hak_sifirla = "Cupos restablecidos", ayar = "Ajuste modificado", nokta = "Punto",
+     mal = "Venta de mercancía", mal_ayar = "Ajuste de mercancía", dolandirma = "Estafa",
 }
 
-local SEKMELER = { { "ayar", "Ayarlar" }, { "mal", "Mallar" }, { "nokta", "Noktalar" }, { "kayit", "Kayıtlar" } }
-local KAYIT_SEKME = { { "hepsi", "Hepsi" }, { "saplama", "Saplama" }, { "satin", "Satın alma" }, { "mal", "Mallar" }, { "kilik", "Kılık" }, { "isinlanma", "Gölge" }, { "ayar", "Ayar" } }
+local SEKMELER = { { "ayar", "Ajustes" }, { "mal", "Mercancías" }, { "nokta", "Puntos" }, { "kayit", "Registros" } }
+local KAYIT_SEKME = { { "hepsi", "Todos" }, { "saplama", "Clavada" }, { "satin", "Compra" }, { "mal", "Mercancías" }, { "kilik", "Disfraz" }, { "isinlanma", "Sombra" }, { "ayar", "Ajustes" } }
 
 local function Admin(islem, t)
      t = t or {}
@@ -56,7 +56,7 @@ local function AyarlarKur(N, kok, W, H, ctx)
      local u = N.u
      local V = S.AdminVeri
      if not V then
-          kok.Paint = function(_, w, h) N.Text("Ayarlar yükleniyor…", "body", w / 2, h / 2, N.Clr.faint, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER) end
+          kok.Paint = function(_, w, h) N.Text("Cargando ajustes…", "body", w / 2, h / 2, N.Clr.faint, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER) end
           return
      end
      kok.Paint = nil
@@ -97,7 +97,7 @@ local function AyarlarKur(N, kok, W, H, ctx)
                     N.Toggle(sc, u(x), u(y), u(kolW), u(54), a.ad, function() return taslak[a.k] == true end,
                          function(v) if V.yaz then taslak[a.k] = v end end, a.aciklama, not V.yaz)
                else
-                    local etiket = a.ad .. "   ·   varsayılan " .. Gosterim(a, (V.varsayilan or {})[a.k])
+                    local etiket = a.ad .. "   ·   predeterminado " .. Gosterim(a, (V.varsayilan or {})[a.k])
                     local sl = N.Slider(sc, u(x), u(y), u(kolW), etiket, a.min, a.max, 0, function() return Gosterim(a, taslak[a.k]) end,
                          function(v) taslak[a.k] = Saklama(a, v) end)
                     if not V.yaz and sl.Slider then sl.Slider:SetEnabled(false) end
@@ -110,23 +110,23 @@ local function AyarlarKur(N, kok, W, H, ctx)
      end
 
      local bar = N.StickyBar(kok, 0, u(H - 56), u(W), function()
-          if not V.yaz then return "Görüntüleme: ayarları yalnız süper admin değiştirebilir.", N.Clr.warn end
+          if not V.yaz then return "Solo lectura: solo el súper admin puede cambiar los ajustes.", N.Clr.warn end
           local n = Kirli()
-          if n > 0 then return n .. " kaydedilmemiş değişiklik.", N.Clr.warn end
-          return "Bu hafta (" .. tostring(V.hafta) .. ") diğerlerinin fiyatı " .. tostring(V.digerFiyat) .. " Galleon. Kaydedince hemen geçerli olur."
+          if n > 0 then return n .. " cambio(s) sin guardar.", N.Clr.warn end
+          return "Esta semana (" .. tostring(V.hafta) .. ") el precio para los demás es " .. tostring(V.digerFiyat) .. " galeones. Al guardar entra en vigor al instante."
      end)
-     local kaydet = N.Button(bar, u(W) - u(170), u(9), u(170), u(36), "Kaydet", function()
+     local kaydet = N.Button(bar, u(W) - u(170), u(9), u(170), u(36), "Guardar", function()
           Admin("yaz", { ayar = taslak })
-          ctx.Flash("Gölge ayarları gönderildi.")
+          ctx.Flash("Ajustes de Sombra enviados.")
      end)
      kaydet.Think = function(s) s:SetEnabled(V.yaz == true and Kirli() > 0) end
-     local sifirla = N.Button(bar, u(W) - u(170) - u(200), u(9), u(190), u(36), "Varsayılana dön", function()
-          N.Confirm("Varsayılana dön", "Bütün Gölge ayarları kurulumdaki değerlere döner (fiyatlar, haklar, süreler).", "Sıfırla", function()
+     local sifirla = N.Button(bar, u(W) - u(170) - u(200), u(9), u(190), u(36), "Restaurar por defecto", function()
+          N.Confirm("Restaurar por defecto", "Todos los ajustes de Sombra vuelven a los valores de instalación (precios, cupos, duraciones).", "Restablecer", function()
                Admin("sifirla")
           end, true)
      end, "ghost")
      sifirla.Think = function(s) s:SetEnabled(V.yaz == true) end
-     local geri = N.Button(bar, u(W) - u(170) - u(200) - u(160), u(9), u(150), u(36), "Değişiklikleri at", function()
+     local geri = N.Button(bar, u(W) - u(170) - u(200) - u(160), u(9), u(150), u(36), "Descartar cambios", function()
           for k in pairs(taslak) do taslak[k] = V.ayar[k] end
           kok:Yeniden()
      end, "quiet")
@@ -149,10 +149,10 @@ local function NoktalarKur(N, kok, W, H, ctx)
      durum:SetSize(u(W), u(34))
      durum.Paint = function(_, w, h)
           local v = V()
-          local metin = (v.aktorVar and ("Gölge şu an: " .. ((v.aktorAlan or "") ~= "" and v.aktorAlan or "alan dışı") .. (v.simdiki and v.simdiki > 0 and ("  (nokta " .. v.simdiki .. ")") or "")) or "Gölge dünyada yok")
-               .. "   ·   sıradaki: " .. ((v.siradaki or 0) > 0 and ("nokta " .. v.siradaki) or "—")
-               .. "   ·   kendiliğinden yer değiştirmeye " .. S.Sure(v.gezintiKalan or 0)
-               .. ((v.muhatap or "") ~= "" and ("   ·   konuşuyor: " .. v.muhatap) or "")
+          local metin = (v.aktorVar and ("Sombra ahora: " .. ((v.aktorAlan or "") ~= "" and v.aktorAlan or "fuera de zona") .. (v.simdiki and v.simdiki > 0 and ("  (punto " .. v.simdiki .. ")") or "")) or "Sombra no está en el mundo")
+               .. "   ·   siguiente: " .. ((v.siradaki or 0) > 0 and ("punto " .. v.siradaki) or "—")
+               .. "   ·   cambio automático de lugar en " .. S.Sure(v.gezintiKalan or 0)
+               .. ((v.muhatap or "") ~= "" and ("   ·   hablando con: " .. v.muhatap) or "")
           N.Text(N.Clip(metin, "tiny", w - u(8)), "tiny", u(4), h / 2, N.Clr.tdText, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
      end
 
@@ -160,13 +160,13 @@ local function NoktalarKur(N, kok, W, H, ctx)
      head:SetPos(0, u(36))
      head:SetSize(u(W), u(30))
      head.Paint = function(_, w)
-          N.TableHead(0, 0, w, { { "No", u(16) }, { "İpucu / alan", w * 0.1 }, { "Uzaklık", w - u(24), TEXT_ALIGN_RIGHT } })
+          N.TableHead(0, 0, w, { { "No", u(16) }, { "Pista / zona", w * 0.1 }, { "Distancia", w - u(24), TEXT_ALIGN_RIGHT } })
      end
 
      local list = N.VList(kok, 0, u(66), u(W), u(H - 66 - 132), {
           rowH = u(46),
           gapY = 0,
-          emptyText = "Hiç nokta yok. Gölge görev yerinde (Domuz Kafası) duruyor.",
+          emptyText = "No hay puntos. Sombra permanece en el lugar de misión (Cabeza de Jabalí).",
           onClick = function(n) sel = n.no end,
           paintRow = function(n, _, x, y, w, h, hovered)
                local on = sel == n.no
@@ -178,44 +178,44 @@ local function NoktalarKur(N, kok, W, H, ctx)
                end
                N.Box(x, y + h - 1, w, 1, N.Clr.tableLine)
                local v = V()
-               local rozet = (n.no == v.simdiki and "ŞU AN" or "") .. (n.no == v.siradaki and ((n.no == v.simdiki and " · " or "") .. "SIRADAKİ") or "")
+               local rozet = (n.no == v.simdiki and "AHORA" or "") .. (n.no == v.siradaki and ((n.no == v.simdiki and " · " or "") .. "SIGUIENTE") or "")
                N.Text(tostring(n.no), "row", x + u(16), y + h / 2, on and N.Clr.text or N.Clr.tdFirst, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-               N.Text(N.Clip(n.ipucu ~= "" and n.ipucu or "(ipucu yok: bölgeden söylenir)", "row", w * 0.72), "row", x + w * 0.1, y + h / 2 - u(8),
+               N.Text(N.Clip(n.ipucu ~= "" and n.ipucu or "(sin pista: se dice desde la zona)", "row", w * 0.72), "row", x + w * 0.1, y + h / 2 - u(8),
                     n.ipucu ~= "" and N.Clr.tdText or N.Clr.faint, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-               N.Text(N.Clip((n.alan ~= "" and n.alan or "alan dışı") .. "  ·  " .. n.pos, "tiny", w * 0.72), "tiny", x + w * 0.1, y + h / 2 + u(9), N.Clr.faint, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+               N.Text(N.Clip((n.alan ~= "" and n.alan or "fuera de zona") .. "  ·  " .. n.pos, "tiny", w * 0.72), "tiny", x + w * 0.1, y + h / 2 + u(9), N.Clr.faint, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                N.Text(rozet, "tiny", x + w - u(110), y + h / 2, N.Clr.gold, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
-               N.Text(n.uz .. " birim", "tiny", x + w - u(24), y + h / 2, N.Clr.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+               N.Text(n.uz .. " uds.", "tiny", x + w - u(24), y + h / 2, N.Clr.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
           end
      })
      kok.Yenile = function() list:SetItems(V().noktalar or {}, true) end
      kok.Yenile()
 
      local alt = u(H - 126)
-     local _, giris = N.PlainEntry(kok, 0, alt, u(W), u(36), "İpucu (Snatcher'a alışverişten sonra söylenir; boşsa bölgeden genel ipucu)")
+     local _, giris = N.PlainEntry(kok, 0, alt, u(W), u(36), "Pista (se dice al Snatcher tras comprar; si está vacía, pista general de la zona)")
      local bw = math.floor((W - 4 * 10) / 5)
      local function B(i, metin, fn, stil, etkin)
           local b = N.Button(kok, u((bw + 10) * (i - 1)), alt + u(46), u(bw), u(36), metin, fn, stil)
           if etkin then b.Think = function(s) s:SetEnabled(etkin()) end end
           return b
      end
-     B(1, "Bulunduğum yere ekle", function()
+     B(1, "Añadir donde estoy", function()
           Admin("nokta_ekle", { ipucu = giris:GetValue() })
-          ctx.Flash("Nokta eklendi: baktığın yön Gölge'nin yönü olur.")
+          ctx.Flash("Punto añadido: la dirección que miras será la de Sombra.")
      end)
-     B(2, "Seçiliye git", function() local n = Secili() if n then Admin("nokta_git", { no = n.no }) end end, "ghost", function() return Secili() ~= nil end)
-     B(3, "Seçilinin ipucunu yaz", function()
+     B(2, "Ir al seleccionado", function() local n = Secili() if n then Admin("nokta_git", { no = n.no }) end end, "ghost", function() return Secili() ~= nil end)
+     B(3, "Guardar pista del seleccionado", function()
           local n = Secili()
           if n then Admin("nokta_ipucu", { no = n.no, ipucu = giris:GetValue() }) end
      end, "ghost", function() return Secili() ~= nil end)
-     B(4, "Seçiliyi sil", function()
+     B(4, "Eliminar seleccionado", function()
           local n = Secili()
           if not n then return end
-          N.Confirm("Noktayı sil", "Nokta " .. n.no .. " silinir; Gölge oraya bir daha ışınlanmaz.", "Sil", function()
+          N.Confirm("Eliminar punto", "Se elimina el punto " .. n.no .. "; Sombra ya no se teletransportará allí.", "Eliminar", function()
                Admin("nokta_sil", { no = n.no })
                sel = nil
           end, true)
      end, "danger", function() return Secili() ~= nil end)
-     B(5, "Gölge'yi şimdi ışınla", function() Admin("simdi") end, nil, function() return #(V().noktalar or {}) > 0 end)
+     B(5, "Teletransportar Sombra ahora", function() Admin("simdi") end, nil, function() return #(V().noktalar or {}) > 0 end)
 end
 
 ----------------------------------------------------------------------------------------
@@ -249,13 +249,13 @@ local function KayitlarKur(N, kok, W, H, ctx)
      head:SetPos(0, u(54))
      head:SetSize(u(W), u(30))
      head.Paint = function(_, w)
-          N.TableHead(0, 0, w, { { "Tür", u(16) }, { "Kim", w * 0.24 }, { "Ayrıntı", w * 0.5 }, { "Tarih", w - u(24), TEXT_ALIGN_RIGHT } })
+          N.TableHead(0, 0, w, { { "Tipo", u(16) }, { "Quién", w * 0.24 }, { "Detalle", w * 0.5 }, { "Fecha", w - u(24), TEXT_ALIGN_RIGHT } })
      end
 
      list = N.VList(kok, 0, u(84), u(W), u(H - 84 - 8), {
           rowH = u(46),
           gapY = 0,
-          emptyText = "Kayıt yok.",
+          emptyText = "Sin registros.",
           onClick = function(r) sel = r.id end,
           paintRow = function(r, _, x, y, w, h, hovered)
                local on = sel == r.id
@@ -281,7 +281,7 @@ end
 ----------------------------------------------------------------------------------------
 -- Mallar sekmesi: Gölge'nin tezgâhına konan Helix eşyaları (sv_3golge S.Mallar; yazma süper admin)
 ----------------------------------------------------------------------------------------
-local KIM_SECENEK = { { "herkes", "Herkes" }, { "snatcher", "Yalnız Snatcher" }, { "diger", "Snatcher dışındakiler" } }
+local KIM_SECENEK = { { "herkes", "Todos" }, { "snatcher", "Solo Snatcher" }, { "diger", "Excepto Snatcher" } }
 
 local function KimAd(k)
      for _, x in ipairs(KIM_SECENEK) do if x[1] == k then return x[2] end end
@@ -323,14 +323,14 @@ local function MallarKur(N, kok, W, H, ctx)
           for _, m in ipairs(V().mallar or {}) do if m.id == id then return m end end
      end
 
-     N.Button(kok, 0, 0, u(LW), u(36), "Yeni mal", function()
+     N.Button(kok, 0, 0, u(LW), u(36), "Nueva mercancía", function()
           secId, S.MalSecili = 0, 0
           FormKur(Bos())
      end)
      local list = N.VList(kok, 0, u(44), u(LW), u(H - 44), {
           rowH = u(52),
           gapY = 0,
-          emptyText = "Tezgâhta mal yok. \"Yeni mal\" ile ekle.",
+          emptyText = "No hay mercancía en el mostrador. Añade con «Nueva mercancía».",
           onClick = function(m)
                secId, S.MalSecili = m.id, m.id
                FormKur(table.Copy(m))
@@ -346,11 +346,11 @@ local function MallarKur(N, kok, W, H, ctx)
                N.Box(x, y + h - 1, w, 1, N.Clr.tableLine)
                local ad = (m.ad or "") ~= "" and m.ad or EsyaAd(m.esya)
                N.Text(N.Clip(ad, "row", w - u(130)), "row", x + u(14), y + h / 2 - u(9), m.aktif and N.Clr.text or N.Clr.faint, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-               N.Text(N.Clip(m.esya .. "  ·  " .. KimAd(m.kimler) .. (m.gecerli and "" or "  ·  EŞYA YOK"), "tiny", w - u(130)), "tiny", x + u(14), y + h / 2 + u(10),
+               N.Text(N.Clip(m.esya .. "  ·  " .. KimAd(m.kimler) .. (m.gecerli and "" or "  ·  ÍTEM INEXISTENTE"), "tiny", w - u(130)), "tiny", x + u(14), y + h / 2 + u(10),
                     m.gecerli and N.Clr.faint or N.Clr.bad, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                N.Text(string.Comma(m.fiyat) .. " G", "row", x + w - u(14), y + h / 2 - u(9), N.Clr.gold, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
-               local stok = m.stok < 0 and ("satılan " .. (m.satilan or 0)) or ((m.satilan or 0) .. "/" .. m.stok .. " satıldı")
-               N.Text(stok .. (m.aktif and "" or " · kapalı"), "tiny", x + w - u(14), y + h / 2 + u(10), N.Clr.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+               local stok = m.stok < 0 and ("vendidos " .. (m.satilan or 0)) or ((m.satilan or 0) .. "/" .. m.stok .. " vendidos")
+               N.Text(stok .. (m.aktif and "" or " · cerrado"), "tiny", x + w - u(14), y + h / 2 + u(10), N.Clr.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
           end
      })
 
@@ -361,7 +361,7 @@ local function MallarKur(N, kok, W, H, ctx)
           sag:SetSize(u(RW), u(H))
           sag.Paint = nil
           if not m then
-               sag.Paint = function(_, w, h) N.Text("Soldan bir mal seç ya da \"Yeni mal\" ile ekle.", "body", w / 2, h / 2, N.Clr.faint, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER) end
+               sag.Paint = function(_, w, h) N.Text("Elige una mercancía a la izquierda o añade con «Nueva mercancía».", "body", w / 2, h / 2, N.Clr.faint, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER) end
                return
           end
           -- yetki her karede güncel veriden (form, sunucu verisi gelmeden kurulmuş olabilir)
@@ -373,21 +373,21 @@ local function MallarKur(N, kok, W, H, ctx)
           bas:SetPos(0, 0)
           bas:SetSize(u(RW), u(28))
           bas.Paint = function(_, w, h)
-               local secili = (m.esya or "") ~= "" and (EsyaAd(m.esya) .. "  (" .. m.esya .. ")") or "Eşya seçilmedi: aşağıda ara ve tıkla"
-               N.Text(N.Clip((m.id > 0 and ("Mal #" .. m.id .. " · ") or "Yeni mal · ") .. secili, "body", w), "body", 0, h / 2,
+               local secili = (m.esya or "") ~= "" and (EsyaAd(m.esya) .. "  (" .. m.esya .. ")") or "Sin ítem: busca abajo y haz clic"
+               N.Text(N.Clip((m.id > 0 and ("Mercancía #" .. m.id .. " · ") or "Nueva mercancía · ") .. secili, "body", w), "body", 0, h / 2,
                     (m.esya or "") ~= "" and N.Clr.gold or N.Clr.warn, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
           end
           y = y + 32
 
           local sonuc
-          N.PlainEntry(sag, 0, u(y), u(RW), u(34), "Eşya ara (ad ya da kimlik, ör. iksir, kitap, hanceri)", function(v)
+          N.PlainEntry(sag, 0, u(y), u(RW), u(34), "Buscar ítem (nombre o id, p. ej. poción, libro, cuchillo)", function(v)
                if IsValid(sonuc) then sonuc:SetItems(EsyaAra(v), false) end
           end)
           y = y + 40
           sonuc = N.VList(sag, 0, u(y), u(RW), u(112), {
                rowH = u(28),
                gapY = 0,
-               emptyText = "Aramak için yaz.",
+               emptyText = "Escribe para buscar.",
                onClick = function(e) m.esya = e.id end,
                paintRow = function(e, _, x, yy, w, h, hovered)
                     if m.esya == e.id then N.Box(x, yy, w, h, N.Clr.selRow) elseif hovered then N.Box(x, yy, w, h, N.Clr.hoverRow) end
@@ -396,32 +396,32 @@ local function MallarKur(N, kok, W, H, ctx)
           })
           y = y + 120
 
-          local _, adE = N.PlainEntry(sag, 0, u(y), u(RW), u(34), "Görünen ad (boşsa eşyanın adı)", function(v) m.ad = v end)
+          local _, adE = N.PlainEntry(sag, 0, u(y), u(RW), u(34), "Nombre visible (si está vacío, el del ítem)", function(v) m.ad = v end)
           adE:SetValue(m.ad or "")
           y = y + 42
 
-          N.Slider(sag, 0, u(y), u(half), "Fiyat (Galleon)", 0, 20000, 0, function() return m.fiyat end, function(v) m.fiyat = math.Round(v) end)
-          N.Slider(sag, u(half + 12), u(y), u(half), "Snatcher fiyatı (0 = aynı)", 0, 20000, 0, function() return m.snatcherFiyat end, function(v) m.snatcherFiyat = math.Round(v) end)
+          N.Slider(sag, 0, u(y), u(half), "Precio (galeones)", 0, 20000, 0, function() return m.fiyat end, function(v) m.fiyat = math.Round(v) end)
+          N.Slider(sag, u(half + 12), u(y), u(half), "Precio Snatcher (0 = igual)", 0, 20000, 0, function() return m.snatcherFiyat end, function(v) m.snatcherFiyat = math.Round(v) end)
           y = y + 62
-          N.Slider(sag, 0, u(y), u(half), "Haftalık stok (-1 = sınırsız)", -1, 500, 0, function() return m.stok end, function(v) m.stok = math.Round(v) end)
-          N.Slider(sag, u(half + 12), u(y), u(half), "Kişi başı haftalık (0 = sınırsız)", 0, 50, 0, function() return m.kisiSinir end, function(v) m.kisiSinir = math.Round(v) end)
+          N.Slider(sag, 0, u(y), u(half), "Stock semanal (-1 = ilimitado)", -1, 500, 0, function() return m.stok end, function(v) m.stok = math.Round(v) end)
+          N.Slider(sag, u(half + 12), u(y), u(half), "Por persona semanal (0 = ilimitado)", 0, 50, 0, function() return m.kisiSinir end, function(v) m.kisiSinir = math.Round(v) end)
           y = y + 62
 
-          N.Combo(sag, 0, u(y + 9), u(half), u(36), KimAd(m.kimler), { "Herkes", "Yalnız Snatcher", "Snatcher dışındakiler" }, function(val)
+          N.Combo(sag, 0, u(y + 9), u(half), u(36), KimAd(m.kimler), { "Todos", "Solo Snatcher", "Excepto Snatcher" }, function(val)
                for _, x in ipairs(KIM_SECENEK) do if x[2] == val then m.kimler = x[1] end end
           end)
-          N.Toggle(sag, u(half + 12), u(y), u(half), u(54), "Tezgâhta", function() return m.aktif == true end, function(v) m.aktif = v end, "Kapalıyken satılmaz, listede kalır.")
+          N.Toggle(sag, u(half + 12), u(y), u(half), u(54), "En mostrador", function() return m.aktif == true end, function(v) m.aktif = v end, "Si está cerrado no se vende; permanece en la lista.")
           y = y + 62
 
-          local _, sozE = N.PlainEntry(sag, 0, u(y), u(RW), u(34), "Gölge'nin sözü (kartta tırnak içinde; boşsa eşyanın açıklaması)", function(v) m.soz = v end)
+          local _, sozE = N.PlainEntry(sag, 0, u(y), u(RW), u(34), "Frase de Sombra (entre comillas en la tarjeta; si está vacía, la descripción del ítem)", function(v) m.soz = v end)
           sozE:SetValue(m.soz or "")
           y = y + 42
-          local _, veriE = N.PlainEntry(sag, 0, u(y), u(RW), u(34), "Eşya verisi, JSON (gelişmiş; çoğu eşyada boş bırak)", function(v) m.veri = v end)
+          local _, veriE = N.PlainEntry(sag, 0, u(y), u(RW), u(34), "Datos del ítem, JSON (avanzado; déjalo vacío en la mayoría)", function(v) m.veri = v end)
           veriE:SetValue(m.veri or "")
           y = y + 46
 
-          local kay = N.Button(sag, 0, u(y), u(half), u(36), m.id > 0 and "Kaydet" or "Tezgâha ekle", function()
-               if (m.esya or "") == "" then return ctx.Flash("Önce bir eşya seç.", "bad") end
+          local kay = N.Button(sag, 0, u(y), u(half), u(36), m.id > 0 and "Guardar" or "Añadir al mostrador", function()
+               if (m.esya or "") == "" then return ctx.Flash("Primero elige un ítem.", "bad") end
                Admin("mal_kaydet", { mal = m })
                if m.id == 0 then
                     secId, S.MalSecili = nil, nil
@@ -430,8 +430,8 @@ local function MallarKur(N, kok, W, H, ctx)
           end)
           kay.Think = function(s) s:SetEnabled(Yaz() and (m.esya or "") ~= "") end
           if m.id > 0 then
-               local sil = N.Button(sag, u(half + 12), u(y), u(half), u(36), "Sil", function()
-                    N.Confirm("Malı sil", ((m.ad or "") ~= "" and m.ad or EsyaAd(m.esya)) .. " Gölge'nin tezgâhından kaldırılır.", "Sil", function()
+               local sil = N.Button(sag, u(half + 12), u(y), u(half), u(36), "Eliminar", function()
+                    N.Confirm("Eliminar mercancía", ((m.ad or "") ~= "" and m.ad or EsyaAd(m.esya)) .. " se quitará del mostrador de Sombra.", "Eliminar", function()
                          Admin("mal_sil", { id = m.id })
                          secId, S.MalSecili = nil, nil
                          FormKur(nil)
@@ -444,9 +444,9 @@ local function MallarKur(N, kok, W, H, ctx)
           not1:SetSize(u(RW), u(24))
           not1.Paint = function(_, w, h)
                if not S.AdminVeri then
-                    N.Text("Sunucudan veri bekleniyor…", "tiny", 0, h / 2, N.Clr.faint, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                    N.Text("Esperando datos del servidor…", "tiny", 0, h / 2, N.Clr.faint, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                elseif not Yaz() then
-                    N.Text("Görüntüleme: malları yalnız süper admin değiştirebilir.", "tiny", 0, h / 2, N.Clr.warn, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                    N.Text("Solo lectura: solo el súper admin puede cambiar las mercancías.", "tiny", 0, h / 2, N.Clr.warn, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                end
           end
      end
@@ -471,7 +471,7 @@ local function SayfaKaydet()
           group = "players",
           order = 34,
           title = "Sombra · Proveedor",
-          subtitle = "Mercado negro del Cuchillo de la Realidad: precios y cupos semanales, puntos de Sombra, registros de plantación y compras.",
+          subtitle = "Mercado negro del Cuchillo de la Realidad: precios y cupos semanales, puntos de Sombra, registros de clavadas y compras.",
           access = "staff",
           rail = true,
 
@@ -515,45 +515,45 @@ local function SayfaKaydet()
 
                ctx.SetRail({
                     hero = "icons/lock",
-                    badge = { text = "Karaborsa", icon = "lock", color = N.Clr.warn },
+                    badge = { text = "Mercado negro", icon = "lock", color = N.Clr.warn },
                     title = function()
                          if sekme == "kayit" and IsValid(kok) and kok.Secili and kok.Secili() then
                               local r = kok.Secili()
                               return TURLER[r.tur] or r.tur
                          end
-                         return "Gölge · Levazımatçı"
+                         return "Sombra · Proveedor"
                     end,
                     body = function()
                          if sekme == "kayit" and IsValid(kok) and kok.Secili and kok.Secili() then return kok.Secili().ayrinti or "" end
                          local v = S.AdminVeri
-                         if not v then return "Yükleniyor…" end
+                         if not v then return "Cargando…" end
                          local a = v.ayar or {}
-                         return (a.Kapali and "TEZGÂH KAPALI. " or "") .. "Snatcher haftada " .. tostring(a.SnatcherSinir) .. " kez "
-                              .. tostring(a.SnatcherPaket) .. " hançerlik paket alır (" .. tostring(a.SnatcherFiyat) .. " G); diğerleri haftada "
-                              .. tostring(a.DigerSinir) .. " kez " .. tostring(a.DigerAdet) .. " hançer (bu hafta " .. tostring(v.digerFiyat)
-                              .. " G). Hak SteamID başına, Pazartesi 07:00'de yenilenir."
+                         return (a.Kapali and "MOSTRADOR CERRADO. " or "") .. "Snatcher puede comprar " .. tostring(a.SnatcherSinir) .. " veces por semana "
+                              .. "un paquete de " .. tostring(a.SnatcherPaket) .. " cuchillos (" .. tostring(a.SnatcherFiyat) .. " G); los demás "
+                              .. tostring(a.DigerSinir) .. " veces por semana " .. tostring(a.DigerAdet) .. " cuchillo(s) (esta semana "
+                              .. tostring(v.digerFiyat) .. " G). Cupos por SteamID; se renuevan los lunes a las 07:00."
                     end,
                     props = function()
                          if sekme == "kayit" and IsValid(kok) and kok.Secili and kok.Secili() then
                               local r = kok.Secili()
                               return {
-                                   { "Kim", (r.kim or "") ~= "" and r.kim or "—" },
-                                   { "Kim SteamID", (r.kimSid or "") ~= "" and util.SteamIDFrom64(r.kimSid) or "—" },
-                                   { "Hedef", (r.hedef or "") ~= "" and r.hedef or "—" },
-                                   { "Hedef SteamID", (r.hedefSid or "") ~= "" and util.SteamIDFrom64(r.hedefSid) or "—" },
-                                   { "Tarih", r.zaman and os.date("%d.%m.%Y %H:%M", r.zaman) or "—" },
+                                   { "Quién", (r.kim or "") ~= "" and r.kim or "—" },
+                                   { "Quién SteamID", (r.kimSid or "") ~= "" and util.SteamIDFrom64(r.kimSid) or "—" },
+                                   { "Objetivo", (r.hedef or "") ~= "" and r.hedef or "—" },
+                                   { "Objetivo SteamID", (r.hedefSid or "") ~= "" and util.SteamIDFrom64(r.hedefSid) or "—" },
+                                   { "Fecha", r.zaman and os.date("%d.%m.%Y %H:%M", r.zaman) or "—" },
                               }
                          end
                          local v = S.AdminVeri or {}
                          return {
-                              { "Hafta", tostring(v.hafta or "—") },
-                              { "Diğer fiyat (bu hafta)", tostring(v.digerFiyat or "—") .. " G" },
-                              { "Nokta", #(v.noktalar or {}) },
-                              { "Yetki", v.yaz and "süper admin (yazar)" or "yetkili (görür)" },
+                              { "Semana", tostring(v.hafta or "—") },
+                              { "Precio otros (esta semana)", tostring(v.digerFiyat or "—") .. " G" },
+                              { "Puntos", #(v.noktalar or {}) },
+                              { "Permiso", v.yaz and "súper admin (edición)" or "autorizado (solo lectura)" },
                          }
                     end
                })
-               ctx.SetHead({ count = function() return #((S.AdminVeri or {}).noktalar or {}) end, note = "NOKTA" })
+               ctx.SetHead({ count = function() return #((S.AdminVeri or {}).noktalar or {}) end, note = "PUNTOS" })
 
                Kur()
                Admin("iste")
