@@ -181,7 +181,7 @@ local function EmanetKur(f, v, govde)
                draw.RoundedBox(6, 0, 0, pw, ph, R.kartAcik)
                draw.SimpleText(so.a .. " dejó: " .. (#so.esya > 0 and table.concat(so.esya, ", ") or "sin objetos") .. (so.para > 0 and (" + " .. so.para .. " G") or ""), "SardonEko.Kucuk", 12, 8, R.yazi)
                draw.SimpleText("Contraprestación: " .. so.karsilik .. " G" .. (so.notu ~= "" and ("  ·  Nota: " .. so.notu) or ""), "SardonEko.Kucuk", 12, 30, R.soluk)
-               draw.SimpleText(math.max(0, math.floor(so.kalan / 3600)) .. " saat restante", "SardonEko.Kucuk", 12, 50, R.soluk)
+               draw.SimpleText(math.max(0, math.floor(so.kalan / 3600)) .. " h restantes", "SardonEko.Kucuk", 12, 50, R.soluk)
           end)
           local b = Dugme(p, "Aceptar (" .. so.karsilik .. " G pagar)", true, function() Gonder("emanet_kabul", {id = so.id}) end, 190, 32)
           p.PerformLayout = function(_, pw, ph) b:SetPos(pw - 202, (ph - 32) / 2) end
@@ -192,7 +192,7 @@ local function EmanetKur(f, v, govde)
           local p = Satir(s, 54, function(_, pw, ph)
                draw.RoundedBox(6, 0, 0, pw, ph, R.kart)
                draw.SimpleText("→ " .. so.b .. ": " .. (#so.esya > 0 and table.concat(so.esya, ", ") or "sin objetos") .. (so.para > 0 and (" + " .. so.para .. " G") or ""), "SardonEko.Kucuk", 12, 8, R.yazi)
-               draw.SimpleText(so.durum == 2 and "Caducado — recuperar" or ("Contraprestación " .. so.karsilik .. " G · " .. math.max(0, math.floor(so.kalan / 3600)) .. " saat restante"),
+               draw.SimpleText(so.durum == 2 and "Caducado — recuperar" or ("Contraprestación " .. so.karsilik .. " G · " .. math.max(0, math.floor(so.kalan / 3600)) .. " h restantes"),
                     "SardonEko.Kucuk", 12, 30, so.durum == 2 and R.kirmizi or R.soluk)
           end)
           local b = Dugme(p, so.durum == 2 and "Recuperar" or "Retirar", true, function() Gonder("emanet_geri", {id = so.id}) end, 110, 32)
